@@ -10,11 +10,24 @@
 
 ## 硬约束：不得影响其他项目
 
+**其他项目继续保存在 `DuanNaiSheQu`（以及 Gitee）名下，这是预期状态，不得改动。**
+只有本项目走 `cafinxnull`。本机各仓库归属：
+
+| 目录 | 远程归属 |
+| --- | --- |
+| `~/telegram云控`（本项目） | `cafinxnull` → `telegram-cloud-control` |
+| `~/cafinxesim` | `DuanNaiSheQu` → `cafinxesim` |
+| `~/DeepSeek-CTFCode` | `China-MY` → `DeepSeek-CTFCode` |
+| `~/soua` | Gitee `HBAI-Ltd` → `Toonflow-app` |
+
 1. 不改 `gh` 的全局登录状态（active 账号保持 `DuanNaiSheQu`），不执行
    `gh auth login / logout / switch` 这类会波及全局的操作。
 2. 不触碰 `DuanNaiSheQu` 名下的任何仓库（`cafinxesim`、`claude-*`、`Telegram-bot` 等）：
    不改名、不转移、不删除、不推送。
-3. 提交只包含明确要提交的文件；工作区里他人未提交的改动保持原样，不代为 commit。
+3. 凭据相关配置只允许写 `--local`（仅本仓库生效），**绝不**写 `--global`；
+   不得覆盖或删除 keychain 里 `acct=DuanNaiSheQu` 的条目。
+4. 提交只包含明确要提交的文件；工作区与暂存区里他人的改动保持原样，不代为 commit。
+   提交时用 `git commit -- <路径>` 限定范围，避免把别人 staged 的文件卷进来。
 
 ## 本地运行（不用 Docker）
 
