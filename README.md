@@ -12,7 +12,7 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.2-2AABEE.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.3-2AABEE.svg" alt="Version"></a>
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新记录-blue.svg" alt="Changelog"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
@@ -589,12 +589,8 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 
 > 想成为赞助方 / 交换 Logo 展示：见 [docs/SPONSOR.md](docs/SPONSOR.md) 的「企业赞助」一节。
 
-| 档位 | 金额（一次性 / 月） | 你能得到 |
-|---|---|---|
-| ☕ 一杯咖啡 | ¥20 / ¥10 | 鸣谢名单留名（可匿名） |
-| 🍱 一顿饭 | ¥100 / ¥30 | 上一档 + Issue 优先响应（工作日 48 小时内） |
-| 🛠️ 支持者 | ¥500 / ¥100 | 上一档 + 需求优先评估 + 私人部署答疑 |
-| 🏢 企业档 | ¥2000+ / ¥300+ | 上一档 + Logo 展示（可选）+ 部署/迁移协助一次 |
+这里**不列金额、不设档位**：给多给少都一样，匿名也完全可以。赞助只用于「让这套东西继续被维护」
+（跟进 Telegram 变更、修 bug、把运维与界面做扎实、文档和测试补齐），**不换取功能、不改变范围边界**。
 
 - 资金去向与季度收支、赞助方式（GitHub Sponsors / 爱发电 / 微信 / 支付宝扫码）、企业赞助与 FAQ：
   见 **[docs/SPONSOR.md](docs/SPONSOR.md)**。
@@ -645,7 +641,7 @@ license 徽章从「待定」改成对应协议。
 | 路线 | [规划.md](规划.md) | 产品口径：范围、状态定义、页面结构、不做清单 |
 | 代码 | [frontend/src/components/README.md](frontend/src/components/README.md) | 通用组件清单与用法（改 UI 前先看） |
 | 代码 | [frontend/src/theme/README.md](frontend/src/theme/README.md) | 设计 token 与主题机制（改样式前先看） |
-| 赞助 | [docs/SPONSOR.md](docs/SPONSOR.md) | 赞助方、档位、资金去向、鸣谢墙、企业 Logo 展示位 |
+| 赞助 | [docs/SPONSOR.md](docs/SPONSOR.md) | 赞助方、支持方式、资金去向、鸣谢墙、企业 Logo 展示位 |
 
 <div align="center">
   <br>
