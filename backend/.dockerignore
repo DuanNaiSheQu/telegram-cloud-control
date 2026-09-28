@@ -1,0 +1,40 @@
+# 构建上下文瘦身 + 防止密钥进镜像
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 密钥与本地配置：绝不进镜像
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.sqlite3
+
+# 本地运行数据 / 日志 / 备份
+.pgdata/
+.redisdata/
+run/
+backups/
+*.log
+*.pid
+
+# 版本控制与编辑器
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+
+# 测试与文档（镜像里不需要）
+tests/
+test/
+*.md
+Dockerfile
+.dockerignore
