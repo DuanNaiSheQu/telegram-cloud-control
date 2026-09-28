@@ -1,0 +1,409 @@
+/**
+ * 群情报（无感采集）：左边的群档案列表 + 右侧选中群的成员名单与入退群事件流。
+ *
+ * 采集是只读的：只调 GetFullChannel / GetParticipants，不发消息、不回应、不加群。
+ * 入群/退群流水本身由 Worker 事件监听被动记录，这里只负责「看」和「手动补采」。
+ */
+import { useEffect, useState } from 'react';
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Form,
+  InputNumber,
+  Modal,
+  Segmented,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+  Typography,
+} from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { CloudDownloadOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { PageContainer, StatCard, StatGrid, RelativeTime, SoftTag } from '../components';
+import BulkResultModal from '../features/accounts/BulkResultModal';
+import { groupIntelApi } from '../api/endpoints';
+import { useAsyncData } from '../hooks/useAsyncData';
+import { notifySuccess } from '../utils/feedback';
+import type {
+  BulkResultOut,
+  GroupEventOut,
+  GroupMemberOut,
+  GroupProfileOut,
+} from '../api/types';
+
+const KIND_LABEL: Record<string, string> = {
+  group: '普通群',
+  megagroup: '超级群',
+  channel: '频道',
+  chat: '群聊',
+};
+
+export default function GroupIntel() {
+  const [keyword, setKeyword] = useState('');
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<GroupProfileOut | null>(null);
+  const [memberScope, setMemberScope] = useState<'all' | 'human' | 'bot'>('all');
+  const [collectOpen, setCollectOpen] = useState(false);
+  const [collectBusy, setCollectBusy] = useState(false);
+  const [collectForm] = Form.useForm();
+  const [collectResult, setCollectResult] = useState<BulkResultOut | null>(null);
+
+  const stats = useAsyncData(() => groupIntelApi.stats(), []);
+  const profiles = useAsyncData(
+    () => groupIntelApi.profiles({ q: keyword || undefined, page, page_size: 20 }),
+    [keyword, page],
+  );
+  const members = useAsyncData(
+    () =>
+      selected
+        ? groupIntelApi.members(selected.id, {
+            page: 1,
+            page_size: 50,
+            only_bots: memberScope === 'bot' || undefined,
+            exclude_bots: memberScope === 'human' || undefined,
+          })
+        : Promise.resolve(null),
+    [selected?.id, memberScope],
+    { immediate: false },
+  );
+  const events = useAsyncData(
+    () => groupIntelApi.events({ tg_chat_id: selected?.tg_chat_id, hours: 24 * 7, page_size: 50 }),
+    [selected?.tg_chat_id],
+  );
+
+  useEffect(() => {
+    if (selected) void members.reload();
+  }, [selected?.id, memberScope]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const runCollect = async () => {
+    const values = collectForm.getFieldsValue() as {
+      scope?: 'all' | 'group';
+      limit_groups?: number;
+      sample_members?: number;
+      with_members?: boolean;
+      member_limit?: number;
+    };
+    setCollectBusy(true);
+    try {
+      const res = await groupIntelApi.collect({
+        scope: 'all',
+        limit_groups: values.limit_groups ?? 30,
+        sample_members: values.sample_members ?? 0,
+        with_members: Boolean(values.with_members),
+        member_limit: values.member_limit ?? 200,
+      });
+      setCollectOpen(false);
+      setCollectResult(res);
+      notifySuccess(res.message);
+      void stats.reload();
+      void profiles.reload();
+    } catch {
+      /* client 已统一提示 */
+    } finally {
+      setCollectBusy(false);
+    }
+  };
+
+  const profileColumns: ColumnsType<GroupProfileOut> = [
+    {
+      title: '群',
+      dataIndex: 'title',
+      render: (value: string, record) => (
+        <span className="tg-stack" style={{ gap: 2 }}>
+          <span style={{ fontWeight: 'var(--tg-font-weight-medium)' }}>{value || '未命名群'}</span>
+          <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
+            {record.username ? `@${record.username}` : record.tg_chat_id}
+          </span>
+        </span>
+      ),
+    },
+    { title: '类型', dataIndex: 'kind', width: 90, render: (value: string) => <Tag>{KIND_LABEL[value] ?? value}</Tag> },
+    {
+      title: '成员数',
+      dataIndex: 'member_count',
+      width: 90,
+      render: (value: number | null) => <span className="tg-num">{value ?? '—'}</span>,
+    },
+    {
+      title: '已采成员',
+      dataIndex: 'member_sampled',
+      width: 100,
+      render: (value: number, record) => (
+        <span>
+          <span className="tg-num">{value}</span>
+          {record.member_synced_at ? null : <Tag style={{ marginLeft: 6 }}>未同步</Tag>}
+        </span>
+      ),
+    },
+    {
+      title: '采集时间',
+      dataIndex: 'collected_at',
+      width: 130,
+      render: (value: string | null) => <RelativeTime value={value} />,
+    },
+    {
+      title: '来源',
+      dataIndex: 'source',
+      width: 110,
+      render: (value: string) => (
+        <SoftTag tone="neutral" size="sm">{value === 'join_event' ? '入群事件' : value === 'profile_sync' ? '资料同步' : value}</SoftTag>
+      ),
+    },
+  ];
+
+  const memberColumns: ColumnsType<GroupMemberOut> = [
+    {
+      title: '成员',
+      dataIndex: 'display_name',
+      render: (value: string, record) => (
+        <span className="tg-stack" style={{ gap: 2 }}>
+          <span>
+            {value || '—'}
+            {record.is_admin ? <Tag color="gold" style={{ marginLeft: 6 }}>管理员</Tag> : null}
+            {record.is_bot ? <Tag style={{ marginLeft: 6 }}>机器人</Tag> : null}
+            {record.is_premium ? <Tag color="purple" style={{ marginLeft: 6 }}>会员</Tag> : null}
+          </span>
+          <span className="tg-muted tg-mono" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
+            {record.username ? `@${record.username}` : record.tg_user_id}
+          </span>
+        </span>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 90,
+      render: (value: string) =>
+        value === 'member' ? <SoftTag tone="success" size="sm">在群</SoftTag> : <SoftTag tone="danger" size="sm">{value === 'kicked' ? '被移除' : '已退群'}</SoftTag>,
+    },
+    { title: '来源', dataIndex: 'source', width: 110, render: (value: string) => (value === 'join_event' ? '入群事件' : value === 'message' ? '群内发言' : '名单同步') },
+    { title: '入群时间', dataIndex: 'joined_at', width: 130, render: (value: string | null) => <RelativeTime value={value} /> },
+    { title: '最近出现', dataIndex: 'last_seen_at', width: 130, render: (value: string | null) => <RelativeTime value={value} /> },
+  ];
+
+  const eventColumns: ColumnsType<GroupEventOut> = [
+    {
+      title: '类型',
+      dataIndex: 'event_type_label',
+      width: 100,
+      render: (value: string, record) => (
+        <SoftTag tone={record.event_type === 'join' || record.event_type === 'invite' ? 'success' : 'danger'} size="sm">
+          {value}
+        </SoftTag>
+      ),
+    },
+    { title: '成员', dataIndex: 'user_display', render: (value: string, record) => value || record.username || record.tg_user_id || '—' },
+    {
+      title: '群',
+      dataIndex: 'group_title',
+      width: 180,
+      ellipsis: true,
+      render: (value: string | null) => value || <span className="tg-muted">—</span>,
+    },
+    {
+      title: '被谁拉进来',
+      dataIndex: 'actor_tg_id',
+      width: 120,
+      render: (value: number | null) => (value ? <span className="tg-mono">{value}</span> : <span className="tg-muted">自己进/退</span>),
+    },
+    { title: '时间', dataIndex: 'occurred_at', width: 130, render: (value: string | null) => <RelativeTime value={value} /> },
+  ];
+
+  return (
+    <PageContainer
+      title="群情报"
+      description="入群即采：Worker 在事件回调里静默记录入群/退群，不发言、不回应；群资料与成员名单按需只读拉取。"
+      actions={
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={() => { void stats.reload(); void profiles.reload(); void events.reload(); }}>
+            刷新
+          </Button>
+          <Button type="primary" icon={<CloudDownloadOutlined />} onClick={() => setCollectOpen(true)}>
+            采集群情报
+          </Button>
+        </Space>
+      }
+    >
+      <StatGrid>
+        <StatCard title="已采群数" value={stats.data?.groups ?? 0} tone="primary" hint="有档案的群" />
+        <StatCard title="已采成员" value={stats.data?.members ?? 0} tone="success" hint={`其中机器人 ${stats.data?.bots ?? 0} 个`} />
+        <StatCard title="今日入群" value={stats.data?.joins_today ?? 0} tone="success" hint="含被邀请入群" />
+        <StatCard title="今日退群" value={stats.data?.leaves_today ?? 0} tone={stats.data?.leaves_today ? 'warning' : 'neutral'} hint="含被移除" />
+      </StatGrid>
+
+      {stats.data && !stats.data.watching ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="入群事件监听已关闭（GROUP_INTEL_WATCH_ENABLED=false）"
+          description="关闭后只能手动采集，事件流不会自动积累。"
+        />
+      ) : null}
+
+      <Card
+        size="small"
+        title="群档案"
+        extra={
+          <Space>
+            <Segmented
+              size="small"
+              value={memberScope}
+              onChange={(value) => setMemberScope(value as 'all' | 'human' | 'bot')}
+              options={[
+                { label: '全部成员', value: 'all' },
+                { label: '只看真人', value: 'human' },
+                { label: '只看机器人', value: 'bot' },
+              ]}
+            />
+          </Space>
+        }
+      >
+        <Space style={{ marginBottom: 'var(--tg-space-lg)' }} wrap>
+          <input
+            className="ant-input"
+            style={{ width: 240, height: 'var(--tg-layout-control-height)' }}
+            placeholder="按群名 / 用户名搜索"
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                setPage(1);
+                void profiles.reload();
+              }
+            }}
+          />
+          <Button icon={<SearchOutlined />} onClick={() => { setPage(1); void profiles.reload(); }}>
+            搜索
+          </Button>
+          <Typography.Text type="secondary" style={{ fontSize: 'var(--tg-font-size-sm)' }}>
+            共 {profiles.data?.total ?? 0} 个群；点一行看成员与事件
+          </Typography.Text>
+        </Space>
+
+        <Table<GroupProfileOut>
+          size="small"
+          rowKey="id"
+          columns={profileColumns}
+          dataSource={profiles.data?.items ?? []}
+          loading={profiles.loading}
+          pagination={{
+            current: page,
+            pageSize: 20,
+            total: profiles.data?.total ?? 0,
+            showSizeChanger: false,
+            onChange: setPage,
+            size: 'small',
+          }}
+          onRow={(record) => ({ onClick: () => setSelected(record), style: { cursor: 'pointer' } })}
+          rowClassName={(record) => (record.id === selected?.id ? 'ant-table-row-selected' : '')}
+          locale={{ emptyText: '还没有群档案：点右上角「采集群情报」，或等入群事件自动积累' }}
+        />
+      </Card>
+
+      {selected ? (
+        <Card
+          size="small"
+          title={`${selected.title || '未命名群'} · 情报详情`}
+          extra={
+            <Space>
+              <Button size="small" href={groupIntelApi.membersCsvUrl(selected.id)} target="_blank">
+                导出成员 CSV
+              </Button>
+              <Button size="small" onClick={() => setSelected(null)}>
+                关闭
+              </Button>
+            </Space>
+          }
+        >
+          <Tabs
+            size="small"
+            items={[
+              {
+                key: 'members',
+                label: `成员（${members.data?.total ?? selected.member_sampled}）`,
+                children: (
+                  <Table<GroupMemberOut>
+                    size="small"
+                    rowKey="id"
+                    columns={memberColumns}
+                    dataSource={members.data?.items ?? []}
+                    loading={members.loading}
+                    pagination={{ pageSize: 10, size: 'small' }}
+                    locale={{ emptyText: '还没有成员数据：用「采集群情报」勾上「同时采成员名单」' }}
+                  />
+                ),
+              },
+              {
+                key: 'events',
+                label: `入退群（${events.data?.total ?? 0}）`,
+                children: (
+                  <Table<GroupEventOut>
+                    size="small"
+                    rowKey="id"
+                    columns={eventColumns}
+                    dataSource={events.data?.items ?? []}
+                    loading={events.loading}
+                    pagination={{ pageSize: 10, size: 'small' }}
+                    locale={{ emptyText: '最近 7 天没有入退群事件' }}
+                  />
+                ),
+              },
+              {
+                key: 'profile',
+                label: '群资料',
+                children: (
+                  <div className="tg-stack" style={{ gap: 'var(--tg-space-md)' }}>
+                    <div>群 ID：<span className="tg-mono">{selected.tg_chat_id}</span></div>
+                    <div>类型：{KIND_LABEL[selected.kind] ?? selected.kind}{selected.is_public ? '（公开）' : '（私有）'}</div>
+                    <div>成员数：{selected.member_count ?? '未知'}</div>
+                    <div>邀请链接：{selected.invite_link ? <span className="tg-mono">{selected.invite_link}</span> : <span className="tg-muted">未采集到（需要管理员权限）</span>}</div>
+                    <div>简介：{selected.about || <span className="tg-muted">—</span>}</div>
+                    <div>采集时间：<RelativeTime value={selected.collected_at} /></div>
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      ) : null}
+
+      <Modal
+        open={collectOpen}
+        title="采集群情报"
+        okText="开始采集"
+        cancelText="取消"
+        confirmLoading={collectBusy}
+        onCancel={() => setCollectOpen(false)}
+        onOk={() => void runCollect()}
+      >
+        <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="只读采集，不会在群里留下任何痕迹"
+            description="对账号选择范围内全部可见账号执行：读取它们已加入群的资料；开启成员名单后会按页拉取（页间有间隔、单群有上限）。"
+          />
+          <Form form={collectForm} layout="vertical" initialValues={{ limit_groups: 30, sample_members: 0, with_members: false, member_limit: 200 }}>
+            <Form.Item label="每个号最多采多少个群" name="limit_groups">
+              <InputNumber min={1} max={300} style={{ width: 200 }} />
+            </Form.Item>
+            <Form.Item label="每群顺带抽样多少个成员（0 = 只采群档案）" name="sample_members">
+              <InputNumber min={0} max={500} style={{ width: 200 }} />
+            </Form.Item>
+            <Form.Item name="with_members" valuePropName="checked">
+              <Checkbox>同时为每个群排队「采集群成员」任务（拉更大名单，速度慢一些）</Checkbox>
+            </Form.Item>
+            <Form.Item label="成员任务每群上限" name="member_limit">
+              <InputNumber min={1} max={500} style={{ width: 200 }} />
+            </Form.Item>
+          </Form>
+        </div>
+      </Modal>
+
+      <BulkResultModal open={Boolean(collectResult)} result={collectResult} onClose={() => setCollectResult(null)} />
+    </PageContainer>
+  );
+}

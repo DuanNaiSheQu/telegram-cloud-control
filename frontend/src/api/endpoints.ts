@@ -15,6 +15,12 @@ import type {
   AccountMatrixState,
   BulkAccountRequest,
   BulkAction,
+  GroupCollectRequest,
+  GroupEventListResponse,
+  GroupIntelStats,
+  GroupMemberListResponse,
+  GroupProfileListResponse,
+  GroupProfileOut,
   BulkPmRequest,
   BulkProbeRequest,
   BulkThrottleRequest,
@@ -292,6 +298,24 @@ export const taskApi = {
    * 空数组 → 400，超过 200 → 422。
    */
   bulkRetry: (taskIds: UUID[]) => api.post<TaskBulkRetryResponse>('/api/tasks/bulk/retry', { task_ids: taskIds }),
+};
+
+// ---------------------------------------------------------------- 群情报（无感采集）
+
+export const groupIntelApi = {
+  /** 概览：群数 / 成员数 / 今日入退群 */
+  stats: () => api.get<GroupIntelStats>('/api/group-intel/stats'),
+  /** 批量采集：对选中的号采它们已加入的群（只读，不发言） */
+  collect: (payload: GroupCollectRequest) => api.post<BulkResultOut>('/api/group-intel/collect', payload),
+  /** 群档案列表 */
+  profiles: (query: { q?: string; account_id?: UUID | null; min_members?: number; page?: number; page_size?: number }) =>
+    api.get<GroupProfileListResponse>('/api/group-intel/profiles', { ...query }),
+  profile: (id: UUID) => api.get<{ profile: GroupProfileOut; members: Record<string, unknown>; events: Record<string, number> }>(`/api/group-intel/profiles/${id}`),
+  members: (id: UUID, query: { q?: string; only_bots?: boolean; exclude_bots?: boolean; status?: string; page?: number; page_size?: number }) =>
+    api.get<GroupMemberListResponse>(`/api/group-intel/profiles/${id}/members`, { ...query }),
+  events: (query: { tg_chat_id?: number; event_type?: string; hours?: number; page?: number; page_size?: number }) =>
+    api.get<GroupEventListResponse>('/api/group-intel/events', { ...query }),
+  membersCsvUrl: (profileId: UUID) => `/api/group-intel/members.csv?profile_id=${profileId}`,
 };
 
 // ---------------------------------------------------------------- 营销中心（批量运营）

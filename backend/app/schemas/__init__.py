@@ -69,6 +69,16 @@ from app.schemas.campaign import (
     StormRequest,
 )
 from app.schemas.common import OkResponse, ORMModel, Page, PageQuery
+from app.schemas.group_intel import (
+    GroupCollectRequest,
+    GroupEventListResponse,
+    GroupEventOut,
+    GroupIntelStats,
+    GroupMemberListResponse,
+    GroupMemberOut,
+    GroupProfileListResponse,
+    GroupProfileOut,
+)
 from app.schemas.matrix import (
     AccountImportBatchOut,
     AccountImportParseResponse,
@@ -215,6 +225,14 @@ __all__ = [
     "BulkThrottleRequest",
     "BulkProbeRequest",
     "AccountMatrixState",
+    "GroupCollectRequest",
+    "GroupProfileOut",
+    "GroupProfileListResponse",
+    "GroupMemberOut",
+    "GroupMemberListResponse",
+    "GroupEventOut",
+    "GroupEventListResponse",
+    "GroupIntelStats",
     "AccountOverviewOut",
     "LeaseDetail",
     "DialogStats",

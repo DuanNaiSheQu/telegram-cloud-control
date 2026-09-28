@@ -109,3 +109,40 @@
 | `THROTTLE_FLOOD_COOLDOWN_SECONDS` | 30 | FloodWait 之外额外冷却 |
 | `IMPORT_MAX_ACCOUNTS` | 500 | 单次导入上限 |
 | `MATERIALS_DIR` | `materials` | 素材落盘目录 |
+
+## 7. 群情报：入群即采（无感）
+
+对应实现：`models/group_intel.py`（三张表）、`services/group_intel.py`（写入口径）、
+`worker/group_intel.py`（事件监听 + 采集任务）、`api/routers/group_intel.py`（查询与导出）。
+
+**无感三条纪律**（代码里逐条落实，不是口号）：
+
+1. 事件回调**只写库**——不回复、不打招呼、不加表情、不撤回，群里看不到任何动作；
+2. 采集只用读接口（`GetFullChannel` / `GetFullChat` / `GetParticipants`），不发言、不加群；
+3. 成员名单按页拉取，页间 `GROUP_INTEL_PAGE_INTERVAL_SECONDS`（默认 3 秒），单任务上限
+   `GROUP_INTEL_MAX_MEMBERS_PER_TASK`（默认 500）——大群不一次性拉全量。
+
+**采到什么**
+
+| 表 | 内容 | 来源 |
+|---|---|---|
+| `group_profiles` | 群名、用户名、类型、成员数、简介、邀请链接、创建时间、是否公开/受限、采集进度 | 事件被动更新 + `collect_group` 只读拉取 |
+| `group_members` | 用户 ID、用户名、昵称、是否机器人/会员/管理员、在群状态、入群时间、最近出现、发言数 | 入群事件增量 + `collect_members` 名单同步 + 群内发言 |
+| `group_events` | 入群 / 被邀请入群 / 退群 / 被移除，含「被谁拉进来」 | ChatAction 事件回调（Worker 常驻监听） |
+
+**接口**
+
+```
+POST /api/group-intel/collect               {选择器, dialog_ids?, limit_groups, sample_members, with_members, member_limit}
+GET  /api/group-intel/stats                 概览：群数 / 成员数 / 机器人 / 今日入退群
+GET  /api/group-intel/profiles              群档案列表（关键词、成员数下限、只看公开群、排序分页）
+GET  /api/group-intel/profiles/{id}         详情：成员状态分布、机器人数量、事件分布
+GET  /api/group-intel/profiles/{id}/members 成员名单（真人/机器人过滤、状态、来源、搜索）
+GET  /api/group-intel/events                事件流（按群、类型、最近 N 小时）
+GET  /api/group-intel/members.csv           导出成员（Excel 友好）
+```
+
+**开关**：`GROUP_INTEL_WATCH_ENABLED=false` 可关掉入群监听（只保留手动采集），
+页面会显式提示「事件监听已关闭」，避免以为流水在积累而实际没有。
+
+验收：`cd backend && .venv/bin/python -m tests.group_intel_check`（10 项）。

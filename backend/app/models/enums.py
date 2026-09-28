@@ -104,6 +104,9 @@ class TaskType(str, enum.Enum):
     force_add_member = "force_add_member"  # 强拉进群：把成员拉进群（需管理员）
     storm_chat = "storm_chat"            # 吵群：按文本池和随机间隔连续发言
     persona_chat = "persona_chat"        # 拟人发言：按人设生成话术连续发言
+    # 群情报（无感采集：只读，不发言）
+    collect_group = "collect_group"      # 采集群档案（资料 + 成员数 + 邀请链接）
+    collect_members = "collect_members"  # 采集群成员名单（分页拉取，带节流）
     # Bot（API 执行）
     relay_to_staff = "relay_to_staff"    # 转发到员工群
     bot_reply = "bot_reply"              # 官方 Bot 自动回复
@@ -136,6 +139,8 @@ TASK_TYPE_LABELS = {
     "force_add_member": "强拉进群",
     "storm_chat": "吵群",
     "persona_chat": "拟人发言",
+    "collect_group": "采集群档案",
+    "collect_members": "采集群成员",
     "relay_to_staff": "转发到员工群",
     "bot_reply": "Bot 自动回复",
     "reply_to_origin": "回复送回原会话",

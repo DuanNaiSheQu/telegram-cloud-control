@@ -111,6 +111,16 @@ class Settings(BaseSettings):
     # 单次批量导入的账号上限（防误传十几万行把库打满）
     import_max_accounts: int = 500
 
+    # ---------- 群情报（无感采集） ----------
+    # 是否监听入群/退群事件（只写库，不在群里回应任何内容）
+    group_intel_watch_enabled: bool = True
+    # 采成员时每页拉多少个
+    group_intel_page_size: int = 100
+    # 页与页之间的间隔秒数（读接口也要有节奏，避免触发风控）
+    group_intel_page_interval_seconds: float = 3.0
+    # 单个任务最多采多少成员（大群不要一次性拉全量）
+    group_intel_max_members_per_task: int = 500
+
     # ---------- 属性 ----------
     @property
     def cors_origin_list(self) -> List[str]:

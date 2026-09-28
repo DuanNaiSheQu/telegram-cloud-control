@@ -458,13 +458,24 @@ class AccountConnection:
         )
 
     def register_handlers(self, client: TelegramClient) -> None:
-        """注册 NewMessage：收到的消息入库并转发，手机发出的也入库。"""
+        """注册事件处理器：新消息入库 + 群入退群事件静默记录。"""
         if not self.handler_enabled:
             return
         handler = make_new_message_handler(
             worker_id=self.worker_id, account_id=self.account_id, redis=self.redis
         )
         client.add_event_handler(handler, events.NewMessage(incoming=True, outgoing=True))
+
+        # 群情报：入群/退群/被拉进来——只写库，不在群里留下任何痕迹
+        if settings.group_intel_watch_enabled:
+            from app.worker.group_intel import make_chat_action_handler
+
+            client.add_event_handler(
+                make_chat_action_handler(
+                    worker_id=self.worker_id, account_id=self.account_id, redis=self.redis
+                ),
+                events.ChatAction(),
+            )
 
     async def ensure_connected(self) -> bool:
         """保证连接可用；连不上按退避重试并写回账号状态，绝不抛给主循环。"""

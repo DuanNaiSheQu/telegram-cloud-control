@@ -1145,3 +1145,101 @@ export interface BulkThrottleRequest extends CampaignScopeRequest {
 export interface BulkProbeRequest extends CampaignScopeRequest {
   write_probe?: boolean;
 }
+
+// ================================================================
+// 群情报：无感采集（群档案 / 成员 / 入退群事件流）
+// ================================================================
+
+export interface GroupProfileOut {
+  id: UUID;
+  account_id?: UUID | null;
+  dialog_id?: UUID | null;
+  tg_chat_id: number;
+  title: string;
+  username?: string | null;
+  kind: string;
+  member_count?: number | null;
+  about: string;
+  invite_link?: string | null;
+  is_public: boolean;
+  is_restricted: boolean;
+  creator_tg_id?: number | null;
+  tg_created_at?: ISODateTime | null;
+  collected_at?: ISODateTime | null;
+  member_synced_at?: ISODateTime | null;
+  member_sampled: number;
+  source: string;
+}
+
+export interface GroupProfileListResponse {
+  items: GroupProfileOut[];
+  total: number;
+  page: number;
+  page_size: number;
+  summary: Record<string, number>;
+}
+
+export interface GroupMemberOut {
+  id: UUID;
+  group_id: UUID;
+  tg_chat_id: number;
+  tg_user_id: number;
+  username?: string | null;
+  display_name: string;
+  is_bot: boolean;
+  is_premium: boolean;
+  is_admin: boolean;
+  status: string;
+  source: string;
+  joined_at?: ISODateTime | null;
+  last_seen_at?: ISODateTime | null;
+  message_count: number;
+}
+
+export interface GroupMemberListResponse {
+  items: GroupMemberOut[];
+  total: number;
+  page: number;
+  page_size: number;
+  counts: Record<string, number>;
+}
+
+export interface GroupEventOut {
+  id: UUID;
+  tg_chat_id: number;
+  tg_user_id?: number | null;
+  event_type: string;
+  event_type_label: string;
+  actor_tg_id?: number | null;
+  user_display: string;
+  username?: string | null;
+  is_bot: boolean;
+  occurred_at?: ISODateTime | null;
+  group_title?: string | null;
+}
+
+export interface GroupEventListResponse {
+  items: GroupEventOut[];
+  total: number;
+  page: number;
+  page_size: number;
+  counts: Record<string, number>;
+}
+
+export interface GroupIntelStats {
+  groups: number;
+  members: number;
+  bots: number;
+  events_today: number;
+  joins_today: number;
+  leaves_today: number;
+  watching: boolean;
+}
+
+export interface GroupCollectRequest extends CampaignScopeRequest {
+  dialog_ids?: UUID[] | null;
+  limit_groups?: number;
+  sample_members?: number;
+  with_members?: boolean;
+  member_limit?: number;
+}

@@ -58,6 +58,8 @@ BULK_RETRY_ALLOWED_TYPES = (
     TaskType.force_add_member,
     TaskType.storm_chat,
     TaskType.persona_chat,
+    TaskType.collect_group,
+    TaskType.collect_members,
 )
 
 #: 被类型过滤拦下时给前端的统一提示

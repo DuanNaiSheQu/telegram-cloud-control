@@ -26,6 +26,15 @@ from app.models.enums import (
     TaskType,
     UserRole,
 )
+from app.models.group_intel import (
+    COLLECT_SOURCE_LABELS,
+    COLLECT_SOURCES,
+    GROUP_EVENT_LABELS,
+    GROUP_EVENT_TYPES,
+    GroupEvent,
+    GroupMember,
+    GroupProfile,
+)
 from app.models.message import Message
 from app.models.material import MATERIAL_KIND_LABELS, Material, MaterialKind
 from app.models.metrics_sample import MetricsSample
@@ -78,6 +87,13 @@ __all__ = [
     "NOTIFICATION_KIND_LABELS",
     "NOTIFICATION_KIND_LEVELS",
     "NOTIFICATION_LEVELS",
+    "GroupProfile",
+    "GroupMember",
+    "GroupEvent",
+    "COLLECT_SOURCES",
+    "COLLECT_SOURCE_LABELS",
+    "GROUP_EVENT_TYPES",
+    "GROUP_EVENT_LABELS",
     "Material",
     "MaterialKind",
     "MATERIAL_KIND_LABELS",

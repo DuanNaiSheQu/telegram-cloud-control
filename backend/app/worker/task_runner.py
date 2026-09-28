@@ -47,6 +47,7 @@ from app.services.throttle import note_flood
 from app.worker import login as login_flow
 from app.worker import metrics
 from app.worker.campaign_tasks import CampaignTasksMixin
+from app.worker.group_intel import GroupIntelMixin
 from app.worker.handlers import MessageData, message_data_from_telethon, persist_message
 from app.worker.telethon_account import (
     AccountConnection,
@@ -102,7 +103,7 @@ class ClaimedTask:
         )
 
 
-class TaskRunner(CampaignTasksMixin):
+class TaskRunner(CampaignTasksMixin, GroupIntelMixin):
     """任务分派器：Worker 领到任务后交给它执行。
 
     批量运营的 8 类 handler 在 `app.worker.campaign_tasks.CampaignTasksMixin` 里。
@@ -128,6 +129,8 @@ class TaskRunner(CampaignTasksMixin):
             TaskType.force_add_member.value: self._force_add_member,
             TaskType.storm_chat.value: self._storm_chat,
             TaskType.persona_chat.value: self._persona_chat,
+            TaskType.collect_group.value: self._collect_group,
+            TaskType.collect_members.value: self._collect_members,
         }
 
     # ---------------- 执行入口 ----------------
