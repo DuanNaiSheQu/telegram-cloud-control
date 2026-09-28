@@ -218,3 +218,54 @@ group-intel-20260929-005530.zip
 
 验收：`cd backend && .venv/bin/python -m tests.collect_progress_check`（13 项：进度端点结构、
 三种任务状态的阶段快照与失败原因、汇总口径、只看进行中、zip 内容与行数一致性、按批次打包、空批次 404）。
+
+## 10. 官方机制的养号防封
+
+Telegram 的客户端是开源的（TDesktop / Android / iOS），服务端还会通过 `help.GetAppConfig` /
+`help.GetConfig` 把**官方限制参数**下发给每一个客户端。官方客户端就是照着这些参数自我节流的。
+所以这一层的原则是：**能对齐官方的，就不自己猜**。实现见 `services/official.py` 与
+`worker/official_tasks.py`。
+
+### 10.1 身份对齐：用真实发布过的客户端版本
+
+`OFFICIAL_CLIENTS` 是官方发布线里的真实身份组合（`device_model` + `system_version` + `app_version` +
+`lang_pack`：Samsung SM-S918B/SDK 34/Android 11.2.3、iPhone 15 Pro/iOS 17.5/11.2.0、Desktop/macOS 14.5/5.3.1 …）。
+导入账号时指纹从这张表里取，**不再随机编造版本号**——编出来的 `app_version` 在服务端看就是不存在的版本，
+反而是异常特征。连接时由 `AccountConnection._identity()` 使用：库里存了就用库里的，没存就按
+`client_kind` 从官方表取。
+
+### 10.2 限制对齐：读官方参数，只收紧不放松
+
+`sync_official` 任务读 `help.GetAppConfig`，把 flood/上限类参数（白名单前缀 `flood_`、
+`group_flood_limit`、`megagroup_size_max`、`edit_time_limit` …）落进 `tg_accounts.official_limits`。
+节流时换算规则只有一条：**取更严的那个**
+
+| 官方参数 | 影响 | 规则 |
+|---|---|---|
+| `flood_wait` | 动作最小间隔 | `max(阶梯间隔, 官方等待秒数)` |
+| `flood_premium_wait` | 同上 | 同上 |
+| `flood_add_peer` | 加人/拉群类日额 | `min(阶梯额度, 官方值)` |
+| 其它键 | 仅记录 | 含义不确定的不拿去驱动发送 |
+
+效果：服务端一收紧我们立刻跟上；服务端放宽时**不会**给我们松绑（免得半夜踩坑）。
+例如新号阶梯间隔 120 秒、官方要求 45 秒 → 取 120；40 天老号阶梯 20 秒、官方要求 90 秒 → 取 90。
+
+### 10.3 行为对齐：官方节奏的养号活动
+
+`warmup_activity` 任务（账号页「官方养号」）：上线 → 翻会话列表 → 可选已读/打字 → 下线，
+全程**不发消息、不加群**。参数：`rounds`（1-5 轮）、`online_min/max_seconds`（默认 60-300 秒）、
+`read_inbox`（默认关，开了对方会看到已读）、`typing`（默认关，开了对方能看到「正在输入」）。
+
+为什么这能防封：风控看的是行为分布。一个从不产生读行为、永远不显示在线、只在特定时刻精准发消息的会话，
+本身就是异常；官方客户端的读/在线/输入节奏是最不异常的模板。页面上每一个号都能看到
+对齐的平台（客户端列）与最近养号时间。
+
+### 10.4 接口
+
+```
+POST /api/accounts/bulk/warmup      {选择器, rounds, online_min/max_seconds, read_inbox, typing, sync_limits}
+GET  /api/accounts/{id}/matrix      回传 client_kind / official_limits / official_overrides / warmup_active_at
+```
+
+验收：`cd backend && .venv/bin/python -m tests.official_check`（17 项：身份表与平台挑选、参数白名单提取、
+只收紧不放松的换算、节流实际生效、批量养号两条任务入队、matrix 官方字段、重试白名单）。

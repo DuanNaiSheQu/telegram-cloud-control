@@ -25,6 +25,7 @@ import type {
   GroupProfileOut,
   BulkPmRequest,
   BulkProbeRequest,
+  BulkWarmupRequest,
   BulkThrottleRequest,
   ImportBatchOut,
   ImportFormatsResponse,
@@ -160,6 +161,8 @@ export const accountApi = {
  * 明确不做批量私信 / 群发 / 加群 / 改资料（见 规划.md「不做这些」）。
  */
 export const accountBulkApiExtra = {
+  /** 官方机制养号：上线/翻会话/下线，不发消息；可选同步官方限制参数 */
+  warmup: (payload: BulkWarmupRequest) => api.post<BulkResultOut>('/api/accounts/bulk/warmup', payload),
   /** 深度验活：连得上 + 会话有效 + 读写权限，复算健康分 */
   probe: (payload: BulkProbeRequest) => api.post<BulkResultOut>('/api/accounts/bulk/probe', payload),
   /** 批量设置节流：每日上限 / 最小间隔 / 解熔断 */

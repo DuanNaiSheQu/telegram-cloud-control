@@ -151,8 +151,23 @@ class ImportOutcome:
 # ---------------- 设备指纹 ----------------
 
 def random_fingerprint(rng: Optional[random.Random] = None) -> dict[str, str]:
-    """给一个号生成一套设备指纹。同批次里也保证不一致（调用方传不同 rng）。"""
+    """给一个号生成一套设备指纹。
+
+    默认从**官方真实发布过的客户端版本**里取（`services/official.py` 的 OFFICIAL_CLIENTS）：
+    编造出来的 app_version 在服务端看是不存在的版本，反而是异常特征。
+    """
+    from app.services.official import OFFICIAL_CLIENTS, pick_official_client
+
     rng = rng or random.Random()
+    if OFFICIAL_CLIENTS:
+        client = pick_official_client(rng)
+        return {
+            "device_model": client.device_model,
+            "system_version": client.system_version,
+            "app_version": client.app_version,
+            "lang_code": client.system_lang_code.split("-")[0].lower() or "zh",
+            "lang_pack": client.lang_pack,
+        }
     model, system, app = rng.choice(DEVICE_POOL)
     lang_code, lang_pack = rng.choice(LANG_POOL)
     return {

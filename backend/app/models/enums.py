@@ -108,6 +108,9 @@ class TaskType(str, enum.Enum):
     collect_group = "collect_group"      # 采集群档案（资料 + 成员数 + 邀请链接）
     collect_members = "collect_members"  # 采集群成员名单（分页拉取，带节流）
     collect_link = "collect_link"        # 按群链接采集：解析链接 → 可选入群 → 档案 + 成员
+    # 官方机制：养号与限制参数同步
+    sync_official = "sync_official"      # 同步服务端下发的官方限制参数（help.GetAppConfig）
+    warmup_activity = "warmup_activity"  # 官方节奏养号：上线→翻会话→（可选）已读/打字→下线，不发消息
     # Bot（API 执行）
     relay_to_staff = "relay_to_staff"    # 转发到员工群
     bot_reply = "bot_reply"              # 官方 Bot 自动回复
@@ -143,6 +146,8 @@ TASK_TYPE_LABELS = {
     "collect_group": "采集群档案",
     "collect_members": "采集群成员",
     "collect_link": "按链接采集群员",
+    "sync_official": "同步官方限制参数",
+    "warmup_activity": "官方养号活动",
     "relay_to_staff": "转发到员工群",
     "bot_reply": "Bot 自动回复",
     "reply_to_origin": "回复送回原会话",

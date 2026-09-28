@@ -26,6 +26,7 @@ from redis.asyncio import Redis
 
 from app.config import settings
 from app.models import TgAccount
+from app.services.official import derive_throttle_overrides
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,17 @@ def _ladder_entry(age_days: int) -> tuple[int, int]:
     return chosen[1], chosen[2]
 
 
+def official_overrides(account: TgAccount, *, now: Optional[datetime] = None) -> dict[str, int]:
+    """该号从服务端拿到的官方限制参数换算出的节流覆盖值（没同步过就是空）。"""
+    limits = getattr(account, "official_limits", None) or {}
+    if not limits:
+        return {}
+    base, interval = _ladder_entry(account_age_days(account, now=now))
+    return derive_throttle_overrides(
+        limits, base_daily=min(base, int(settings.throttle_daily_default)), base_interval=interval
+    )
+
+
 def daily_limit_for(account: TgAccount, *, now: Optional[datetime] = None) -> int:
     """每日额度：人工指定的优先；否则按养号阶梯，且不超过全局默认上限。"""
     explicit = int(getattr(account, "daily_message_limit", 0) or 0)
@@ -123,6 +135,10 @@ def daily_limit_for(account: TgAccount, *, now: Optional[datetime] = None) -> in
     strikes = int(getattr(account, "flood_strikes", 0) or 0)
     if strikes >= 3:
         capped = max(5, capped // 2)
+    # 官方参数只收紧：服务端要求更严时立刻跟上，放宽时不给我们松绑
+    official = official_overrides(account, now=now)
+    if official.get("daily_message_limit_max"):
+        capped = min(capped, int(official["daily_message_limit_max"]))
     return max(5, capped)
 
 
@@ -132,6 +148,9 @@ def min_interval_for(account: TgAccount, *, now: Optional[datetime] = None) -> i
     if explicit > 0:
         return explicit
     _, interval = _ladder_entry(account_age_days(account, now=now))
+    official = official_overrides(account, now=now)
+    if official.get("min_action_seconds"):
+        interval = max(interval, int(official["min_action_seconds"]))
     return interval
 
 
@@ -188,6 +207,12 @@ async def throttle_state(redis: Redis, account: TgAccount, *, now: Optional[date
     if flood_until is not None and flood_until.tzinfo is None:
         flood_until = flood_until.replace(tzinfo=timezone.utc)
     return {
+        "official_limits": len(getattr(account, "official_limits", None) or {}),
+        "official_synced_at": (
+            getattr(account, "official_synced_at", None).isoformat()
+            if getattr(account, "official_synced_at", None)
+            else None
+        ),
         "used_today": used,
         "daily_limit": daily_limit_for(account, now=moment),
         "min_interval_seconds": min_interval_for(account, now=moment),
@@ -332,6 +357,7 @@ __all__ = [
     "ThrottleDecision",
     "WARMUP_LADDER",
     "account_age_days",
+    "official_overrides",
     "action_cost",
     "allow_action",
     "daily_limit_for",

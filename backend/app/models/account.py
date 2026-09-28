@@ -113,6 +113,15 @@ class TgAccount(Base, TimestampMixin):
     app_version: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     lang_code: Mapped[str] = mapped_column(String(8), nullable=False, default="zh")
     lang_pack: Mapped[str] = mapped_column(String(8), nullable=False, default="")
+    # 对齐的官方客户端平台（android / ios / tdesktop），身份取自官方发布版本表
+    client_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="", index=True)
+
+    # ---------- 官方机制：服务端下发的限制参数 ----------
+    # help.GetAppConfig 里 flood/上限类参数的快照；节流时「只收紧不放松」地参考它
+    official_limits: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    official_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 最近一次养号活动的时间（官方节奏：上线→翻会话→打字→下线的周期）
+    warmup_active_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # ---------- 验活：健康分与风险标记 ----------
     # 0-100，验活任务每次复算；低于阈值在账号页标黄/标红

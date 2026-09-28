@@ -88,6 +88,7 @@ from app.schemas.matrix import (
     AccountMatrixState,
     BulkProbeRequest,
     BulkThrottleRequest,
+    BulkWarmupRequest,
     ImportItemPreview,
 )
 from app.schemas.dialog import (
@@ -224,6 +225,7 @@ __all__ = [
     "AccountImportResponse",
     "AccountImportBatchOut",
     "BulkThrottleRequest",
+    "BulkWarmupRequest",
     "BulkProbeRequest",
     "AccountMatrixState",
     "GroupCollectRequest",

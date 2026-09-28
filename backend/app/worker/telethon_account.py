@@ -278,6 +278,8 @@ class AccountSnapshot:
     app_version: str = ""
     lang_code: str = ""
     lang_pack: str = ""
+    # 对齐的官方客户端平台（android / ios / tdesktop）
+    client_kind: str = ""
 
 
 def snapshot_from_row(row: TgAccount) -> AccountSnapshot:
@@ -309,6 +311,7 @@ def snapshot_from_row(row: TgAccount) -> AccountSnapshot:
         app_version=(getattr(row, "app_version", "") or "").strip(),
         lang_code=(getattr(row, "lang_code", "") or "").strip(),
         lang_pack=(getattr(row, "lang_pack", "") or "").strip(),
+        client_kind=(getattr(row, "client_kind", "") or "").strip(),
         proxy=proxy,
         proxy_error=proxy_error,
     )
@@ -433,6 +436,8 @@ class AccountConnection:
             raise CredentialsMissing("未配置 TELEGRAM_API_ID/TELEGRAM_API_HASH")
         proxy = self.snapshot.proxy
         proxy_arg = telethon_proxy_argument(proxy) if proxy is not None else None
+        # 身份对齐：号自己没指纹时，从官方发布版本表里按平台挑一个（而不是用全局默认的假设备名）
+        identity = self._identity()
         return TelegramClient(
             StringSession(session_string if session_string is not None else self.snapshot.session_string),
             settings.telegram_api_id,
@@ -441,11 +446,11 @@ class AccountConnection:
             proxy=proxy_arg,
             # 设备指纹走这个号自己的（导入时随机生成），没有才退回全局默认：
             # 一批号用同型号同客户端版本是最容易被关联的特征之一
-            device_model=self.snapshot.device_model or settings.telegram_device_model,
-            system_version=self.snapshot.system_version or settings.telegram_system_version,
-            app_version=self.snapshot.app_version or settings.telegram_app_version,
-            lang_code=self.snapshot.lang_code or "en",
-            lang_pack=self.snapshot.lang_pack or "",
+            device_model=identity["device_model"] or settings.telegram_device_model,
+            system_version=identity["system_version"] or settings.telegram_system_version,
+            app_version=identity["app_version"] or settings.telegram_app_version,
+            lang_code=identity["lang_code"] or "en",
+            lang_pack=identity["lang_pack"] or "",
             timeout=15,
             request_retries=3,
             connection_retries=3,
@@ -456,6 +461,31 @@ class AccountConnection:
             # 限流直接抛 FloodWaitError，交给任务重试，别在事件循环里睡
             flood_sleep_threshold=0,
         )
+
+    def _identity(self) -> dict[str, str]:
+        """这个号对外呈现的客户端身份：优先用库里存的对齐值，缺失则按 client_kind 从官方表取。"""
+        snapshot = self.snapshot
+        if snapshot.device_model and snapshot.app_version:
+            return {
+                "device_model": snapshot.device_model,
+                "system_version": snapshot.system_version,
+                "app_version": snapshot.app_version,
+                "lang_code": snapshot.lang_code or "en",
+                "lang_pack": snapshot.lang_pack,
+            }
+        try:
+            from app.services.official import pick_official_client
+
+            client = pick_official_client(prefer=snapshot.client_kind or None)
+            return {
+                "device_model": client.device_model,
+                "system_version": client.system_version,
+                "app_version": client.app_version,
+                "lang_code": client.system_lang_code.split("-")[0].lower() or "en",
+                "lang_pack": client.lang_pack,
+            }
+        except Exception:  # noqa: BLE001 - 身份表不可用就退回配置默认值
+            return {"device_model": "", "system_version": "", "app_version": "", "lang_code": "", "lang_pack": ""}
 
     def register_handlers(self, client: TelegramClient) -> None:
         """注册事件处理器：新消息入库 + 群入退群事件静默记录。"""

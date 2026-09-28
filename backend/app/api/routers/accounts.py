@@ -388,6 +388,7 @@ async def account_matrix(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="该账号未分配给你")
 
     from app.redis_client import get_redis
+    from app.services.throttle import official_overrides as _official_overrides
     from app.services.throttle import throttle_state
 
     try:
@@ -402,6 +403,11 @@ async def account_matrix(
         throttle=state,
         device_model=account.device_model or "",
         import_source=account.import_source or "manual",
+        client_kind=account.client_kind or "",
+        official_synced_at=account.official_synced_at,
+        official_limits=dict(account.official_limits or {}),
+        official_overrides=_official_overrides(account),
+        warmup_active_at=account.warmup_active_at,
     )
 
 

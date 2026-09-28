@@ -61,6 +61,8 @@ BULK_RETRY_ALLOWED_TYPES = (
     TaskType.collect_group,
     TaskType.collect_members,
     TaskType.collect_link,
+    TaskType.sync_official,
+    TaskType.warmup_activity,
 )
 
 #: 被类型过滤拦下时给前端的统一提示

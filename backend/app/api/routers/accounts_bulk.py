@@ -48,6 +48,7 @@ from app.models import (
 )
 from app.schemas import (
     BulkAccountResult,
+    BulkWarmupRequest,
     BulkProbeRequest,
     BulkThrottleRequest,
     BulkAssignRequest,
@@ -723,6 +724,95 @@ async def bulk_probe(
         accounts,
         items,
         message=f"已排队深度验活 {len(items)} 个账号，结果会写回各自的健康分",
+        truncated=truncated,
+        task_ids=task_ids,
+    )
+
+# ---------------- 官方机制：养号活动 ----------------
+
+@router.post("/warmup", response_model=BulkResultResponse, summary="官方机制养号（上线/翻会话/下线，不发消息）")
+async def bulk_warmup(
+    payload: BulkWarmupRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """给选中的号排队「官方节奏养号活动」：上线 → 翻会话列表 → 下线，全程不发消息、不加群。
+
+    为什么这么做：风控看行为分布——从不读、永远离线、只在特定时刻精准发消息的会话本身就是异常特征；
+    官方客户端的读/在线节奏是最不异常的模板。默认**不**开已读与打字状态（那两项对方可见）。
+
+    `sync_limits=true` 时会额外排一条官方参数同步任务：把服务端下发的 flood/上限参数拉下来，
+    后续节流「只收紧不放松」地参考它们。
+    """
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload)
+    if not accounts:
+        raise _empty()
+
+    items: List[BulkAccountResult] = []
+    task_ids: List[uuid.UUID] = []
+    for account in accounts:
+        try:
+            task = await enqueue_task(
+                session,
+                type=TaskType.warmup_activity,
+                account_id=account.id,
+                payload={
+                    "rounds": payload.rounds,
+                    "online_min_seconds": payload.online_min_seconds,
+                    "online_max_seconds": payload.online_max_seconds,
+                    "read_inbox": payload.read_inbox,
+                    "typing": payload.typing,
+                    "source": "bulk_warmup",
+                },
+                created_by=user.id,
+                priority=60,
+            )
+            task_ids.append(task.id)
+            made: list[str] = [f"养号 {payload.rounds} 轮"]
+            if payload.sync_limits:
+                limits_task = await enqueue_task(
+                    session,
+                    type=TaskType.sync_official,
+                    account_id=account.id,
+                    payload={"source": "bulk_warmup"},
+                    created_by=user.id,
+                    priority=55,
+                )
+                task_ids.append(limits_task.id)
+                made.append("同步官方参数")
+            items.append(_item(account, message=" + ".join(made)))
+        except Exception as exc:  # noqa: BLE001 - 单个号入队失败不影响整批
+            logger.warning("养号入队失败 account_id=%s: %s", account.id, exc)
+            items.append(_item(account, ok=False, message=f"入队失败：{exc}"))
+
+    await write_audit(
+        session,
+        action="account.bulk_warmup",
+        user_id=user.id,
+        target_type="account_batch",
+        target_id=scope,
+        detail={
+            "count": len(items),
+            "rounds": payload.rounds,
+            "read_inbox": payload.read_inbox,
+            "typing": payload.typing,
+            "sync_limits": payload.sync_limits,
+            "truncated": truncated,
+        },
+    )
+    await session.commit()
+    await publish_task_safely(
+        {"task_id": None, "type": TaskType.warmup_activity.value, "ok": True, "detail": f"官方养号排队 {len(task_ids)} 条任务"}
+    )
+    return _response(
+        "warmup",
+        accounts,
+        items,
+        message=(
+            f"已排队 {len(items)} 个号的养号活动"
+            + ("（含官方参数同步）" if payload.sync_limits else "")
+            + "；活动期间只上线与翻会话，不发任何消息"
+        ),
         truncated=truncated,
         task_ids=task_ids,
     )

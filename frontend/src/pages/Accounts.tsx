@@ -80,6 +80,9 @@ export default function Accounts() {
   const [bulkResult, setBulkResult] = useState<BulkResultOut | null>(null);
   // 账号矩阵入口：导入向导、深度验活、节流设置
   const [importOpen, setImportOpen] = useState(false);
+  const [warmupOpen, setWarmupOpen] = useState(false);
+  const [warmupBusy, setWarmupBusy] = useState(false);
+  const [warmupForm] = Form.useForm();
   const [probeOpen, setProbeOpen] = useState(false);
   const [probeWrite, setProbeWrite] = useState(false);
   const [probeBusy, setProbeBusy] = useState(false);
@@ -335,6 +338,42 @@ export default function Accounts() {
     ),
   };
 
+  // 官方机制养号：上线/翻会话/下线，不发消息
+  const runWarmup = async () => {
+    if (!selection.count) {
+      toast.warning('先在列表里勾选要养号的账号');
+      return;
+    }
+    const values = warmupForm.getFieldsValue() as {
+      rounds?: number;
+      online_min_seconds?: number;
+      online_max_seconds?: number;
+      read_inbox?: boolean;
+      typing?: boolean;
+      sync_limits?: boolean;
+    };
+    setWarmupBusy(true);
+    try {
+      const res = await accountBulkApiExtra.warmup({
+        scope: 'selected',
+        account_ids: selection.selectedIds,
+        rounds: values.rounds ?? 1,
+        online_min_seconds: values.online_min_seconds ?? 60,
+        online_max_seconds: values.online_max_seconds ?? 300,
+        read_inbox: Boolean(values.read_inbox),
+        typing: Boolean(values.typing),
+        sync_limits: values.sync_limits !== false,
+      });
+      setWarmupOpen(false);
+      setBulkResult(res);
+      reloadAll();
+    } catch {
+      /* client 已统一提示 */
+    } finally {
+      setWarmupBusy(false);
+    }
+  };
+
   // 深度验活：排队执行，结果写回健康分
   const runProbe = async () => {
     if (!selection.count) {
@@ -391,6 +430,17 @@ export default function Accounts() {
   };
 
   // 健康分列：验活结果的直观呈现（绿 ≥80 / 黄 ≥50 / 红 <50）
+  // 官方身份列：显示对齐的客户端平台（导入时从官方发布版本表里取）
+  const clientColumn: ColumnsType<AccountOut>[number] = {
+    title: '客户端',
+    dataIndex: 'client_kind',
+    width: 110,
+    render: (value: string) => {
+      const label = value === 'android' ? 'Android' : value === 'ios' ? 'iOS' : value === 'tdesktop' ? 'Desktop' : '未对齐';
+      return <SoftTag tone={value ? 'neutral' : 'warning'} size="sm">{label}</SoftTag>;
+    },
+  };
+
   const healthColumn: ColumnsType<AccountOut>[number] = {
     title: '健康',
     dataIndex: 'health_score',
@@ -409,9 +459,10 @@ export default function Accounts() {
     },
   };
 
-  const columns: ColumnsType<AccountOut> = [selectColumn, healthColumn, ...baseColumns];
+  const columns: ColumnsType<AccountOut> = [selectColumn, clientColumn, healthColumn, ...baseColumns];
 
   const bulkMenuItems = [
+    { key: 'warmup', label: '官方养号（上线/翻会话）' },
     { key: 'probe', label: '深度验活（健康分）' },
     { key: 'throttle', label: '设置发送节流（防封）' },
     { type: 'divider' as const },
@@ -668,6 +719,51 @@ export default function Accounts() {
           reloadAll();
         }}
       />
+
+      <Modal
+        open={warmupOpen}
+        title="官方机制养号"
+        okText="排队养号"
+        cancelText="取消"
+        confirmLoading={warmupBusy}
+        onCancel={() => setWarmupOpen(false)}
+        onOk={() => void runWarmup()}
+      >
+        <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
+          <Alert
+            type="info"
+            showIcon
+            message={`将对选中的 ${selection.count} 个号排队官方节奏活动`}
+            description="动作完全对齐官方客户端：上线 → 翻会话列表 → 下线。全程不发消息、不加群，只产生正常的读行为与在线状态。默认不同步已读与打字状态（那两项对方可见）。"
+          />
+          <Form
+            form={warmupForm}
+            layout="vertical"
+            initialValues={{ rounds: 1, online_min_seconds: 60, online_max_seconds: 300, sync_limits: true }}
+          >
+            <Form.Item label="养号轮数" name="rounds">
+              <InputNumber min={1} max={5} style={{ width: 140 }} />
+            </Form.Item>
+            <Space>
+              <Form.Item label="单轮在线最短（秒）" name="online_min_seconds">
+                <InputNumber min={10} max={1800} style={{ width: 160 }} />
+              </Form.Item>
+              <Form.Item label="最长（秒）" name="online_max_seconds">
+                <InputNumber min={10} max={3600} style={{ width: 160 }} />
+              </Form.Item>
+            </Space>
+            <Form.Item name="read_inbox" valuePropName="checked" style={{ marginBottom: 'var(--tg-space-sm)' }}>
+              <Checkbox>标记已读（更像真人，但对方会看到「已读」）</Checkbox>
+            </Form.Item>
+            <Form.Item name="typing" valuePropName="checked" style={{ marginBottom: 'var(--tg-space-sm)' }}>
+              <Checkbox>显示「正在输入」（对方可见，慎用）</Checkbox>
+            </Form.Item>
+            <Form.Item name="sync_limits" valuePropName="checked" style={{ marginBottom: 0 }}>
+              <Checkbox>同时同步官方限制参数（服务端下发的 flood/上限，节流只收紧不放松）</Checkbox>
+            </Form.Item>
+          </Form>
+        </div>
+      </Modal>
 
       <Modal
         open={probeOpen}

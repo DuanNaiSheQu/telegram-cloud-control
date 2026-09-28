@@ -89,6 +89,17 @@ class BulkProbeRequest(BulkScopeRequest):
     )
 
 
+class BulkWarmupRequest(BulkScopeRequest):
+    """官方机制养号：排队「官方节奏活动」任务，可选同时同步服务端限制参数。"""
+
+    rounds: int = Field(default=1, ge=1, le=5, description="做几轮养号活动")
+    online_min_seconds: int = Field(default=60, ge=10, le=1800, description="单轮在线最短时长")
+    online_max_seconds: int = Field(default=300, ge=10, le=3600, description="单轮在线最长时长")
+    read_inbox: bool = Field(default=False, description="是否标记已读（对方会看到已读，默认关闭）")
+    typing: bool = Field(default=False, description="是否显示正在输入（对方能看到，默认关闭）")
+    sync_limits: bool = Field(default=True, description="同时排队一条官方参数同步任务")
+
+
 class AccountMatrixState(BaseModel):
     """账号页展示用：健康分、风险标记与节流快照。"""
 
@@ -99,3 +110,10 @@ class AccountMatrixState(BaseModel):
     throttle: Dict[str, Any] = Field(default_factory=dict)
     device_model: str = ""
     import_source: str = ""
+    # ---------- 官方机制 ----------
+    client_kind: str = ""
+    official_synced_at: Optional[datetime] = None
+    official_limits: Dict[str, Any] = Field(default_factory=dict)
+    # 官方参数换算后的节流覆盖值（只收紧不放松）
+    official_overrides: Dict[str, Any] = Field(default_factory=dict)
+    warmup_active_at: Optional[datetime] = None

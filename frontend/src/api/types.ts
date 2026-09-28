@@ -1131,6 +1131,14 @@ export interface AccountMatrixState {
   throttle: Record<string, unknown>;
   device_model: string;
   import_source: string;
+  /** 官方机制：对齐的客户端平台（android / ios / tdesktop） */
+  client_kind: string;
+  official_synced_at?: ISODateTime | null;
+  /** 服务端下发的限制参数快照 */
+  official_limits: Record<string, unknown>;
+  /** 官方参数换算出的节流覆盖值（只收紧不放松） */
+  official_overrides: Record<string, unknown>;
+  warmup_active_at?: ISODateTime | null;
 }
 
 export interface BulkThrottleRequest extends CampaignScopeRequest {
@@ -1140,6 +1148,19 @@ export interface BulkThrottleRequest extends CampaignScopeRequest {
   min_action_seconds?: number | null;
   reset_flood?: boolean;
   start_warmup_now?: boolean;
+}
+
+export interface BulkWarmupRequest extends CampaignScopeRequest {
+  /** 做几轮养号活动 */
+  rounds?: number;
+  online_min_seconds?: number;
+  online_max_seconds?: number;
+  /** 标记已读（对方可见，默认关闭） */
+  read_inbox?: boolean;
+  /** 显示正在输入（对方可见，默认关闭） */
+  typing?: boolean;
+  /** 同时同步服务端下发的官方限制参数 */
+  sync_limits?: boolean;
 }
 
 export interface BulkProbeRequest extends CampaignScopeRequest {
