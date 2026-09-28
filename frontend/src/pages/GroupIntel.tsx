@@ -11,6 +11,7 @@ import {
   Card,
   Checkbox,
   Form,
+  Input,
   InputNumber,
   Modal,
   Segmented,
@@ -21,8 +22,9 @@ import {
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { CloudDownloadOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { CloudDownloadOutlined, LinkOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { PageContainer, StatCard, StatGrid, RelativeTime, SoftTag } from '../components';
+import { toast } from '../utils/feedback';
 import BulkResultModal from '../features/accounts/BulkResultModal';
 import { groupIntelApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -50,6 +52,10 @@ export default function GroupIntel() {
   const [collectBusy, setCollectBusy] = useState(false);
   const [collectForm] = Form.useForm();
   const [collectResult, setCollectResult] = useState<BulkResultOut | null>(null);
+  // 按链接采集：粘贴群链接 → 自动解析 + 采群员
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkForm] = Form.useForm();
 
   const stats = useAsyncData(() => groupIntelApi.stats(), []);
   const profiles = useAsyncData(
@@ -104,6 +110,41 @@ export default function GroupIntel() {
       /* client 已统一提示 */
     } finally {
       setCollectBusy(false);
+    }
+  };
+
+  const runCollectByLink = async () => {
+    const values = linkForm.getFieldsValue() as {
+      links?: string;
+      join_if_missing?: boolean;
+      leave_after?: boolean;
+      member_limit?: number;
+    };
+    const links = String(values.links ?? '')
+      .split(/[\n\s]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (!links.length) {
+      toast.warning('先粘贴至少一个群链接');
+      return;
+    }
+    setLinkBusy(true);
+    try {
+      const res = await groupIntelApi.collectByLink({
+        scope: 'all',
+        links,
+        join_if_missing: Boolean(values.join_if_missing),
+        leave_after: Boolean(values.leave_after),
+        member_limit: values.member_limit ?? 200,
+      });
+      setLinkOpen(false);
+      setCollectResult(res);
+      notifySuccess(res.message);
+      void stats.reload();
+    } catch {
+      /* client 已统一提示 */
+    } finally {
+      setLinkBusy(false);
     }
   };
 
@@ -220,6 +261,9 @@ export default function GroupIntel() {
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => { void stats.reload(); void profiles.reload(); void events.reload(); }}>
             刷新
+          </Button>
+          <Button icon={<LinkOutlined />} onClick={() => setLinkOpen(true)}>
+            按链接采集
           </Button>
           <Button type="primary" icon={<CloudDownloadOutlined />} onClick={() => setCollectOpen(true)}>
             采集群情报
@@ -398,6 +442,47 @@ export default function GroupIntel() {
             </Form.Item>
             <Form.Item label="成员任务每群上限" name="member_limit">
               <InputNumber min={1} max={500} style={{ width: 200 }} />
+            </Form.Item>
+          </Form>
+        </div>
+      </Modal>
+
+      <Modal
+        open={linkOpen}
+        title="按群链接采集群员"
+        okText="开始采集"
+        cancelText="取消"
+        confirmLoading={linkBusy}
+        onCancel={() => setLinkOpen(false)}
+        onOk={() => void runCollectByLink()}
+      >
+        <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="粘贴群链接，系统自动解析群并采集群员"
+            description="支持 t.me/xxx、t.me/+hash、@username、数字 ID，一行一个（最多 50 个）。只有号**已经在群里**才能读到成员名单；不在群里时可勾选自动加入。多个链接会轮流分给不同账号，避免一个号连续进群。"
+          />
+          <Form form={linkForm} layout="vertical" initialValues={{ join_if_missing: false, leave_after: false, member_limit: 200 }}>
+            <Form.Item
+              label="群链接（每行一个）"
+              name="links"
+              rules={[{ required: true, message: '至少一个链接' }]}
+            >
+              <Input.TextArea
+                rows={6}
+                placeholder={'https://t.me/somegroup\nt.me/+AbCdEfGh123\n@public_group'}
+                style={{ fontFamily: 'var(--tg-font-family-mono, monospace)' }}
+              />
+            </Form.Item>
+            <Form.Item name="join_if_missing" valuePropName="checked">
+              <Checkbox>不在群里时自动加入（会在群里留下一条入群系统消息，并按高风险动作计费）</Checkbox>
+            </Form.Item>
+            <Form.Item name="leave_after" valuePropName="checked">
+              <Checkbox>采完自动退出该群（留人不留痕，仅对本次加入的号生效）</Checkbox>
+            </Form.Item>
+            <Form.Item label="每群采集多少成员" name="member_limit">
+              <InputNumber min={0} max={500} style={{ width: 200 }} />
             </Form.Item>
           </Form>
         </div>

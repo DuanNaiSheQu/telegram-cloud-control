@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.bulk import BulkScopeRequest
 from app.schemas.common import ORMModel
@@ -26,6 +26,29 @@ class GroupCollectRequest(BulkScopeRequest):
         default=False, description="是否额外为每个群排队一条「采集群成员」任务（用更大额度拉名单）"
     )
     member_limit: int = Field(default=200, ge=1, le=500, description="with_members 时每个群采多少成员")
+
+
+class CollectLinkRequest(BulkScopeRequest):
+    """按群链接采集：粘贴若干链接，自动解析群、可选加入、采档案与群员。"""
+
+    links: List[str] = Field(description="群链接，每行一个：t.me/xxx、t.me/+hash、@username、数字 ID 都支持")
+    join_if_missing: bool = Field(
+        default=False,
+        description="号不在群里时是否自动加入（加入会产生一条入群系统消息，且按高风险动作计费）",
+    )
+    leave_after: bool = Field(default=False, description="采完就退出——留人不留痕，适合一次性采集号")
+    member_limit: int = Field(default=200, ge=0, le=500, description="每群采多少成员；0 表示只采群档案")
+
+    @model_validator(mode="after")
+    def _check_links(self):
+        cleaned = [str(item).strip() for item in (self.links or []) if str(item).strip()]
+        cleaned = list(dict.fromkeys(cleaned))
+        if not cleaned:
+            raise ValueError("至少给一个群链接")
+        if len(cleaned) > 50:
+            raise ValueError("单次最多提交 50 个链接，请分批")
+        self.links = cleaned
+        return self
 
 
 class GroupProfileOut(ORMModel):

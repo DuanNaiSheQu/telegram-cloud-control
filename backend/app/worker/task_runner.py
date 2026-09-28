@@ -131,6 +131,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin):
             TaskType.persona_chat.value: self._persona_chat,
             TaskType.collect_group.value: self._collect_group,
             TaskType.collect_members.value: self._collect_members,
+            TaskType.collect_link.value: self._collect_link,
         }
 
     # ---------------- 执行入口 ----------------

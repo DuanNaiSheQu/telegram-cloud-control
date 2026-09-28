@@ -15,6 +15,7 @@ import type {
   AccountMatrixState,
   BulkAccountRequest,
   BulkAction,
+  CollectLinkRequest,
   GroupCollectRequest,
   GroupEventListResponse,
   GroupIntelStats,
@@ -307,6 +308,9 @@ export const groupIntelApi = {
   stats: () => api.get<GroupIntelStats>('/api/group-intel/stats'),
   /** 批量采集：对选中的号采它们已加入的群（只读，不发言） */
   collect: (payload: GroupCollectRequest) => api.post<BulkResultOut>('/api/group-intel/collect', payload),
+  /** 按群链接采集：粘贴链接，自动解析群 + 采群员（可选先加入、采完退出） */
+  collectByLink: (payload: CollectLinkRequest) =>
+    api.post<BulkResultOut>('/api/group-intel/collect-link', payload),
   /** 群档案列表 */
   profiles: (query: { q?: string; account_id?: UUID | null; min_members?: number; page?: number; page_size?: number }) =>
     api.get<GroupProfileListResponse>('/api/group-intel/profiles', { ...query }),

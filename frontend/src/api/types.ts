@@ -1236,6 +1236,16 @@ export interface GroupIntelStats {
   watching: boolean;
 }
 
+export interface CollectLinkRequest extends CampaignScopeRequest {
+  /** 群链接，每行一个：t.me/xxx、t.me/+hash、@username、数字 ID */
+  links: string[];
+  /** 号不在群里时是否自动加入（会在群里留一条入群系统消息） */
+  join_if_missing?: boolean;
+  /** 采完自动退出——留人不留痕 */
+  leave_after?: boolean;
+  member_limit?: number;
+}
+
 export interface GroupCollectRequest extends CampaignScopeRequest {
   dialog_ids?: UUID[] | null;
   limit_groups?: number;

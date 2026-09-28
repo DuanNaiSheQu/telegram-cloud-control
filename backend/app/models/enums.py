@@ -107,6 +107,7 @@ class TaskType(str, enum.Enum):
     # 群情报（无感采集：只读，不发言）
     collect_group = "collect_group"      # 采集群档案（资料 + 成员数 + 邀请链接）
     collect_members = "collect_members"  # 采集群成员名单（分页拉取，带节流）
+    collect_link = "collect_link"        # 按群链接采集：解析链接 → 可选入群 → 档案 + 成员
     # Bot（API 执行）
     relay_to_staff = "relay_to_staff"    # 转发到员工群
     bot_reply = "bot_reply"              # 官方 Bot 自动回复
@@ -141,6 +142,7 @@ TASK_TYPE_LABELS = {
     "persona_chat": "拟人发言",
     "collect_group": "采集群档案",
     "collect_members": "采集群成员",
+    "collect_link": "按链接采集群员",
     "relay_to_staff": "转发到员工群",
     "bot_reply": "Bot 自动回复",
     "reply_to_origin": "回复送回原会话",

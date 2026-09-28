@@ -40,6 +40,7 @@ from app.models import (
 )
 from app.schemas import (
     BulkResultResponse,
+    CollectLinkRequest,
     GroupCollectRequest,
     GroupEventListResponse,
     GroupEventOut,
@@ -200,6 +201,89 @@ async def collect_group_intel(
         accounts,
         items,
         message=f"已排队采集 {len(dialogs)} 个群（{len(task_ids)} 条任务），Worker 会逐个只读拉取",
+        truncated=truncated,
+        task_ids=task_ids,
+    )
+
+
+@router.post("/collect-link", response_model=BulkResultResponse, summary="按群链接采集群员（自动解析，可选入群）")
+async def collect_by_link(
+    payload: CollectLinkRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """粘贴群链接 → 系统自动解析群 → 采群档案 + 群员名单。
+
+    链接形式：`https://t.me/xxx`、`t.me/+hash`、`@username`、`-1001234567890` 都能吃。
+    **号必须已经在这个群里**才能读到成员名单；不在群里时：
+    - 勾选 `join_if_missing` → 先用选中的号加入（按高风险动作计费、过节流），再加群采集；
+    - 再勾 `leave_after` → 采完自动退出，群里只留一条入群/退群系统消息。
+
+    多个链接会轮流分给选择范围内的账号（round-robin），避免单个号连续加入多个群。
+    """
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload)
+    if not accounts:
+        raise _empty()
+
+    items = []
+    task_ids: List[uuid.UUID] = []
+    for index, link in enumerate(payload.links):
+        # 轮询分配账号：一个号连续进太多群是最容易被风控盯上的形态
+        account = accounts[index % len(accounts)]
+        try:
+            task = await enqueue_task(
+                session,
+                type=TaskType.collect_link,
+                account_id=account.id,
+                payload={
+                    "link": link,
+                    "join_if_missing": payload.join_if_missing,
+                    "leave_after": payload.leave_after,
+                    "member_limit": payload.member_limit,
+                    "source": "link_collect",
+                },
+                created_by=user.id,
+                priority=45,
+            )
+            task_ids.append(task.id)
+            items.append(
+                _item(
+                    account,
+                    message=f"已排队 {link}" + ("（不在群里则先加入）" if payload.join_if_missing else ""),
+                    task_id=task.id,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - 单个链接入队失败不影响整批
+            logger.warning("按链接采集入队失败 account_id=%s link=%s: %s", account.id, link, exc)
+            items.append(_item(account, ok=False, message=f"入队失败：{exc}"))
+
+    await write_audit(
+        session,
+        action="group_intel.collect_link",
+        user_id=user.id,
+        target_type="account_batch",
+        target_id=scope,
+        detail={
+            "links": len(payload.links),
+            "tasks": len(task_ids),
+            "join_if_missing": payload.join_if_missing,
+            "leave_after": payload.leave_after,
+            "member_limit": payload.member_limit,
+        },
+    )
+    await session.commit()
+    await publish_task_safely(
+        {"task_id": None, "type": TaskType.collect_link.value, "ok": True, "detail": f"按链接采集排队 {len(task_ids)} 条任务"}
+    )
+    return _response(
+        "collect-link",
+        accounts,
+        items,
+        message=(
+            f"已排队采集 {len(payload.links)} 个链接（{len(task_ids)} 条任务）"
+            + ("；不在群里的号会先加入" if payload.join_if_missing else "；只采已经在群里的号")
+            + ("，采完自动退出" if payload.leave_after else "")
+        ),
         truncated=truncated,
         task_ids=task_ids,
     )

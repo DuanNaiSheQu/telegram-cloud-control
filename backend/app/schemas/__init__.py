@@ -70,6 +70,7 @@ from app.schemas.campaign import (
 )
 from app.schemas.common import OkResponse, ORMModel, Page, PageQuery
 from app.schemas.group_intel import (
+    CollectLinkRequest,
     GroupCollectRequest,
     GroupEventListResponse,
     GroupEventOut,
@@ -226,6 +227,7 @@ __all__ = [
     "BulkProbeRequest",
     "AccountMatrixState",
     "GroupCollectRequest",
+    "CollectLinkRequest",
     "GroupProfileOut",
     "GroupProfileListResponse",
     "GroupMemberOut",

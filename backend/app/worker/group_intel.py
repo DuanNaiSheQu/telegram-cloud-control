@@ -128,7 +128,7 @@ def make_chat_action_handler(
 
 
 class GroupIntelMixin:
-    """两个只读采集任务：群档案（`collect_group`）与成员名单（`collect_members`）。"""
+    """采集任务：群档案（`collect_group`）、成员名单（`collect_members`）、按链接采集（`collect_link`）。"""
 
     async def _collect_group(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """采集群档案：资料 + 成员数 + 邀请链接；可选顺带抽样前 N 个成员。"""
@@ -253,6 +253,185 @@ class GroupIntelMixin:
             },
         )
         return {"profile_id": str(profile.id), "fetched": fetched, "limit": limit}
+
+    async def _collect_link(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
+        """按群链接采集群员：`t.me/xxx`、`t.me/+hash`、`@username`、数字 ID 都能吃。
+
+        流程（每一步都写清楚，失败时前端能直接读懂原因）：
+        1. 解析链接——邀请链接先用 `CheckChatInvite` 预览：号**已在群里**就直接拿到实体；
+        2. 号不在群里时：`join_if_missing=true` 才加入（加入是按高风险动作计费并过节流），否则明确报错；
+        3. 采群档案 + 成员名单（分页、限速、单任务上限）；
+        4. `leave_after=true` 时采完退出——留人不留痕，适合只用一次就走的采集号。
+        """
+        assert account is not None
+        payload = dict(task.payload or {})
+        link = str(payload.get("link") or "").strip()
+        if not link:
+            raise TaskFailure("缺少群链接", retryable=False)
+        client = self._client(account.id)
+
+        entity, joined_now, preview = await self._resolve_link(
+            client, link, join_if_missing=bool(payload.get("join_if_missing")), account=account, task=task
+        )
+        tg_chat_id = int(getattr(entity, "id", 0) or 0)
+        if not tg_chat_id:
+            raise TaskFailure(f"链接解析不出群实体：{link}", retryable=False)
+
+        try:
+            full = await self._full_chat(client, entity)
+        except Exception as exc:  # noqa: BLE001 - 拿不到完整资料不算失败，档案字段能填多少填多少
+            logger.warning("按链接采集时读群资料失败：%s", describe_exception(exc))
+            full = None
+
+        fields = profile_fields_from_entity(entity, full)
+        if preview.get("title") and not fields.get("title"):
+            fields["title"] = preview["title"]
+        if preview.get("participants_count") and not fields.get("member_count"):
+            fields["member_count"] = preview["participants_count"]
+        if preview.get("about") and not fields.get("about"):
+            fields["about"] = preview["about"]
+
+        profile = await upsert_profile(
+            session,
+            account_id=account.id,
+            tg_chat_id=tg_chat_id,
+            source="manual",
+            raw={"link": link, "joined_now": joined_now},
+            **fields,
+        )
+        # 顺手写进会话表：之后这个群就能出现在批量操作的选择范围里
+        try:
+            from app.models import DialogChannel, DialogKind
+            from app.services.inbound import upsert_dialog
+
+            dialog = await upsert_dialog(
+                session,
+                channel=DialogChannel.user_account,
+                kind=DialogKind.group,
+                tg_chat_id=tg_chat_id,
+                account_id=account.id,
+                title=profile.title,
+                username=profile.username,
+                peer_display=profile.title,
+                member_count=profile.member_count,
+            )
+            profile.dialog_id = dialog.id
+            await session.flush()
+        except Exception:  # noqa: BLE001 - 会话表写入失败不影响采集结果
+            logger.warning("按链接采集后写入会话表失败 tg_chat_id=%s", tg_chat_id)
+
+        limit = min(int(payload.get("member_limit") or 200), settings.group_intel_max_members_per_task)
+        fetched = 0
+        if limit > 0:
+            fetched = await self._fetch_members(
+                session, account=account, client=client, profile=profile, entity=entity, limit=limit
+            )
+            profile.member_synced_at = _now()
+            profile.member_sampled = int(profile.member_sampled or 0) + fetched
+            await session.flush()
+
+        left = False
+        if joined_now and payload.get("leave_after"):
+            try:
+                if isinstance(entity, (tl_types.Channel, tl_types.ChannelForbidden)):
+                    await client(functions.channels.LeaveChannelRequest(channel=entity))
+                else:
+                    await client(functions.messages.DeleteChatUserRequest(chat_id=tg_chat_id, user_id="me"))
+                left = True
+            except Exception:  # noqa: BLE001 - 退出失败不影响已采到的数据
+                logger.warning("采完退出群失败 tg_chat_id=%s", tg_chat_id)
+
+        logger.info(
+            "按链接采集完成",
+            extra={
+                "worker_id": self.worker.worker_id,
+                "account_id": str(account.id),
+                "task_id": str(task.id),
+                "tg_chat_id": tg_chat_id,
+                "fetched": fetched,
+                "joined": joined_now,
+                "left": left,
+            },
+        )
+        return {
+            "tg_chat_id": tg_chat_id,
+            "title": profile.title,
+            "member_count": profile.member_count,
+            "fetched": fetched,
+            "joined_now": joined_now,
+            "left_after": left,
+            "profile_id": str(profile.id),
+        }
+
+    async def _resolve_link(
+        self, client: Any, link: str, *, join_if_missing: bool, account: TgAccount, task: Task
+    ) -> tuple[Any, bool, dict]:
+        """链接 → (群实体, 是否本次加入, 预览信息)。邀请链接先预览，避免「默默把人全加进去」。"""
+        raw = link.strip()
+        invite_hash = ""
+        if "+" in raw or "joinchat" in raw:
+            invite_hash = raw.rsplit("+", 1)[-1] if "+" in raw else raw.rsplit("/", 1)[-1]
+            invite_hash = invite_hash.split("?")[0].strip()
+
+        if invite_hash:
+            try:
+                invite = await client(functions.messages.CheckChatInviteRequest(hash=invite_hash))
+            except Exception as exc:  # noqa: BLE001
+                wait = flood_wait_seconds(exc)
+                if wait:
+                    raise TaskFailure(
+                        f"检查邀请链接被限流，{wait} 秒后重试：{describe_exception(exc)}",
+                        retryable=True,
+                        requeue_after=wait + 1,
+                    ) from exc
+                raise TaskFailure(f"邀请链接无效或已过期：{describe_exception(exc)}", retryable=False) from exc
+
+            preview = {
+                "title": str(getattr(invite, "title", "") or ""),
+                "participants_count": getattr(invite, "participants_count", None),
+                "about": str(getattr(invite, "about", "") or ""),
+            }
+            chat = getattr(invite, "chat", None)  # ChatInviteAlready：号已经在群里
+            if chat is not None:
+                return chat, False, preview
+            if not join_if_missing:
+                raise TaskFailure(
+                    f"该号不在群里（{preview['title'] or '未知群'}，约 {preview['participants_count'] or '?'} 人）："
+                    "发起采集时勾选「不在群里时自动加入」即可采集",
+                    retryable=False,
+                )
+            # 加入群是高风险动作：过闸门并按 3 倍权重计费
+            await self._throttle_gate(account, task, task_type="join_group")
+            try:
+                result = await client(functions.messages.ImportChatInviteRequest(hash=invite_hash))
+            except Exception as exc:  # noqa: BLE001
+                wait = flood_wait_seconds(exc)
+                if wait:
+                    raise TaskFailure(
+                        f"加入群被限流，{wait} 秒后重试：{describe_exception(exc)}", retryable=True, requeue_after=wait + 1
+                    ) from exc
+                raise TaskFailure(f"加入群失败：{describe_exception(exc)}", retryable=False) from exc
+            await self._throttle_record(account, task, cost=3, task_type="join_group")
+            chats = list(getattr(result, "chats", []) or [])
+            if not chats:
+                raise TaskFailure("加入群成功但没拿到群实体，稍后重试", retryable=True)
+            return chats[0], True, preview
+
+        # 公开群 / 用户名 / 数字 ID
+        username = raw.split("/")[-1].lstrip("@").strip()
+        try:
+            entity = await client.get_entity(username)
+        except Exception as exc:  # noqa: BLE001
+            wait = flood_wait_seconds(exc)
+            if wait:
+                raise TaskFailure(
+                    f"解析群链接被限流，{wait} 秒后重试：{describe_exception(exc)}", retryable=True, requeue_after=wait + 1
+                ) from exc
+            raise TaskFailure(
+                f"解析群链接失败（{raw}）：{describe_exception(exc)}；私有群请用邀请链接 t.me/+xxx",
+                retryable=False,
+            ) from exc
+        return entity, False, {}
 
     # ---------------- 公共：Telegram 调用 ----------------
 
