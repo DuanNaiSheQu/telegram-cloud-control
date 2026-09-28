@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -47,6 +48,8 @@ from app.models import (
 )
 from app.schemas import (
     BulkAccountResult,
+    BulkProbeRequest,
+    BulkThrottleRequest,
     BulkAssignRequest,
     BulkCheckRequest,
     BulkGroupRequest,
@@ -599,3 +602,127 @@ async def bulk_release_lease(
     await session.commit()
     message = f"已清除 {len(items)} 个账号的租约" + (f"（实际释放 {released} 个）" if released else "（原本就没有租约）")
     return _response("release-lease", accounts, items, message=message, truncated=truncated)
+
+# ---------------- 账号矩阵：批量节流 / 深度验活 ----------------
+
+@router.post("/throttle", response_model=BulkResultResponse, summary="批量设置节流（每日上限 / 动作间隔 / 解熔断）")
+async def bulk_throttle(
+    payload: BulkThrottleRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """给一批号设定发送额度与最小间隔，是防封的主要旋钮。
+
+    - `daily_message_limit`：每日发送上限；传 `0` 表示回到「按号龄自动阶梯」；
+    - `min_action_seconds`：两次动作之间的最小间隔；传 `0` 同样回到自动；
+    - `start_warmup_now`：把养号起点重置为现在（刚批量导入的新号用，阶梯从最严档开始）；
+    - `reset_flood`：清掉熔断冷却与限流计数（确认号已经恢复再点）。
+    """
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload)
+    if not accounts:
+        raise _empty()
+
+    now = datetime.now(tz=timezone.utc)
+    changed = 0
+    items = []
+    for account in accounts:
+        notes: list[str] = []
+        if payload.daily_message_limit is not None:
+            account.daily_message_limit = int(payload.daily_message_limit)
+            notes.append("额度按自动阶梯" if payload.daily_message_limit == 0 else f"每日上限 {payload.daily_message_limit}")
+        if payload.min_action_seconds is not None:
+            account.min_action_seconds = int(payload.min_action_seconds)
+            notes.append("间隔按自动阶梯" if payload.min_action_seconds == 0 else f"最小间隔 {payload.min_action_seconds} 秒")
+        if payload.start_warmup_now:
+            account.warmup_started_at = now
+            notes.append("养号起点重置为今天")
+        if payload.reset_flood:
+            account.flood_until = None
+            account.flood_strikes = 0
+            flags = dict(account.risk_flags or {})
+            flags.pop("downgrade", None)
+            account.risk_flags = flags
+            notes.append("已解除熔断")
+        changed += 1
+        items.append(_item(account, message="；".join(notes) or "未变更"))
+
+    await session.flush()
+    await write_audit(
+        session,
+        action="account.bulk_throttle",
+        user_id=user.id,
+        target_type="account_batch",
+        target_id=scope,
+        detail={
+            "count": len(items),
+            "daily_message_limit": payload.daily_message_limit,
+            "min_action_seconds": payload.min_action_seconds,
+            "reset_flood": payload.reset_flood,
+            "start_warmup_now": payload.start_warmup_now,
+            "truncated": truncated,
+        },
+    )
+    await session.commit()
+    return _response(
+        "throttle",
+        accounts,
+        items,
+        message=f"已更新 {changed} 个账号的节流设置（额度/间隔传 0 即回到按号龄自动阶梯）",
+        truncated=truncated,
+    )
+
+
+@router.post("/probe", response_model=BulkResultResponse, summary="批量深度验活（连得上 + 会话有效 + 读写权限）")
+async def bulk_probe(
+    payload: Optional[BulkProbeRequest] = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """排队深度验活：由持有租约的 Worker 逐个连上去读账号状态，复算健康分。
+
+    与普通检测的区别：普通检测只确认「连得上」；深度验活还会读会话列表、统计授权会话数、
+    可选做一次写权限探测（往自己的收藏夹发一条），把结果写进 `health_score` / `health_detail`。
+    """
+    payload = payload or BulkProbeRequest()
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload)
+    if not accounts:
+        raise _empty()
+
+    items: List[BulkAccountResult] = []
+    task_ids: List[uuid.UUID] = []
+    for account in accounts:
+        try:
+            task = await enqueue_task(
+                session,
+                type=TaskType.account_check,
+                account_id=account.id,
+                payload={"deep": True, "write_probe": bool(payload.write_probe), "source": "bulk_probe"},
+                created_by=user.id,
+                priority=40,
+            )
+            task_ids.append(task.id)
+            items.append(_item(account, message="已排队深度验活", task_id=task.id))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("深度验活入队失败 account_id=%s: %s", account.id, exc)
+            items.append(_item(account, ok=False, message=f"入队失败：{exc}"))
+
+    await write_audit(
+        session,
+        action="account.bulk_probe",
+        user_id=user.id,
+        target_type="account_batch",
+        target_id=scope,
+        detail={"count": len(items), "write_probe": payload.write_probe, "truncated": truncated},
+    )
+    await session.commit()
+    await publish_task_safely(
+        {"task_id": None, "type": TaskType.account_check.value, "ok": True, "detail": f"批量深度验活 {len(task_ids)} 个号"}
+    )
+    return _response(
+        "probe",
+        accounts,
+        items,
+        message=f"已排队深度验活 {len(items)} 个账号，结果会写回各自的健康分",
+        truncated=truncated,
+        task_ids=task_ids,
+    )

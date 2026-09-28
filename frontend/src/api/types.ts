@@ -86,6 +86,17 @@ export interface AccountOut {
   worker_id?: string | null;
   lease_until?: ISODateTime | null;
   remark: string;
+  // 账号矩阵
+  import_source: string;
+  device_model: string;
+  health_score: number;
+  health_checked_at?: ISODateTime | null;
+  health_detail?: Record<string, unknown> | null;
+  risk_flags: Record<string, unknown>;
+  daily_message_limit: number;
+  min_action_seconds: number;
+  flood_until?: ISODateTime | null;
+  flood_strikes: number;
   created_at?: ISODateTime | null;
 }
 
@@ -1039,4 +1050,98 @@ export interface CampaignBatchListResponse {
   total: number;
   page: number;
   page_size: number;
+}
+
+// ================================================================
+// 账号矩阵：多格式导入 / 健康分 / 节流防封
+// ================================================================
+
+export interface ImportFormat {
+  kind: string;
+  label: string;
+  accept: string;
+  description: string;
+  hint?: string;
+}
+
+export interface ImportFormatsResponse {
+  formats: ImportFormat[];
+  max_accounts: number;
+  tdata_available: boolean;
+}
+
+export interface ImportItemPreview {
+  source: string;
+  label: string;
+  phone_masked?: string | null;
+  dc_id?: number | null;
+  tg_user_id?: number | null;
+  has_session: boolean;
+  remark: string;
+  error?: string | null;
+}
+
+export interface ImportParseResponse {
+  source_kind: string;
+  total: number;
+  ready: number;
+  failed: number;
+  items: ImportItemPreview[];
+  tdata_available: boolean;
+}
+
+export interface ImportResultItem {
+  index: number;
+  source: string;
+  label: string;
+  ok: boolean;
+  message: string;
+  account_id?: UUID | null;
+}
+
+export interface ImportResponse {
+  ok: boolean;
+  message: string;
+  batch_id: UUID;
+  source_kind: string;
+  total: number;
+  succeeded: number;
+  failed: number;
+  duplicate: number;
+  results: ImportResultItem[];
+}
+
+export interface ImportBatchOut {
+  id: UUID;
+  source_kind: string;
+  total: number;
+  succeeded: number;
+  failed: number;
+  duplicate: number;
+  remark: string;
+  created_at?: ISODateTime | null;
+}
+
+/** 账号矩阵状态：健康分 + 节流快照 + 设备指纹（详情抽屉用） */
+export interface AccountMatrixState {
+  account_id: UUID;
+  health_score: number;
+  health_checked_at?: ISODateTime | null;
+  risk_flags: Record<string, unknown>;
+  throttle: Record<string, unknown>;
+  device_model: string;
+  import_source: string;
+}
+
+export interface BulkThrottleRequest extends CampaignScopeRequest {
+  /** 每日发送上限；0 = 回到按号龄自动阶梯 */
+  daily_message_limit?: number | null;
+  /** 最小动作间隔（秒）；0 = 自动 */
+  min_action_seconds?: number | null;
+  reset_flood?: boolean;
+  start_warmup_now?: boolean;
+}
+
+export interface BulkProbeRequest extends CampaignScopeRequest {
+  write_probe?: boolean;
 }

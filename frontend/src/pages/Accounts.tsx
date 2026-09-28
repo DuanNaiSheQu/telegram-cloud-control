@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Button, Checkbox, Dropdown, Input, Select, Space, Tooltip, Typography } from 'antd';
+import { Alert, Button, Checkbox, Dropdown, Form, Input, InputNumber, Modal, Select, Space, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   CloudSyncOutlined,
@@ -14,8 +14,9 @@ import {
   StopOutlined,
   ThunderboltOutlined,
   UserSwitchOutlined,
+  ImportOutlined,
 } from '@ant-design/icons';
-import { accountApi, exportApi, groupApi, proxyApi, userApi } from '../api/endpoints';
+import { accountApi, accountBulkApiExtra, exportApi, groupApi, proxyApi, userApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { useTableQuery, buildActiveFilters } from '../hooks/useTableQuery';
 import { useAuth } from '../auth/AuthContext';
@@ -39,6 +40,7 @@ import AccountLoginWizard from '../components/AccountLoginWizard';
 import AccountDetailDrawer, { type AccountDetailHandlers } from '../features/accounts/AccountDetailDrawer';
 import { BulkActionModal, CreateAccountModal, EditAccountModal, ProfileModal } from '../features/accounts/AccountModals';
 import BulkResultModal from '../features/accounts/BulkResultModal';
+import AccountImportModal from '../features/accounts/AccountImportModal';
 import { useRowSelection } from '../features/accounts/useRowSelection';
 import type { AccountOut, AccountStatus, BulkAction, BulkResultOut, CurrentTask } from '../api/types';
 
@@ -76,6 +78,14 @@ export default function Accounts() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [bulkAction, setBulkAction] = useState<BulkAction | null>(null);
   const [bulkResult, setBulkResult] = useState<BulkResultOut | null>(null);
+  // 账号矩阵入口：导入向导、深度验活、节流设置
+  const [importOpen, setImportOpen] = useState(false);
+  const [probeOpen, setProbeOpen] = useState(false);
+  const [probeWrite, setProbeWrite] = useState(false);
+  const [probeBusy, setProbeBusy] = useState(false);
+  const [throttleOpen, setThrottleOpen] = useState(false);
+  const [throttleBusy, setThrottleBusy] = useState(false);
+  const [throttleForm] = Form.useForm();
 
   const q = useTableQuery<AccountFilters>({
     filters: { group_id: null, status: '', current_task: '', phone: '', keyword: '' },
@@ -325,9 +335,86 @@ export default function Accounts() {
     ),
   };
 
-  const columns: ColumnsType<AccountOut> = [selectColumn, ...baseColumns];
+  // 深度验活：排队执行，结果写回健康分
+  const runProbe = async () => {
+    if (!selection.count) {
+      toast.warning('先在列表里勾选要验活的账号');
+      return;
+    }
+    setProbeBusy(true);
+    try {
+      const res = await accountBulkApiExtra.probe({
+        scope: 'selected',
+        account_ids: selection.selectedIds,
+        write_probe: probeWrite,
+      });
+      setProbeOpen(false);
+      setBulkResult(res);
+      reloadAll();
+    } catch {
+      /* client 已统一提示 */
+    } finally {
+      setProbeBusy(false);
+    }
+  };
+
+  // 节流设置：留空不改，填 0 回到自动阶梯
+  const runThrottle = async () => {
+    if (!selection.count) {
+      toast.warning('先在列表里勾选要设置节流的账号');
+      return;
+    }
+    const values = throttleForm.getFieldsValue() as {
+      daily?: number;
+      interval?: number;
+      resetFlood?: boolean;
+      warmupNow?: boolean;
+    };
+    setThrottleBusy(true);
+    try {
+      const res = await accountBulkApiExtra.throttle({
+        scope: 'selected',
+        account_ids: selection.selectedIds,
+        daily_message_limit: values.daily ?? undefined,
+        min_action_seconds: values.interval ?? undefined,
+        reset_flood: Boolean(values.resetFlood),
+        start_warmup_now: Boolean(values.warmupNow),
+      });
+      setThrottleOpen(false);
+      setBulkResult(res);
+      reloadAll();
+    } catch {
+      /* client 已统一提示 */
+    } finally {
+      setThrottleBusy(false);
+    }
+  };
+
+  // 健康分列：验活结果的直观呈现（绿 ≥80 / 黄 ≥50 / 红 <50）
+  const healthColumn: ColumnsType<AccountOut>[number] = {
+    title: '健康',
+    dataIndex: 'health_score',
+    width: 88,
+    render: (value: number, record) => {
+      const score = Number(value ?? 0);
+      const tone = score >= 80 ? 'success' : score >= 50 ? 'warning' : 'danger';
+      const color = `var(--tg-color-${tone === 'success' ? 'success' : tone === 'warning' ? 'warning' : 'danger'})`;
+      return (
+        <Tooltip title={record.health_checked_at ? '深度验活结果' : '还没验活过：选「深度验活」跑一次'}>
+          <span className="tg-num" style={{ color, fontWeight: 'var(--tg-font-weight-medium)' }}>
+            {score}
+          </span>
+        </Tooltip>
+      );
+    },
+  };
+
+  const columns: ColumnsType<AccountOut> = [selectColumn, healthColumn, ...baseColumns];
 
   const bulkMenuItems = [
+    { key: 'probe', label: '深度验活（健康分）' },
+    { key: 'throttle', label: '设置发送节流（防封）' },
+    { type: 'divider' as const },
     { key: 'check', label: '批量检测' },
     { key: 'sync-dialogs', label: '批量同步会话' },
     { key: 'group', label: '批量改分组 / 移出分组' },
@@ -345,6 +432,9 @@ export default function Accounts() {
       description="状态、分组、心跳、当前任务；异常口径与工作台一致（不等于「正常」，也不是「待登录」）。"
       actions={
         <Space>
+          <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>
+            批量导入
+          </Button>
           <Button icon={<KeyOutlined />} onClick={() => { setWizardAccount(null); setWizardOpen(true); }}>
             登录向导
           </Button>
@@ -466,7 +556,14 @@ export default function Accounts() {
         toolbar={
           <span className="tg-flex" style={{ alignItems: 'center', gap: 'var(--tg-space-sm)' }}>
             <Dropdown
-              menu={{ items: bulkMenuItems, onClick: ({ key }) => setBulkAction(key as BulkAction) }}
+              menu={{
+                items: bulkMenuItems,
+                onClick: ({ key }) => {
+                  if (key === 'probe') setProbeOpen(true);
+                  else if (key === 'throttle') setThrottleOpen(true);
+                  else setBulkAction(key as BulkAction);
+                },
+              }}
               trigger={['click']}
             >
               <Button icon={<ExportOutlined />} disabled={!accounts.data?.total}>
@@ -563,6 +660,69 @@ export default function Accounts() {
       />
 
       <BulkResultModal open={Boolean(bulkResult)} result={bulkResult} onClose={() => setBulkResult(null)} />
+
+      <AccountImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => {
+          reloadAll();
+        }}
+      />
+
+      <Modal
+        open={probeOpen}
+        title="深度验活"
+        okText="开始验活"
+        cancelText="取消"
+        confirmLoading={probeBusy}
+        onCancel={() => setProbeOpen(false)}
+        onOk={() => void runProbe()}
+      >
+        <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
+          <Alert
+            type="info"
+            showIcon
+            message={`将对选中的 ${selection.count} 个账号排队深度验活`}
+            description="验活会读账号状态、会话列表与授权会话数，复算 0-100 的健康分；结果写回账号页的健康列。"
+          />
+          <Checkbox checked={probeWrite} onChange={(event) => setProbeWrite(event.target.checked)}>
+            额外做一次写权限探测（往该号自己的收藏夹发一条「验活探测」）
+          </Checkbox>
+        </div>
+      </Modal>
+
+      <Modal
+        open={throttleOpen}
+        title="设置发送节流"
+        okText="应用到选中账号"
+        cancelText="取消"
+        confirmLoading={throttleBusy}
+        onCancel={() => setThrottleOpen(false)}
+        onOk={() => void runThrottle()}
+      >
+        <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
+          <Alert
+            type="info"
+            showIcon
+            message={`将对选中的 ${selection.count} 个账号应用节流设置`}
+            description="每日上限与最小间隔留空表示不修改；填 0 表示回到「按号龄自动阶梯」（新号 20 条/天起，老号最多 200 条/天）。"
+          />
+          <Form form={throttleForm} layout="vertical" initialValues={{ daily: undefined, interval: undefined }}>
+            <Form.Item label="每日发送上限" name="daily">
+              <InputNumber min={0} max={2000} style={{ width: 200 }} placeholder="留空不改；0 = 自动阶梯" />
+            </Form.Item>
+            <Form.Item label="最小动作间隔（秒）" name="interval">
+              <InputNumber min={0} max={3600} style={{ width: 200 }} placeholder="留空不改；0 = 自动阶梯" />
+            </Form.Item>
+            <Form.Item name="resetFlood" valuePropName="checked" style={{ marginBottom: 'var(--tg-space-md)' }}>
+              <Checkbox>同时解除熔断冷却与限流计数（确认账号已恢复再勾）</Checkbox>
+            </Form.Item>
+            <Form.Item name="warmupNow" valuePropName="checked" style={{ marginBottom: 0 }}>
+              <Checkbox>把养号起点重置为今天（新导入的号从最严档开始）</Checkbox>
+            </Form.Item>
+          </Form>
+        </div>
+      </Modal>
 
       <AccountDetailDrawer accountId={detailId} handlers={handlers} onClose={() => setDetailId(null)} />
     </PageContainer>

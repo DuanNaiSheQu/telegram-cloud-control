@@ -272,6 +272,12 @@ class AccountSnapshot:
     session_string: Optional[str] = None
     proxy: Optional[ProxyConfig] = None
     proxy_error: str = ""
+    # 设备指纹：每个号一套（导入时随机写入），空值表示回退到全局默认
+    device_model: str = ""
+    system_version: str = ""
+    app_version: str = ""
+    lang_code: str = ""
+    lang_pack: str = ""
 
 
 def snapshot_from_row(row: TgAccount) -> AccountSnapshot:
@@ -298,6 +304,11 @@ def snapshot_from_row(row: TgAccount) -> AccountSnapshot:
         phone_masked=row.phone_masked or "未知",
         status=status,
         session_string=session_string,
+        device_model=(getattr(row, "device_model", "") or "").strip(),
+        system_version=(getattr(row, "system_version", "") or "").strip(),
+        app_version=(getattr(row, "app_version", "") or "").strip(),
+        lang_code=(getattr(row, "lang_code", "") or "").strip(),
+        lang_pack=(getattr(row, "lang_pack", "") or "").strip(),
         proxy=proxy,
         proxy_error=proxy_error,
     )
@@ -428,9 +439,13 @@ class AccountConnection:
             settings.telegram_api_hash,
             connection=connection_class_for(proxy),
             proxy=proxy_arg,
-            device_model=settings.telegram_device_model,
-            system_version=settings.telegram_system_version,
-            app_version=settings.telegram_app_version,
+            # 设备指纹走这个号自己的（导入时随机生成），没有才退回全局默认：
+            # 一批号用同型号同客户端版本是最容易被关联的特征之一
+            device_model=self.snapshot.device_model or settings.telegram_device_model,
+            system_version=self.snapshot.system_version or settings.telegram_system_version,
+            app_version=self.snapshot.app_version or settings.telegram_app_version,
+            lang_code=self.snapshot.lang_code or "en",
+            lang_pack=self.snapshot.lang_pack or "",
             timeout=15,
             request_retries=3,
             connection_retries=3,

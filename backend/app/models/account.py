@@ -17,7 +17,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, uuid_pk
@@ -70,6 +70,8 @@ class TgAccount(Base, TimestampMixin):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     phone_enc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # 手机号的确定性哈希：Fernet 密文每次不同，去重必须靠它（建档/导入都写）
+    phone_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     phone_masked: Mapped[str] = mapped_column(String(32), nullable=False, default="未知")
     tg_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
     username: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -101,12 +103,68 @@ class TgAccount(Base, TimestampMixin):
     last_error: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     remark: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
+    # ---------- 账号矩阵：导入来源 / 设备指纹 ----------
+    # 怎么进来的：manual（手工建档）/ phone（手机号列表）/ session_string / session_file / tdata
+    import_source: Mapped[str] = mapped_column(String(24), nullable=False, default="manual", index=True)
+    import_batch_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    # 设备指纹：每个号独立（同型号大批量是典型风控特征，建档时随机化）
+    device_model: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    system_version: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    app_version: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    lang_code: Mapped[str] = mapped_column(String(8), nullable=False, default="zh")
+    lang_pack: Mapped[str] = mapped_column(String(8), nullable=False, default="")
+
+    # ---------- 验活：健康分与风险标记 ----------
+    # 0-100，验活任务每次复算；低于阈值在账号页标黄/标红
+    health_score: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    health_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 验活明细：{reachable, read_ok, write_ok, auth_count, dc_id, checked_at, ...}
+    health_detail: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    # 风控标记：{restricted, spam_blocked, flood_strikes, last_flood_at, notes}
+    risk_flags: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    # ---------- 节流与养号 ----------
+    # 0 = 走默认阶梯（按号龄自动算），非 0 = 人工指定
+    daily_message_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    min_action_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # 养号起点（首次进入本系统的时间），阶梯按它计算号龄
+    warmup_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 熔断：收到 FloodWait 时写入，期间发送类任务直接顺延
+    flood_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    flood_strikes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     group: Mapped[Optional[AccountGroup]] = relationship(lazy="joined")
     proxy: Mapped[Optional[Proxy]] = relationship(lazy="joined")
 
     __table_args__ = (
         UniqueConstraint("tg_user_id", name="uq_tg_accounts_tg_user_id"),
     )
+
+
+class AccountImport(Base, TimestampMixin):
+    """一次批量导入的批次：导入方式、逐条结果，便于回溯「这批号哪来的」。"""
+
+    __tablename__ = "account_imports"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # phone / session_string / session_file / tdata / mixed
+    source_kind: Mapped[str] = mapped_column(String(24), nullable=False, default="mixed")
+    total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    succeeded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duplicate: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    proxy_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("proxies.id", ondelete="SET NULL"), nullable=True
+    )
+    group_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("account_groups.id", ondelete="SET NULL"), nullable=True
+    )
+    # 逐条结果：[{index, source, phone_masked, ok, message, account_id}]
+    results: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    remark: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
 
 class AccountAssignment(Base, TimestampMixin):

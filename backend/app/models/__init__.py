@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.models.account import AccountAssignment, AccountGroup, Proxy, TgAccount
+from app.models.account import AccountAssignment, AccountGroup, AccountImport, Proxy, TgAccount
 from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.bot import Bot
@@ -47,6 +47,7 @@ __all__ = [
     "AccountGroup",
     "Proxy",
     "AccountAssignment",
+    "AccountImport",
     "AccountStatus",
     "ACCOUNT_STATUS_LABELS",
     "CLAIMABLE_STATUSES",

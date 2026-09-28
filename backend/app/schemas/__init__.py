@@ -69,6 +69,16 @@ from app.schemas.campaign import (
     StormRequest,
 )
 from app.schemas.common import OkResponse, ORMModel, Page, PageQuery
+from app.schemas.matrix import (
+    AccountImportBatchOut,
+    AccountImportParseResponse,
+    AccountImportResponse,
+    AccountImportResultItem,
+    AccountMatrixState,
+    BulkProbeRequest,
+    BulkThrottleRequest,
+    ImportItemPreview,
+)
 from app.schemas.dialog import (
     DialogListResponse,
     DialogOut,
@@ -197,6 +207,14 @@ __all__ = [
     "CampaignBatchOut",
     "CampaignBatchItem",
     "CampaignBatchListResponse",
+    "ImportItemPreview",
+    "AccountImportParseResponse",
+    "AccountImportResultItem",
+    "AccountImportResponse",
+    "AccountImportBatchOut",
+    "BulkThrottleRequest",
+    "BulkProbeRequest",
+    "AccountMatrixState",
     "AccountOverviewOut",
     "LeaseDetail",
     "DialogStats",

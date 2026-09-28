@@ -43,6 +43,7 @@ from app.models import (
     TgAccount,
 )
 from app.services.inbound import preview_of, publish_message, upsert_dialog
+from app.services.throttle import note_flood
 from app.worker import login as login_flow
 from app.worker import metrics
 from app.worker.campaign_tasks import CampaignTasksMixin
@@ -531,7 +532,8 @@ class TaskRunner(CampaignTasksMixin):
         except Exception as exc:  # noqa: BLE001
             wait = flood_wait_seconds(exc)
             if wait:
-                # 限流是临时的：只记 last_error，不动状态，等一会儿再发
+                # 限流是临时的：写熔断冷却（期间别的发送类任务也会被闸门挡住），只记 last_error，不动状态
+                await note_flood(account, wait)
                 account.last_error = describe_exception(exc)[:512]
                 await session.flush()
                 self.log.warning(
@@ -553,6 +555,7 @@ class TaskRunner(CampaignTasksMixin):
             raise self._failure(exc, "发送失败", retryable=status is None) from exc
 
         row = await self._mark_message_sent(session, task=task, dialog=dialog, account=account, text=text, sent=sent)
+        await self._throttle_record(account, task, cost=1)
         self.log.info(
             "消息已发出",
             extra={
@@ -675,7 +678,13 @@ class TaskRunner(CampaignTasksMixin):
 
         await persist_identity(session, account, me)
         status_value = _status_value(account.status)
-        return {
+        payload = dict(task.payload or {})
+        health: Optional[dict] = None
+        if payload.get("deep"):
+            health = await self._deep_probe(
+                session, task, account, conn, write_probe=bool(payload.get("write_probe"))
+            )
+        result = {
             "reachable": True,
             "status": status_value,
             "status_label": ACCOUNT_STATUS_LABELS.get(status_value, status_value),
@@ -683,6 +692,94 @@ class TaskRunner(CampaignTasksMixin):
             "username": account.username,
             "display_name": account.display_name,
         }
+        if health is not None:
+            result["health"] = health
+            result["health_score"] = account.health_score
+        return result
+
+    async def _deep_probe(
+        self,
+        session: AsyncSession,
+        task: Task,
+        account: TgAccount,
+        conn: AccountConnection,
+        *,
+        write_probe: bool,
+    ) -> dict:
+        """深度验活：读权限 / 授权会话数 / 可选写权限探测，复算 health_score 与风险标记。
+
+        轻检（普通检测）只回答「连得上」；深度验活要回答「这个号还能不能用来干活」：
+        - 读权限：能不能列会话（被限制的号常常读得到但发不出，所以读通过不代表健康）；
+        - 授权会话数：突然变多说明可能被异地登录；
+        - 写探测（可选）：往自己的收藏夹发一条，确认写权限与限流状态；
+        - 结合账号状态与历史限流次数折算 0-100 的健康分。
+        """
+        detail: dict[str, Any] = {"checked_at": _now().isoformat(), "deep": True}
+        score = 100
+        try:
+            client = conn.require_client()
+        except AccountUnavailable as exc:
+            raise TaskFailure(f"该号当前未连接（{exc}）", retryable=True, requeue_after=15) from exc
+
+        try:
+            await client.get_dialogs(limit=1)
+            detail["read_ok"] = True
+        except Exception as exc:  # noqa: BLE001 - 读失败也要把原因记下来
+            detail["read_ok"] = False
+            detail["read_error"] = describe_exception(exc)
+            score -= 30
+
+        try:
+            auths = await client(functions.account.GetAuthorizationsRequest())
+            detail["auth_count"] = len(getattr(auths, "authorizations", []) or [])
+        except Exception:  # noqa: BLE001 - 拿不到不算失败
+            detail["auth_count"] = None
+
+        if write_probe:
+            try:
+                await client.send_message("me", "云控验活探测（可自行删除）")
+                detail["write_ok"] = True
+                await self._throttle_record(account, task, cost=1)
+            except Exception as exc:  # noqa: BLE001
+                detail["write_ok"] = False
+                wait = flood_wait_seconds(exc)
+                if wait:
+                    await note_flood(account, wait)
+                    detail["flood_wait"] = wait
+                    score -= 25
+                else:
+                    detail["write_error"] = describe_exception(exc)
+                    score -= 45
+
+        status_value = _status_value(account.status)
+        if status_value != AccountStatus.healthy.value:
+            score -= 25
+        if int(getattr(account, "flood_strikes", 0) or 0) >= 3:
+            score -= 15
+        account.health_score = max(0, min(100, score))
+        account.health_checked_at = _now()
+        account.health_detail = detail
+        flags = dict(account.risk_flags or {})
+        flags["restricted"] = detail.get("write_ok") is False or status_value in (
+            AccountStatus.frozen.value,
+            AccountStatus.invalid.value,
+            AccountStatus.dead.value,
+        )
+        flags["last_probe_at"] = detail["checked_at"]
+        account.risk_flags = flags
+        await session.flush()
+        self.log.info(
+            "深度验活完成",
+            extra={
+                "worker_id": self.worker.worker_id,
+                "account_id": str(account.id),
+                "task_id": str(task.id),
+                "health_score": account.health_score,
+                "read_ok": detail.get("read_ok"),
+                "write_ok": detail.get("write_ok"),
+            },
+        )
+        return {"score": account.health_score, **detail}
 
     async def _update_profile(self, session: AsyncSession, task: Task, account: Optional[TgAccount]) -> dict:
         """改本号名称 / 简介 / 用户名 / 头像。"""

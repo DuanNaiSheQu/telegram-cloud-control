@@ -41,6 +41,7 @@ from app.models import (
 )
 from app.services.ai import ai_service
 from app.services.inbound import publish_message
+from app.services.throttle import action_cost, allow_action, note_flood, record_action
 from app.worker.handlers import MessageData, persist_message
 from app.worker.humanize import (
     naturalize,
@@ -80,6 +81,43 @@ class CampaignTasksMixin:
         if status_value != AccountStatus.healthy.value:
             label = ACCOUNT_STATUS_LABELS.get(status_value, status_value)
             raise TaskFailure(f"账号不是正常状态（当前：{label}），不替它发送", retryable=False)
+
+    async def _throttle_gate(
+        self, account: TgAccount, task: Task, *, cost: Optional[int] = None, task_type: Optional[str] = None
+    ) -> None:
+        """发出前的节流闸门：熔断 / 活跃时段 / 最小间隔 / 每日配额四道检查。
+
+        不通过时按「可重试失败 + 顺延」处理，绝不硬发出去换个 PeerFlood 回来。
+        """
+        kind = task_type or task.type.value
+        decision = await allow_action(self.worker.redis, account, task_type=kind, cost=cost)
+        if not decision.ok:
+            self.log.warning(
+                "节流拦下动作",
+                extra={
+                    "worker_id": self.worker.worker_id,
+                    "account_id": str(account.id),
+                    "task_id": str(task.id),
+                    "task_type": kind,
+                    "reason": decision.reason,
+                    "retry_after": decision.retry_after,
+                },
+            )
+            raise TaskFailure(
+                f"节流拦下：{decision.reason}",
+                retryable=True,
+                requeue_after=max(5, int(decision.retry_after)),
+            )
+
+    async def _throttle_record(
+        self, account: TgAccount, task: Task, *, cost: Optional[int] = None, task_type: Optional[str] = None
+    ) -> None:
+        """记一次动作额度；发送类动作按条计数，加群/强拉按动作权重计数。"""
+        kind = task_type or task.type.value
+        weight = cost if cost is not None else action_cost(kind)
+        if weight <= 0:
+            return
+        await record_action(self.worker.redis, account, cost=weight, task_type=kind)
 
     def _campaign_rng(self, task: Task, payload: dict, salt: int = 0) -> Any:
         index = int(payload.get("account_index") or 0)
@@ -168,6 +206,8 @@ class CampaignTasksMixin:
         """发一条并回填；FloodWait 交给调用方决定重试策略。"""
         sent = await client.send_message(entity, text, reply_to=reply_to)
         await self._record_campaign_sent(session, task, account, entity, text, sent)
+        # 每发出一条就记一个额度：吵群/拟人这类高频动作会很快撞到当日上限
+        await self._throttle_record(account, task, cost=1)
         self.log.info(
             "批量运营消息已发出",
             extra={
@@ -193,6 +233,7 @@ class CampaignTasksMixin:
         """批量私信：向 payload.targets 逐个发消息，目标之间随机间隔。"""
         assert account is not None
         self._ensure_sendable(account)
+        await self._throttle_gate(account, task)
         payload = dict(task.payload or {})
         targets = [str(item).strip() for item in (payload.get("targets") or []) if str(item).strip()]
         if not targets:
@@ -229,6 +270,7 @@ class CampaignTasksMixin:
         """群发：向指定群发一条（文本池按号分配）。"""
         assert account is not None
         self._ensure_sendable(account)
+        await self._throttle_gate(account, task)
         payload = dict(task.payload or {})
         client = self._client(account.id)
         entity = await self._resolve_group_entity(session, task, payload, client)
@@ -247,6 +289,7 @@ class CampaignTasksMixin:
         """素材群发：按素材库内容发给指定群或逐个私信目标。"""
         assert account is not None
         self._ensure_sendable(account)
+        await self._throttle_gate(account, task)
         payload = dict(task.payload or {})
         material_id = payload.get("material_id")
         if not material_id:
@@ -338,14 +381,18 @@ class CampaignTasksMixin:
         target = str(payload.get("target") or "").strip()
         if not target:
             raise TaskFailure("加群任务缺少目标", retryable=False)
+        # 加群是高风险动作：按权重预检，并在成功加入后记账
+        await self._throttle_gate(account, task)
         client = self._client(account.id)
         try:
             if "+" in target:
                 await client(functions.messages.ImportChatInviteRequest(hash=self._invite_hash(target)))
+                await self._throttle_record(account, task)
                 return {"joined": True, "via": "invite"}
             username = target.lstrip("@").split("/")[-1].strip()
             entity = await client.get_input_entity(username)
             await client(functions.channels.JoinChannelRequest(channel=entity))
+            await self._throttle_record(account, task)
             return {"joined": True, "via": "username"}
         except (UserAlreadyParticipantError, InviteHashExpiredError) as exc:
             return {"joined": False, "already": True, "detail": describe_exception(exc)}
@@ -395,6 +442,8 @@ class CampaignTasksMixin:
         members = [str(item).strip() for item in (payload.get("members") or []) if str(item).strip()]
         if not group_raw or not members:
             raise TaskFailure("强拉任务缺少群或成员", retryable=False)
+        # 强拉成员同样是高风险动作
+        await self._throttle_gate(account, task)
         client = self._client(account.id)
         try:
             group = await client.get_entity(group_raw)
@@ -420,6 +469,7 @@ class CampaignTasksMixin:
                         chat_id=int(group.id), user_id=input_user, fwd_limit=0
                     ))
                 added += 1
+                await self._throttle_record(account, task, cost=1)
             except UserAlreadyParticipantError:
                 already += 1
             except (UserNotMutualContactError, ChatAdminRequiredError) as exc:
@@ -480,6 +530,7 @@ class CampaignTasksMixin:
             except Exception as exc:  # noqa: BLE001
                 wait = flood_wait_seconds(exc)
                 if wait:
+                    await note_flood(account, wait)
                     self.log.warning(
                         "循环发言被限流，等待后继续",
                         extra={
@@ -502,6 +553,7 @@ class CampaignTasksMixin:
         """吵群：按文本池随机挑句、随机间隔连续发言。"""
         assert account is not None
         self._ensure_sendable(account)
+        await self._throttle_gate(account, task)
         payload = dict(task.payload or {})
         texts = [str(item).strip() for item in (payload.get("texts") or []) if str(item).strip()]
         if not texts:
@@ -524,6 +576,7 @@ class CampaignTasksMixin:
         """拟人发言：按人设用 AI 生成话术；AI 不可用时退回文本池。"""
         assert account is not None
         self._ensure_sendable(account)
+        await self._throttle_gate(account, task)
         payload = dict(task.payload or {})
         persona = str(payload.get("persona") or "").strip()
         if not persona:

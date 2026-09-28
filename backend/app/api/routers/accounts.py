@@ -62,6 +62,7 @@ from app.models import (
 from app.redis_client import get_redis
 from app.schemas import (
     AccountCreate,
+    AccountMatrixState,
     AccountListResponse,
     AccountOut,
     AccountOverviewOut,
@@ -156,6 +157,11 @@ async def _find_by_phone(session: AsyncSession, phone: str) -> Optional[TgAccoun
     脱敏值会碰撞（同一个 mask 可能对应不同号），所以先用 phone_masked 粗筛，
     再解密 phone_enc 精确比对数字部分。这样重复建档不会产生第二个号。
     """
+    digest = security.short_hash(phone)
+    quick = await session.scalar(select(TgAccount).where(TgAccount.phone_hash == digest))
+    if quick is not None:
+        return quick
+    # 兼容早期没有 phone_hash 的行：退回「masked 粗筛 + 解密精确比对」
     masked = security.mask_phone(phone)
     wanted = _digits(phone)
     rows = await session.scalars(select(TgAccount).where(TgAccount.phone_masked == masked))
@@ -341,6 +347,8 @@ async def create_account(
 
     account = TgAccount(
         phone_enc=security.encrypt_secret(payload.phone),
+        # 确定性哈希：导入/建档两条路径共用同一个去重键
+        phone_hash=security.short_hash(payload.phone),
         phone_masked=security.mask_phone(payload.phone),
         group_id=payload.group_id,
         proxy_id=payload.proxy_id,
@@ -363,6 +371,38 @@ async def create_account(
     await session.commit()
     logger.info("账号建档 account_id=%s phone=%s", account.id, account.phone_masked)
     return account_out(await _reload_account(session, account.id))
+
+
+@router.get("/{account_id}/matrix", response_model=AccountMatrixState, summary="账号矩阵状态（健康分 / 节流 / 设备指纹）")
+async def account_matrix(
+    account_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> AccountMatrixState:
+    """详情抽屉用：健康分与验活明细、当前节流配额、设备指纹、导入来源。"""
+    account = await session.get(TgAccount, account_id)
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在")
+    ids = await visible_account_ids(session, user)
+    if ids is not None and account.id not in set(ids):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="该账号未分配给你")
+
+    from app.redis_client import get_redis
+    from app.services.throttle import throttle_state
+
+    try:
+        state = await throttle_state(get_redis(), account)
+    except Exception:  # noqa: BLE001 - Redis 挂了也要能看健康分
+        state = {}
+    return AccountMatrixState(
+        account_id=account.id,
+        health_score=int(account.health_score or 0),
+        health_checked_at=account.health_checked_at,
+        risk_flags=dict(account.risk_flags or {}),
+        throttle=state,
+        device_model=account.device_model or "",
+        import_source=account.import_source or "manual",
+    )
 
 
 @router.get("/{account_id}", response_model=AccountOut, summary="账号详情")

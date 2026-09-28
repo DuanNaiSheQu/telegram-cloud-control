@@ -12,9 +12,16 @@ import type {
   AccountOverviewOut,
   AccountSummary,
   AccountUpdate,
+  AccountMatrixState,
   BulkAccountRequest,
   BulkAction,
   BulkPmRequest,
+  BulkProbeRequest,
+  BulkThrottleRequest,
+  ImportBatchOut,
+  ImportFormatsResponse,
+  ImportParseResponse,
+  ImportResponse,
   BulkResultOut,
   CampaignBatchListResponse,
   CampaignBatchOut,
@@ -110,6 +117,8 @@ export const dashboardApi = {
 // ---------------------------------------------------------------- 账号
 
 export const accountApi = {
+  /** 账号矩阵状态：健康分 / 节流快照 / 设备指纹 */
+  matrix: (id: UUID) => api.get<AccountMatrixState>(`/api/accounts/${id}/matrix`),
   list: (query: AccountListQuery, options?: RequestOptions) =>
     api.get<AccountListResponse>('/api/accounts', { ...query }, options),
   summary: () => api.get<AccountSummary>('/api/accounts/summary'),
@@ -142,6 +151,13 @@ export const accountApi = {
  * 只覆盖「对已有的号做一次已有操作」：检测、同步会话、分配、改分组、改代理、启停、清租约。
  * 明确不做批量私信 / 群发 / 加群 / 改资料（见 规划.md「不做这些」）。
  */
+export const accountBulkApiExtra = {
+  /** 深度验活：连得上 + 会话有效 + 读写权限，复算健康分 */
+  probe: (payload: BulkProbeRequest) => api.post<BulkResultOut>('/api/accounts/bulk/probe', payload),
+  /** 批量设置节流：每日上限 / 最小间隔 / 解熔断 */
+  throttle: (payload: BulkThrottleRequest) => api.post<BulkResultOut>('/api/accounts/bulk/throttle', payload),
+};
+
 export const accountBulkApi = {
   /**
    * 通用入口。除 bulk/assign 外都允许**不带 body**（等价 `{}` → 400「没有选中任何账号」），
@@ -175,6 +191,18 @@ export const accountLoginApi = {
       { account_id: accountId, password },
       { silent },
     ),
+};
+
+// ---------------------------------------------------------------- 账号矩阵（导入 / 健康 / 节流）
+
+export const accountImportApi = {
+  /** 支持的导入方式与限制（前端照着渲染引导，不写死格式） */
+  formats: () => api.get<ImportFormatsResponse>('/api/accounts/import/formats'),
+  /** 解析预览：不写库，先确认清单 */
+  parse: (form: FormData) => api.post<ImportParseResponse>('/api/accounts/import/parse', form),
+  /** 正式导入 */
+  run: (form: FormData) => api.post<ImportResponse>('/api/accounts/import', form),
+  batches: () => api.get<ImportBatchOut[]>('/api/accounts/import/batches'),
 };
 
 // ---------------------------------------------------------------- 分组

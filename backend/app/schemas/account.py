@@ -56,6 +56,19 @@ class AccountOut(ORMModel):
     remark: str = ""
     created_at: Optional[datetime] = None
 
+    # ---------- 账号矩阵 ----------
+    import_source: str = "manual"
+    device_model: str = ""
+    health_score: int = 100
+    health_checked_at: Optional[datetime] = None
+    health_detail: dict = {}
+    risk_flags: dict = {}
+    daily_message_limit: int = 0
+    min_action_seconds: int = 0
+    flood_until: Optional[datetime] = None
+    flood_strikes: int = 0
+    warmup_started_at: Optional[datetime] = None
+
 
 class AccountSummary(BaseModel):
     total: int = 0

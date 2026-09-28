@@ -101,6 +101,16 @@ class Settings(BaseSettings):
     # 拟人发言每次向 AI 要的近邻消息条数
     campaign_persona_context_messages: int = 10
 
+    # ---------- 账号矩阵：节流与防封 ----------
+    # 号龄养号阶梯之外的全局上限（阶梯见 services/throttle.py 的 WARMUP_LADDER）
+    throttle_daily_default: int = 200
+    # 允许动作的活跃时段（本地时区，闭开区间；8-24 表示 08:00–24:00，0-24 表示全天）
+    throttle_active_hours: str = "8-24"
+    # 收到 FloodWait 后在原等待时间上额外加的冷却秒数
+    throttle_flood_cooldown_seconds: int = 30
+    # 单次批量导入的账号上限（防误传十几万行把库打满）
+    import_max_accounts: int = 500
+
     # ---------- 属性 ----------
     @property
     def cors_origin_list(self) -> List[str]:

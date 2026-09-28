@@ -28,6 +28,7 @@ from app.api.bots import webhook as webhook_router
 from app.api.routers import (
     accounts,
     accounts_bulk,
+    accounts_import,
     assignments,
     audit,
     auth,
@@ -194,6 +195,7 @@ def create_app() -> FastAPI:
         # ⚠️ /accounts/bulk/* 必须排在 /accounts/{account_id}/* 之前：
         # 否则 "bulk" 会被当成 account_id 去解析 UUID，直接 422。
         accounts_bulk.router,
+        accounts_import.router,
         accounts.router,
         groups.router,
         network.router,
