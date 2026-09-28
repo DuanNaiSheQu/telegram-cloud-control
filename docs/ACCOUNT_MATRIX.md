@@ -1,5 +1,7 @@
 # 账号矩阵：导入、验活、防封与批量管理
 
+> 文档索引：[docs/README.md](README.md) · 相邻：功能地图 [FEATURES.md](FEATURES.md) · 安全与边界 [SECURITY.md](SECURITY.md)
+
 这套控制台把「一批 Telegram 账号」当作**资产**来管：怎么进来、还剩多少额度、
 这个号还能不能干活、什么时候该停手。对应实现分布在
 `services/account_import.py`（导入）、`services/throttle.py`（节流）、

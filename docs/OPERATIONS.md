@@ -1,5 +1,7 @@
 # 运维手册
 
+> 文档索引：[docs/README.md](README.md) · 相邻：部署 [DEPLOYMENT.md](DEPLOYMENT.md) · 安全 [SECURITY.md](SECURITY.md)
+
 面向值班的人：告警响了先看第 1 节，页面出问题先看第 2 节，要动数据先看第 3 节。
 快速开始与命令清单在 [../README.md](../README.md#5-常用命令)，备份恢复细则在
 [../deploy/postgres-backup.md](../deploy/postgres-backup.md)。

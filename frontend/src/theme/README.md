@@ -1,5 +1,7 @@
 # 主题与设计 token（换皮入口）
 
+> 文档索引：[docs/README.md](../../../docs/README.md) · 相邻：通用组件 [../components/README.md](../components/README.md)
+
 > **改配色 / 圆角 / 密度 / 字体，只改 `tokens.ts` 一个文件。**
 > 页面和组件里禁止出现写死色值，一律用 CSS 变量 `var(--tg-*)` 或 `useTheme().tokens`。
 

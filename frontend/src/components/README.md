@@ -1,5 +1,7 @@
 # 共享组件库（页面负责人照这个用）
 
+> 文档索引：[docs/README.md](../../../docs/README.md) · 相邻：主题 token [../theme/README.md](../theme/README.md) · 贡献指南 [docs/CONTRIBUTING.md](../../../docs/CONTRIBUTING.md)
+
 > 目标：页面只消费这里的组件 + `theme/tokens.ts` 的变量，**不自己写样式、不写死色值**。
 > 每个组件的完整 props 契约写在文件头注释里；本文件是速查表。
 > 开发环境打开 **http://127.0.0.1:5173/__components** 可以看到全部组件的真实渲染（深/浅色都切一遍）。

@@ -1,5 +1,7 @@
 # 验收对照表
 
+> 文档索引：[docs/README.md](README.md) · 相邻：部署 [DEPLOYMENT.md](DEPLOYMENT.md) · 运维 [OPERATIONS.md](OPERATIONS.md)
+
 把 [规划.md](../规划.md) 的每一条落到具体产物和验证方式上。验证命令都能重跑。
 
 ## 0. 本次落地实测记录（可复跑）

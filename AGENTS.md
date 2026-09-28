@@ -1,5 +1,7 @@
 # Telegram 云控 —— 项目约定
 
+> 文档索引：[docs/README.md](docs/README.md) · 相邻：贡献指南 [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) · 快速开始 [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
+
 ## Git：本项目只对接 cafinxnull 这一个仓库
 
 - `origin` → `https://github.com/cafinxnull/telegram-cloud-control`（private，`main`）

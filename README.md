@@ -12,7 +12,7 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.1-2AABEE.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.2-2AABEE.svg" alt="Version"></a>
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新记录-blue.svg" alt="Changelog"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
@@ -59,6 +59,7 @@
 
 ## 目录
 
+- [最新更新](#最新更新)
 - [功能特性](#功能特性)
 - [界面预览](#界面预览)
 - [技术栈](#技术栈)
@@ -74,7 +75,7 @@
 - [贡献](#贡献)
 - [许可证](#许可证)
 - [鸣谢](#鸣谢)
-- [文档索引](#文档索引)
+- [文档索引](#文档索引)（完整版：[docs/README.md](docs/README.md)）
 
 ## 功能特性
 
@@ -624,15 +625,27 @@ license 徽章从「待定」改成对应协议。
 
 ## 文档索引
 
-| 文档 | 内容 |
-|---|---|
-| [规划.md](规划.md) | 产品口径：范围、状态定义、页面结构、不做清单 |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构、数据模型（16 张表）、租约与任务不变量、目录说明 |
-| [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | HTTP / WebSocket / Webhook 契约、任务载荷约定、错误与权限 |
-| [docs/OPERATIONS.md](docs/OPERATIONS.md) | 告警逐条处置、五类常见故障、恢复演练、容量与巡检 |
-| [deploy/postgres-backup.md](deploy/postgres-backup.md) | 备份产物、逻辑恢复、PITR 全步骤、演练清单 |
-| [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | 验收对照表：规划每一条 → 产物 → 可复跑命令 |
-| [docs/SPONSOR.md](docs/SPONSOR.md) | 赞助方式、档位、资金去向、鸣谢墙、FAQ |
+完整索引与阅读顺序：[**docs/README.md**](docs/README.md)（每篇文档顶部都有指回索引的导航条）。
+
+| 分类 | 文档 | 内容 |
+|---|---|---|
+| 入门 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | 环境要求、起栈、首次登录账号、发第一条消息、常见坑排查 |
+| 功能 | [docs/FEATURES.md](docs/FEATURES.md) | 功能地图：账号矩阵、群情报、营销中心、会话、任务、Bot、治理、边界 |
+| 功能 | [docs/ACCOUNT_MATRIX.md](docs/ACCOUNT_MATRIX.md) | 四类导入、深度验活、节流防封、群情报采集、官方机制养号 |
+| 架构 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 进程职责、数据模型（21 张表）、任务队列与租约、状态口径 |
+| 接口 | [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | HTTP / WebSocket / Webhook 契约、任务载荷约定、错误与权限 |
+| 部署 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 本地与 Compose、生产清单、反代与证书、备份、升级与回滚 |
+| 运维 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 故障速查、告警逐条处置、恢复演练、容量与巡检 |
+| 运维 | [deploy/postgres-backup.md](deploy/postgres-backup.md) | 备份产物、逻辑恢复、PITR 全步骤、演练清单 |
+| 安全 | [docs/SECURITY.md](docs/SECURITY.md) | 凭据与加密、权限模型、审计留痕、行为边界、数据留存 |
+| 验收 | [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | 规划条目 → 产物 → 可复跑命令；哪些需真机验证 |
+| 协作 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | 开发环境、代码约定、验收门槛、发版与提交流程 |
+| 协作 | [AGENTS.md](AGENTS.md) | 仓库约定：远程仓库、凭据隔离、本地运行排障 |
+| 版本 | [CHANGELOG.md](CHANGELOG.md) · [VERSION](VERSION) | 变更记录；版本号真源（后端 /health 与前端侧栏都读它） |
+| 路线 | [规划.md](规划.md) | 产品口径：范围、状态定义、页面结构、不做清单 |
+| 代码 | [frontend/src/components/README.md](frontend/src/components/README.md) | 通用组件清单与用法（改 UI 前先看） |
+| 代码 | [frontend/src/theme/README.md](frontend/src/theme/README.md) | 设计 token 与主题机制（改样式前先看） |
+| 赞助 | [docs/SPONSOR.md](docs/SPONSOR.md) | 赞助方、档位、资金去向、鸣谢墙、企业 Logo 展示位 |
 
 <div align="center">
   <br>

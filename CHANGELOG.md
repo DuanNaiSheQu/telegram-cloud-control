@@ -7,6 +7,33 @@
 
 ---
 
+## v0.3.2 — 2026-09-29
+
+主题：**文档归类补齐**——从「几篇散文档」变成有索引、有分类、可导航的文档体系。
+
+### 新增文档
+
+| 文档 | 归类 | 解决什么问题 |
+|---|---|---|
+| [`docs/README.md`](docs/README.md) | 索引 | 全部文档的总入口：按「我想做什么」查表 + 按类别归类 + 阅读顺序建议 |
+| [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | 入门 | 从环境准备到发出第一条消息，含 7 类常见坑的排查表 |
+| [`docs/FEATURES.md`](docs/FEATURES.md) | 功能 | 功能地图：账号资产 / 群情报 / 营销中心 / 会话 / 任务 / Bot / 治理 / 边界，逐项给入口与详细文档 |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | 部署 | 本地与 Compose 两种形态、生产清单（凭据/入口/资源/代理）、反向代理片段、备份、升级回滚 |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | 安全 | 凭据与加密、权限模型、审计留痕、行为边界（节流/养号/无感采集）、数据留存、上线自查 |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | 协作 | 开发环境、后端/前端代码约定、验收门槛、提交与发版流程、加新功能的自查清单 |
+
+### 优化
+
+- 每篇文档（含 `deploy/postgres-backup.md`、`AGENTS.md`、`规划.md`、两份代码内 README）顶部统一加一行
+  **导航条**：指回文档索引与相邻文档，不再有「翻到某篇后不知道还写了什么」的情况。
+- README 的「文档索引」重写为**按分类的完整表**（入门 / 功能 / 架构 / 接口 / 部署 / 运维 / 安全 / 验收 /
+  协作 / 版本 / 路线 / 代码 / 赞助），并指向 `docs/README.md` 作为总索引；目录段补「最新更新」入口。
+- `docs/ARCHITECTURE.md` 数据模型同步为 **21 张表**，并补一节说明账号矩阵与群情报新增的
+  `materials` / `account_imports` / `group_profiles` / `group_members` / `group_events`，
+  以及 `tg_accounts` 上新增的账号矩阵字段。
+
+---
+
 ## v0.3.1 — 2026-09-29
 
 主题：**文档与品牌标识补齐**——赞助方 Logo 入库、README 写完整、版本记录机制固化。

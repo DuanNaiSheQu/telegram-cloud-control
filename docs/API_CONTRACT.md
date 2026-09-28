@@ -1,5 +1,7 @@
 # API 契约（v1）
 
+> 文档索引：[docs/README.md](README.md) · 相邻：架构 [ARCHITECTURE.md](ARCHITECTURE.md) · 功能地图 [FEATURES.md](FEATURES.md)
+
 Telegram 云控 API。所有时间戳为带时区的 ISO8601（UTC）；所有 ID 为 UUID 字符串；字段命名 snake_case。
 基址：`http://<host>:8000`。
 

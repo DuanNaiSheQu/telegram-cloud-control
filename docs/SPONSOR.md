@@ -12,6 +12,8 @@
 
 ---
 
+> 文档索引：[docs/README.md](README.md) · 相邻：版本记录 [../CHANGELOG.md](../CHANGELOG.md)
+
 ## 赞助方
 
 感谢下面的赞助方。它们不只是出钱，本身也都是这套系统在真实运营中用到的服务——

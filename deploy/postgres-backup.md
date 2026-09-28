@@ -1,5 +1,7 @@
 # Postgres 备份与恢复
 
+> 文档索引：[docs/README.md](../docs/README.md) · 相邻：部署 [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md) · 运维 [docs/OPERATIONS.md](../docs/OPERATIONS.md)
+
 > 备份由 `deploy/backup.sh` 执行，cron 片段见 `deploy/backup.cron`，告警规则见 `deploy/alert.rules.yml`
 > 的 `tgcc-database-backup` 组。本文是恢复用的操作手册（每季度按「恢复演练」一节走一遍）。
 
