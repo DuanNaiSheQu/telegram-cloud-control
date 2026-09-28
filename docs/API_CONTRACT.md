@@ -305,14 +305,6 @@ Worker 单独暴露 `:9101/metrics`：在线号数量、重连次数、任务成
 | `relay_to_staff` | API | `{"route_id","message_id","dialog_id","staff_chat_id"}` |
 | `bot_reply` | API | `{"dialog_id","message_id"}` |
 | `reply_to_origin` | API | `{"dialog_id","text","staff_chat_id","staff_message_id","origin_message_id"}` |
-| `bulk_pm` | Worker | `{"batch_id","targets":[...],"texts"?:[...],"text"?,"naturalize"?,"min_interval","max_interval","account_index","account_count"}` |
-| `group_broadcast` | Worker | `{"batch_id","target_group","texts"?,"text"?,"naturalize"?}` |
-| `material_send` | Worker | `{"batch_id","material_id","target_group"?,"targets"?,"min_interval","max_interval"}` |
-| `join_group` | Worker | `{"batch_id","target"}`（邀请链接或 @username） |
-| `leave_group` | Worker | `{"batch_id","target","delete_history"}` |
-| `force_add_member` | Worker | `{"batch_id","group","members":[...]}` |
-| `storm_chat` | Worker | `{"batch_id","dialog_id"?,"group"?,"rounds","min_interval","max_interval","texts":[...],"reply_probability"}` |
-| `persona_chat` | Worker | `{"batch_id","dialog_id"?,"group"?,"persona","topic"?,"use_ai","texts"?,"rounds","min_interval","max_interval"}` |
 
 领取规则：Worker 只领「账号租约属于自己」的 `account_id` 任务；API 只领带 `bot_id` 的任务
 （`core.tasks.claim_tasks(kind="worker"|"bot")`）。
