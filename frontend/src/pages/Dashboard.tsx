@@ -11,6 +11,7 @@ import {
   GlobalOutlined,
   MessageOutlined,
   ReloadOutlined,
+  LoginOutlined,
   RiseOutlined,
   SafetyCertificateOutlined,
   ScheduleOutlined,
@@ -229,6 +230,24 @@ export default function Dashboard() {
         </Space>
       }
     >
+      {data && !loading && (data.total_accounts ?? 0) === 0 ? (
+        <Alert
+          type="info"
+          showIcon
+          icon={<LoginOutlined />}
+          message="还没有接入任何 Telegram 账号"
+          description="账号是整套系统的起点：先用一个自己的号通过验证码登录，系统才能同步会话、接收消息并按你的指令发送。登录后建议顺手做一次「账号检测」确认号在线。"
+          action={
+            <Space direction={isCompact ? 'vertical' : 'horizontal'}>
+              <Button type="primary" onClick={() => navigate('/accounts?wizard=1')}>
+                登录第一个账号
+              </Button>
+              <Button onClick={() => navigate('/accounts')}>进入账号管理</Button>
+            </Space>
+          }
+        />
+      ) : null}
+
       <StatGrid>
         <StatCard
           title="在线数"

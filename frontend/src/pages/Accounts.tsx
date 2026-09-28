@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button, Checkbox, Dropdown, Input, Select, Space, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -57,6 +58,16 @@ export default function Accounts() {
   const selection = useRowSelection();
   const [createOpen, setCreateOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  // 从工作台/引导条带 ?wizard=1 进来时直接开登录向导，参数用完即清（避免刷新又弹）
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('wizard') !== '1') return;
+    setWizardAccount(null);
+    setWizardOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('wizard');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [wizardAccount, setWizardAccount] = useState<AccountOut | null>(null);
   const [editAccount, setEditAccount] = useState<AccountOut | null>(null);
   const [profileAccount, setProfileAccount] = useState<AccountOut | null>(null);

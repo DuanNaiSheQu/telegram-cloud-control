@@ -2542,3 +2542,356 @@ body .ant-spin-container::after {
 .app-breadcrumb-link:hover {
   color: var(--tg-color-primary);
 }
+
+/* ============================================================================
+   登录页（2026-09-28 重做）
+   双栏：左侧品牌叙事（渐变 + 光晕 + 网格 + 能力卡），右侧登录卡。
+   颜色全部走变量，深浅主题自适应；≤980px 收起品牌区，只留卡片 + 迷你品牌头。
+   ============================================================================ */
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  background: var(--tg-color-bg-app);
+}
+
+.login-brand {
+  position: relative;
+  flex: 1.05 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--tg-space-colossal);
+  padding: var(--tg-space-colossal) var(--tg-space-colossal) var(--tg-space-huge);
+  overflow: hidden;
+  color: var(--tg-color-on-primary);
+  background-color: var(--tg-color-gradient-from);
+  background-image: linear-gradient(
+    150deg,
+    var(--tg-color-gradient-from) 0%,
+    var(--tg-color-gradient-to) 52%,
+    var(--tg-color-primary-active) 100%
+  );
+}
+
+/* 网格纹理 + 两团光晕：廉价但有效的质感来源，不引外链图片 */
+.login-brand::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(var(--tg-color-on-primary) 1px, transparent 1px),
+    linear-gradient(90deg, var(--tg-color-on-primary) 1px, transparent 1px);
+  background-size: 52px 52px;
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+.login-brand-glow {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--tg-color-on-primary);
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+.login-brand-glow.is-a {
+  width: 560px;
+  height: 560px;
+  right: -180px;
+  top: -200px;
+  opacity: 0.10;
+}
+
+.login-brand-glow.is-b {
+  width: 420px;
+  height: 420px;
+  left: -160px;
+  bottom: -180px;
+  opacity: 0.07;
+}
+
+.login-brand-top,
+.login-brand-foot {
+  position: relative;
+  z-index: 1;
+}
+
+.login-brand-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--tg-radius-card);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: var(--tg-color-on-primary);
+  flex: 0 0 48px;
+}
+
+.login-brand-name {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-lg);
+  margin-bottom: var(--tg-space-colossal);
+}
+
+.login-brand-name-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.login-brand-name-main {
+  font-size: var(--tg-font-size-xl);
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: var(--tg-font-letter-tight);
+}
+
+.login-brand-name-sub {
+  font-size: var(--tg-font-size-sm);
+  opacity: 0.78;
+}
+
+.login-brand-title {
+  font-size: 32px;
+  line-height: 1.28;
+  font-weight: var(--tg-font-weight-bold);
+  letter-spacing: var(--tg-font-letter-tight);
+  margin: 0 0 var(--tg-space-xl);
+  max-width: 15em;
+}
+
+.login-brand-desc {
+  font-size: var(--tg-font-size-lg);
+  line-height: var(--tg-font-line-loose);
+  opacity: 0.86;
+  margin: 0;
+  max-width: 30em;
+}
+
+.login-brand-points {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tg-space-lg);
+  margin-top: var(--tg-space-colossal);
+}
+
+.login-brand-point {
+  display: flex;
+  gap: var(--tg-space-lg);
+  padding: var(--tg-space-xl);
+  border-radius: var(--tg-radius-card);
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.login-brand-point-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  font-size: 15px;
+  opacity: 0.95;
+}
+
+.login-brand-point-title {
+  display: block;
+  font-size: var(--tg-font-size);
+  font-weight: var(--tg-font-weight-medium);
+  margin-bottom: var(--tg-space-xxs);
+}
+
+.login-brand-point-desc {
+  display: block;
+  font-size: var(--tg-font-size-sm);
+  line-height: var(--tg-font-line-normal);
+  opacity: 0.78;
+}
+
+.login-brand-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-lg);
+  flex-wrap: wrap;
+  font-size: var(--tg-font-size-sm);
+  opacity: 0.82;
+}
+
+.login-brand-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+}
+
+.login-brand-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--tg-radius-pill);
+  background: #6ee7b7;
+  box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.25);
+}
+
+/* ---------------- 右侧登录卡 ---------------- */
+
+.login-panel {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--tg-space-colossal) var(--tg-space-xxxl);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 424px;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-card-lg);
+  box-shadow: var(--tg-shadow-lg);
+  padding: var(--tg-space-colossal) var(--tg-space-huge) var(--tg-space-xxl);
+}
+
+.login-mini-brand {
+  display: none;
+  align-items: center;
+  gap: var(--tg-space-lg);
+  margin-bottom: var(--tg-space-xxl);
+}
+
+.login-mini-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--tg-radius-md);
+  background-image: linear-gradient(135deg, var(--tg-color-gradient-from), var(--tg-color-gradient-to));
+  color: var(--tg-color-on-primary);
+  font-size: var(--tg-font-size-sm);
+  font-weight: var(--tg-font-weight-bold);
+}
+
+.login-card-head {
+  margin-bottom: var(--tg-space-xxl);
+}
+
+.login-env-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tg-space-sm);
+  height: 22px;
+  padding: 0 var(--tg-space-md);
+  border-radius: var(--tg-radius-pill);
+  background: var(--tg-color-warning-bg);
+  color: var(--tg-color-warning);
+  font-size: var(--tg-font-size-xs);
+  margin-bottom: var(--tg-space-xl);
+}
+
+.login-title {
+  font-size: 24px;
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: var(--tg-font-letter-tight);
+  color: var(--tg-color-text-primary);
+  margin: 0 0 var(--tg-space-md);
+}
+
+.login-subtitle {
+  font-size: var(--tg-font-size);
+  color: var(--tg-color-text-tertiary);
+  margin: 0;
+  line-height: var(--tg-font-line-normal);
+}
+
+.login-hint {
+  margin-bottom: var(--tg-space-xl);
+}
+
+.login-hint-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tg-space-sm);
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--tg-color-text-link);
+  font-size: var(--tg-font-size-sm);
+  cursor: pointer;
+}
+
+.login-hint-toggle:hover {
+  color: var(--tg-color-text-link-hover);
+}
+
+.login-form .ant-form-item-label > label {
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-color-text-secondary);
+}
+
+.login-form .ant-input-affix-wrapper,
+.login-form .ant-input {
+  border-radius: var(--tg-radius-control);
+}
+
+.login-capslock {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-sm);
+  margin: calc(var(--tg-space-sm) * -1) 0 var(--tg-space-lg);
+  padding: var(--tg-space-sm) var(--tg-space-lg);
+  border-radius: var(--tg-radius-sm);
+  background: var(--tg-color-warning-bg);
+  color: var(--tg-color-warning);
+  font-size: var(--tg-font-size-sm);
+}
+
+.login-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-lg);
+  margin-bottom: var(--tg-space-xl);
+}
+
+.login-row-note {
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-color-text-tertiary);
+}
+
+.login-foot {
+  margin: var(--tg-space-xxl) 0 0;
+  padding-top: var(--tg-space-xl);
+  border-top: 1px solid var(--tg-color-divider);
+  font-size: var(--tg-font-size-sm);
+  line-height: var(--tg-font-line-loose);
+  color: var(--tg-color-text-tertiary);
+  text-align: center;
+}
+
+.login-foot strong {
+  color: var(--tg-color-text-secondary);
+  font-weight: var(--tg-font-weight-medium);
+}
+
+@media (max-width: 980px) {
+  .login-brand {
+    display: none;
+  }
+
+  .login-mini-brand {
+    display: flex;
+  }
+
+  .login-panel {
+    padding: var(--tg-space-huge) var(--tg-space-xl);
+    align-items: flex-start;
+  }
+
+  .login-card {
+    margin-top: var(--tg-space-mega);
+    padding: var(--tg-space-huge) var(--tg-space-xxl);
+    box-shadow: var(--tg-shadow-md);
+  }
+}
