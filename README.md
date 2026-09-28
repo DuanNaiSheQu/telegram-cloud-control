@@ -12,7 +12,7 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.4-2AABEE.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.5-2AABEE.svg" alt="Version"></a>
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新记录-blue.svg" alt="Changelog"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
@@ -30,8 +30,7 @@
 </p>
 
 <p>
-  <a href="docs/SPONSOR.md"><img src="https://img.shields.io/badge/%E8%B5%9E%E5%8A%A9-%E6%94%AF%E6%8C%81%E9%A1%B9%E7%9B%AE-FF69B4?logo=githubsponsors&logoColor=white" alt="赞助"></a>
-  <a href="https://github.com/sponsors/cafinxnull"><img src="https://img.shields.io/badge/GitHub%20Sponsors-%E8%B5%9E%E5%8A%A9-3FB950?logo=github&logoColor=white" alt="GitHub Sponsors"></a>
+  <a href="docs/SPONSOR.md"><img src="https://img.shields.io/badge/%E8%B5%9E%E5%8A%A9%E5%95%86-CAFINX%20%C2%B7%20CAFINXSIM-2AABEE" alt="赞助商"></a>
 </p>
 
 <p>
@@ -40,9 +39,53 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="#部署与运维">部署</a> ·
   <a href="#开发与测试">开发</a> ·
-  <a href="#赞助">赞助</a> ·
+  <a href="#赞助商">赞助商</a> ·
   <a href="#文档索引">文档</a>
 </p>
+
+---
+
+### 核心能力
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h4>账号矩阵</h4>
+      <sub>四种格式批量导入（手机号 / Session 串 / .session / tdata）、深度验活与健康分、<br>
+      每号独立设备指纹、节流防封与养号阶梯</sub><br>
+      <sub><a href="docs/ACCOUNT_MATRIX.md">文档 →</a></sub>
+    </td>
+    <td width="33%" valign="top">
+      <h4>群情报采集</h4>
+      <sub>入群即采、不发言不回应；粘贴群链接自动采群员，<br>
+      进度逐条可见，采完一键打包（群总表 + 成员 + 事件）</sub><br>
+      <sub><a href="docs/ACCOUNT_MATRIX.md#7-群情报入群即采无感">文档 →</a></sub>
+    </td>
+    <td width="33%" valign="top">
+      <h4>批量运营</h4>
+      <sub>私信 / 群发 / 素材群发 / 加群 / 退群 / 强拉 / 改资料 / 吵群 / 拟人发言，<br>
+      按批次跟踪进度、可取消、可打包导出</sub><br>
+      <sub><a href="docs/FEATURES.md#3-营销中心批量动作">文档 →</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <h4>会话收件箱</h4>
+      <sub>群聊、私信、Bot 私信统一入口，WebSocket 实时推送，AI 草稿人工确认后发送</sub><br>
+      <sub><a href="docs/FEATURES.md#4-会话与收件箱">文档 →</a></sub>
+    </td>
+    <td valign="top">
+      <h4>任务队列与租约</h4>
+      <sub>一个号同时只被一个 Worker 使用；被节流拦下的任务顺延而不是硬发</sub><br>
+      <sub><a href="docs/ARCHITECTURE.md#3-任务队列">文档 →</a></sub>
+    </td>
+    <td valign="top">
+      <h4>审计与权限</h4>
+      <sub>谁在什么时间对哪个号做了什么全部留痕；操作员只能看到分配给自己的账号</sub><br>
+      <sub><a href="docs/SECURITY.md">文档 →</a></sub>
+    </td>
+  </tr>
+</table>
 
 </div>
 
@@ -71,7 +114,7 @@
 - [部署与运维](#部署与运维)
 - [范围与合规边界](#范围与合规边界)
 - [路线图](#路线图)
-- [赞助](#赞助)
+- [赞助商](#赞助商)
 - [贡献](#贡献)
 - [许可证](#许可证)
 - [鸣谢](#鸣谢)
@@ -548,22 +591,7 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 - [ ] 英文文档
 - [ ] 多租户字段（当前单租户使用，不拆商户）
 
-## 赞助
-
-这个项目是给自己人用的运维后台，没有付费点、没有广告、也不卖数据。它的成本落在看不见的地方：
-服务器与带宽、每个号的出站代理、AI 调用的 token、Webhook 要用的域名与证书，以及跟进 Telegram 变更的时间。
-
-如果它帮你省下了时间，可以考虑赞助：
-
-<p>
-  <a href="https://github.com/sponsors/cafinxnull"><img src="https://img.shields.io/badge/GitHub%20Sponsors-%E8%B5%9E%E5%8A%A9-3FB950?logo=github&logoColor=white" alt="GitHub Sponsors"></a>
-  <a href="docs/SPONSOR.md"><img src="https://img.shields.io/badge/%E5%BE%AE%E4%BF%A1%2F%E6%94%AF%E4%BB%98%E5%AE%9D-%E6%89%AB%E7%A0%81%E8%B5%9E%E5%8A%A9-07C160" alt="扫码赞助"></a>
-  <a href="docs/SPONSOR.md"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-%E8%B5%9E%E5%8A%A9-946CE6" alt="爱发电"></a>
-</p>
-
-### 赞助方
-
-感谢以下赞助方让这个项目能持续跟进 Telegram 的变化。它们本身也是这套系统在真实运营里用到的服务：
+## 赞助商
 
 <table>
   <tr>
@@ -571,7 +599,7 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
       <a href="https://cafinx.com"><img src="docs/assets/sponsor/cafinx.png" width="88" alt="CAFINX 虚拟卡"></a><br>
       <b><a href="https://cafinx.com">CAFINX 虚拟卡</a></b><br>
       <sub>跨境收付虚拟卡 · cafinx.com</sub><br>
-      <sub>绑卡订阅、小额多笔付款、多号分账时用得上</sub>
+      <sub>绑卡订阅、小额多笔付款、多号分账</sub>
     </td>
     <td align="center" width="50%">
       <a href="https://cafinxsim.com">
@@ -582,20 +610,12 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
       </a><br>
       <b><a href="https://cafinxsim.com">CAFINXSIM</a></b><br>
       <sub>全球 eSIM 流量卡 · cafinxsim.com</sub><br>
-      <sub>一机一号一出口，海外号养号与固定 IP 时用得上</sub>
+      <sub>一机一号一出口，海外号养号与固定 IP</sub>
     </td>
   </tr>
 </table>
 
-> 想成为赞助方 / 交换 Logo 展示：见 [docs/SPONSOR.md](docs/SPONSOR.md) 的「企业赞助」一节。
-
-这里**不列金额、不设档位**：给多给少都一样，匿名也完全可以。赞助只用于让这套东西继续被维护
-（跟进 Telegram 变更、修 bug、把运维与界面做扎实、文档和测试补齐），**不换取功能、不改变范围边界**。
-
-- 支持方式（GitHub Sponsors / 爱发电 / 微信 / 支付宝扫码）、企业赞助与 FAQ：
-  见 **[docs/SPONSOR.md](docs/SPONSOR.md)**。
-- 仓库右上角的 **Sponsor** 按钮由 [`.github/FUNDING.yml`](.github/FUNDING.yml) 配置。
-- 一句话规则：**赞助不会改变任何范围边界**（主线不做的事给钱也不会做，见上一节）。
+赞助商的 Logo 展示位与素材规格见 [docs/SPONSOR.md](docs/SPONSOR.md)。
 
 ## 贡献
 
@@ -621,27 +641,35 @@ license 徽章从「待定」改成对应协议。
 
 ## 文档索引
 
-完整索引与阅读顺序：[**docs/README.md**](docs/README.md)（每篇文档顶部都有指回索引的导航条）。
+完整索引：[**docs/README.md**](docs/README.md)。
 
-| 分类 | 文档 | 内容 |
-|---|---|---|
-| 入门 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | 环境要求、起栈、首次登录账号、发第一条消息、常见坑排查 |
-| 功能 | [docs/FEATURES.md](docs/FEATURES.md) | 功能地图：账号矩阵、群情报、营销中心、会话、任务、Bot、治理、边界 |
-| 功能 | [docs/ACCOUNT_MATRIX.md](docs/ACCOUNT_MATRIX.md) | 四类导入、深度验活、节流防封、群情报采集、官方机制养号 |
-| 架构 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 进程职责、数据模型（21 张表）、任务队列与租约、状态口径 |
-| 接口 | [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | HTTP / WebSocket / Webhook 契约、任务载荷约定、错误与权限 |
-| 部署 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 本地与 Compose、生产清单、反代与证书、备份、升级与回滚 |
-| 运维 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 故障速查、告警逐条处置、恢复演练、容量与巡检 |
-| 运维 | [deploy/postgres-backup.md](deploy/postgres-backup.md) | 备份产物、逻辑恢复、PITR 全步骤、演练清单 |
-| 安全 | [docs/SECURITY.md](docs/SECURITY.md) | 凭据与加密、权限模型、审计留痕、行为边界、数据留存 |
-| 验收 | [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | 规划条目 → 产物 → 可复跑命令；哪些需真机验证 |
-| 协作 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | 开发环境、代码约定、验收门槛、发版与提交流程 |
-| 协作 | [AGENTS.md](AGENTS.md) | 仓库约定：远程仓库、凭据隔离、本地运行排障 |
-| 版本 | [CHANGELOG.md](CHANGELOG.md) · [VERSION](VERSION) | 变更记录；版本号真源（后端 /health 与前端侧栏都读它） |
-| 路线 | [规划.md](规划.md) | 产品口径：范围、状态定义、页面结构、不做清单 |
-| 代码 | [frontend/src/components/README.md](frontend/src/components/README.md) | 通用组件清单与用法（改 UI 前先看） |
-| 代码 | [frontend/src/theme/README.md](frontend/src/theme/README.md) | 设计 token 与主题机制（改样式前先看） |
-| 赞助 | [docs/SPONSOR.md](docs/SPONSOR.md) | 赞助方、支持方式、鸣谢墙、企业 Logo 展示位 |
+| 我想…… | 文档 |
+|---|---|
+| 把它跑起来、登录第一个号 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) |
+| 知道这套系统能做什么 | [docs/FEATURES.md](docs/FEATURES.md) |
+| 管账号：导入、验活、防封、群情报采集 | [docs/ACCOUNT_MATRIX.md](docs/ACCOUNT_MATRIX.md) |
+| 部署到服务器、备份、升级 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| 搞清密钥、权限与数据边界 | [docs/SECURITY.md](docs/SECURITY.md) |
+| 线上出问题了 | [docs/OPERATIONS.md](docs/OPERATIONS.md) |
+| 看每个版本改了什么 | [CHANGELOG.md](CHANGELOG.md)（版本号真源 [VERSION](VERSION)） |
+| 赞助商 | [docs/SPONSOR.md](docs/SPONSOR.md) |
+
+<details>
+<summary><b>工程与协作文档（开发/运维时再看）</b></summary>
+
+| 文档 | 内容 |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 进程职责、数据模型（21 张表）、任务队列与租约、状态口径 |
+| [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | HTTP / WebSocket / Webhook 契约、任务载荷、错误与权限 |
+| [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | 验收范围、关键不变量、可复跑命令 |
+| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | 开发环境、代码约定、验收门槛、发版流程 |
+| [规划.md](规划.md) | 产品口径：范围、状态定义、页面结构、不做清单 |
+| [AGENTS.md](AGENTS.md) | 仓库约定：远程仓库、凭据隔离、本地运行排障 |
+| [deploy/postgres-backup.md](deploy/postgres-backup.md) | 数据库备份产物、PITR 恢复步骤、演练清单 |
+| [frontend/src/components/README.md](frontend/src/components/README.md) | 通用组件清单与用法（改 UI 前先看） |
+| [frontend/src/theme/README.md](frontend/src/theme/README.md) | 设计 token 与主题机制（改样式前先看） |
+
+</details>
 
 <div align="center">
   <br>

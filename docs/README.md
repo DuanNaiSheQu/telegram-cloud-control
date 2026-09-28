@@ -16,7 +16,7 @@
 | 想改代码 / 提 PR | [CONTRIBUTING.md](CONTRIBUTING.md) | 开发环境、代码约定、验收门槛、提交规范 |
 | 版本改了哪些东西 | [../CHANGELOG.md](../CHANGELOG.md) | 按版本记录功能与修复 |
 | 接下来打算做什么 | [../规划.md](../规划.md) | 范围边界与路线 |
-| 赞助 / 成为赞助方 | [SPONSOR.md](SPONSOR.md) | 赞助方、支持方式、Logo 展示位 |
+| 赞助商 / 成为赞助方 | [SPONSOR.md](SPONSOR.md) | 赞助商 Logo 与简介、Logo 展示位规格 |
 
 ## 按类别归类
 
@@ -50,7 +50,7 @@
 
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — 开发环境、代码约定、验收门槛、提交与 PR 规范、安全问题披露方式。
 - **[../AGENTS.md](../AGENTS.md)** — 本仓库的协作约定（远程仓库、凭据隔离、本地运行）。
-- **[SPONSOR.md](SPONSOR.md)** — 赞助方与支持方式（不设档位与金额）、企业 Logo 展示位规格。
+- **[SPONSOR.md](SPONSOR.md)** — 赞助商（Logo + 简介 + 官网）与 Logo 展示位规格。
 - **[../CHANGELOG.md](../CHANGELOG.md)** — 版本记录（版本号真源是 [`../VERSION`](../VERSION)）。
 
 ### 代码内文档
