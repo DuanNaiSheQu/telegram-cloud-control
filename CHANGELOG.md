@@ -7,6 +7,33 @@
 
 ---
 
+## v0.3.1 — 2026-09-29
+
+主题：**文档与品牌标识补齐**——赞助方 Logo 入库、README 写完整、版本记录机制固化。
+
+### 文档
+
+- README 新增「最新更新」（当前版本功能摘要）与「赞助方」（Logo + 简介）两段，
+  顶部徽章补齐版本与变更记录入口，界面预览补上营销中心与群情报截图。
+- [`docs/SPONSOR.md`](docs/SPONSOR.md) 新增「赞助方」区块与「企业赞助与 Logo 展示」说明，
+  列清成为赞助方需要提供的素材规格（浅色底 + 深色底两版）。
+- 新增赞助方素材到 `docs/assets/sponsor/`：
+
+| 文件 | 赞助方 | 用途 |
+|---|---|---|
+| `cafinx.png` | [CAFINX 虚拟卡](https://cafinx.com) | 狐狸标识，README 与赞助页展示 |
+| `cafinxsim.png` / `cafinxsim-white.png` | [CAFINXSIM](https://cafinxsim.com) | 横向字标，深色模式用 `<picture>` + `prefers-color-scheme` 自动切白色版 |
+| `cafinxsim-mark.png` | CAFINXSIM | 图形标记（方位置用） |
+
+- 素材维护方式写入 `docs/assets/sponsor/README.md`：覆盖同名文件即可，Markdown 引用不用改。
+
+### 修复
+
+- `docs/SPONSOR.md` 的「赞助方」区块一直没写进去：判断条件用了 `"## 赞助方"`，
+  而它是 `"## 赞助方式"` 的前缀，永远命中为「已存在」。改用图片路径做存在性判断后正常写入。
+
+---
+
 ## v0.3.0 — 2026-09-29
 
 主题：**账号矩阵成熟化**——多格式导入、验活、防封，加上群情报采集与官方机制养号。

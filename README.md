@@ -12,7 +12,7 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.0-2AABEE.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.1-2AABEE.svg" alt="Version"></a>
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新记录-blue.svg" alt="Changelog"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
@@ -559,6 +559,34 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
   <a href="docs/SPONSOR.md"><img src="https://img.shields.io/badge/%E5%BE%AE%E4%BF%A1%2F%E6%94%AF%E4%BB%98%E5%AE%9D-%E6%89%AB%E7%A0%81%E8%B5%9E%E5%8A%A9-07C160" alt="扫码赞助"></a>
   <a href="docs/SPONSOR.md"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-%E8%B5%9E%E5%8A%A9-946CE6" alt="爱发电"></a>
 </p>
+
+### 赞助方
+
+感谢以下赞助方让这个项目能持续跟进 Telegram 的变化。它们本身也是这套系统在真实运营里用到的服务：
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="https://cafinx.com"><img src="docs/assets/sponsor/cafinx.png" width="88" alt="CAFINX 虚拟卡"></a><br>
+      <b><a href="https://cafinx.com">CAFINX 虚拟卡</a></b><br>
+      <sub>跨境收付虚拟卡 · cafinx.com</sub><br>
+      <sub>绑卡订阅、小额多笔付款、多号分账时用得上</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="https://cafinxsim.com">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinxsim-white.png">
+          <img src="docs/assets/sponsor/cafinxsim.png" width="210" alt="CAFINXSIM">
+        </picture>
+      </a><br>
+      <b><a href="https://cafinxsim.com">CAFINXSIM</a></b><br>
+      <sub>全球 eSIM 流量卡 · cafinxsim.com</sub><br>
+      <sub>一机一号一出口，海外号养号与固定 IP 时用得上</sub>
+    </td>
+  </tr>
+</table>
+
+> 想成为赞助方 / 交换 Logo 展示：见 [docs/SPONSOR.md](docs/SPONSOR.md) 的「企业赞助」一节。
 
 | 档位 | 金额（一次性 / 月） | 你能得到 |
 |---|---|---|

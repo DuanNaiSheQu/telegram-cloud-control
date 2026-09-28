@@ -12,6 +12,53 @@
 
 ---
 
+## 赞助方
+
+感谢下面的赞助方。它们不只是出钱，本身也都是这套系统在真实运营中用到的服务——
+放在这里既是对它们的回报，也是给同样在做多号运营的人的参考。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="https://cafinx.com"><img src="assets/sponsor/cafinx.png" width="96" alt="CAFINX 虚拟卡"></a><br>
+      <b><a href="https://cafinx.com">CAFINX 虚拟卡</a></b><br>
+      <sub>跨境收付虚拟卡</sub><br>
+      <sub><a href="https://cafinx.com">cafinx.com</a></sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="https://cafinxsim.com">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="assets/sponsor/cafinxsim-white.png">
+          <img src="assets/sponsor/cafinxsim.png" width="220" alt="CAFINXSIM">
+        </picture>
+      </a><br>
+      <b><a href="https://cafinxsim.com">CAFINXSIM</a></b><br>
+      <sub>全球 eSIM 流量卡</sub><br>
+      <sub><a href="https://cafinxsim.com">cafinxsim.com</a></sub>
+    </td>
+  </tr>
+</table>
+
+### 为什么这两个和本项目相关
+
+| 赞助方 | 做什么 | 在本项目里的用法 |
+|---|---|---|
+| [CAFINX 虚拟卡](https://cafinx.com) | 跨境收付用的虚拟卡 | Telegram 相关的订阅与小额多笔付款；多号运营时分账、控额度 |
+| [CAFINXSIM](https://cafinxsim.com) | 全球 eSIM 流量卡 | 一机一号一出口：海外号需要稳定、干净的出口 IP 时，eSIM 比公共代理更不容易撞风控 |
+
+> 说明：以上是赞助方介绍，不构成效果承诺。出口 IP 只是降低风控的一个变量，
+> 账号能不能用得久，更多取决于行为是否像真人（见 [ACCOUNT_MATRIX.md](ACCOUNT_MATRIX.md) 的节流与官方机制养号）。
+
+### 企业赞助与 Logo 展示
+
+- **企业档**（¥2000+ / 月 ¥300+）包含本页与 README 的 Logo 展示位，位置与尺寸与上面两家一致；
+- Logo 素材请提供：**浅色底一张 + 深色底一张**（PNG 透明背景或 SVG，横向字标建议宽度 ≥ 640px），
+  归档到 `docs/assets/sponsor/` 后由维护者更新本页与 README；
+- 已收录的素材：`docs/assets/sponsor/cafinx.png`（CAFINX 虚拟卡）、
+  `docs/assets/sponsor/cafinxsim.png` 与 `cafinxsim-white.png`（CAFINXSIM，深浅两版）。
+
+---
+
 ## 为什么需要赞助
 
 这套控制台是给**自己的号、自己的 Bot、自己的员工**用的运维后台，代码里没有 SaaS 收费点，也不会塞广告或者把数据卖出去。它的成本都在看不见的地方：

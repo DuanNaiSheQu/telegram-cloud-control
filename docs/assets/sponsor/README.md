@@ -15,3 +15,15 @@
 3. 只想放一个码：保存成 `sponsor-qr.png`，然后删掉文档里另外两张图的引用。
 
 > 这些是**占位图**，内容只是提示文字；提交前记得换成真实收款码，不要把占位图留在对外页面上。
+
+## 赞助方 Logo（已收录）
+
+| 文件 | 用途 | 来源 |
+|---|---|---|
+| `cafinx.png`（256×256） | CAFINX 虚拟卡标识，用于 README 与 SPONSOR.md | <https://cafinx.com> 站点图标 |
+| `cafinxsim.png`（320×123） | CAFINXSIM 横向字标（浅色底） | 品牌素材 `logo.png` |
+| `cafinxsim-white.png`（320×123） | CAFINXSIM 横向字标（深色底，README 用 `<picture>` 自动切换） | 品牌素材 `logo-white.png` |
+| `cafinxsim-mark.png`（256×256） | CAFINXSIM 图形标记（方位置用） | 品牌素材 `logo-mark.png` |
+
+更新方式：把新素材覆盖同名文件即可，README 与 SPONSOR.md 的引用不需要改
+（深色模式靠 `<picture>` + `prefers-color-scheme` 自动切到 `-white` 版本）。
