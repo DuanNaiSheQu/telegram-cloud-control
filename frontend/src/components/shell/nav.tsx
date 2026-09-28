@@ -96,7 +96,7 @@ export const NAV_GROUPS: NavGroup[] = [
         badge: 'abnormal',
         badgeTone: 'danger',
       },
-      { path: '/groups', label: '账号分组', icon: <AppstoreOutlined />, description: '内部标签，用来把号分给同事' },
+      { path: '/groups', label: '账号分组', icon: <AppstoreOutlined />, description: '自定义标签，用来把号分给同事' },
       {
         path: '/detection',
         label: '账号检测',

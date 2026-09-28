@@ -10,7 +10,7 @@
 <!-- 徽章说明：仓库为 private 时 shields.io 的 github/* 徽章会显示 not found，
      改成 public 后自动恢复；其余静态徽章不受影响。 -->
 <p>
-  <a href="#许可证"><img src="https://img.shields.io/badge/license-内部使用-blue.svg" alt="License"></a>
+  <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
@@ -84,7 +84,7 @@
 | 七态状态机 | `待登录 / 正常 / 要验证码 / 冻结 / 失效 / 永久双向 / 停用`，状态由 Worker 按实况写回，页面标色区分 |
 | 单号检测 | 一键续租 + 读一次真实状态（连得上 / 要验证码 / 会话失效），结果写回该行 |
 | 验证码登录 | 只用这个号自己的验证码：发码 → 提交 →（可选）两步密码，会话串加密落库；登录成功后自动补一条「同步会话」 |
-| 分组与代理 | 内部标签把号分给同事；每个号绑定固定出站地址（代理口令加密保存，页面只显示「有没有」） |
+| 分组与代理 | 自定义标签把号分给同事；每个号绑定固定出站地址（代理口令加密保存，页面只显示「有没有」） |
 | 批量操作 | 批量检测 / 同步会话 / 分配 / 改分组 / 改代理 / 停用启用 / 清租约 —— 都是「对已有的号做一次已有操作」 |
 | 导出与详情 | 按当前筛选导出 CSV；点行看账号详情抽屉（租约、会话、最近消息、任务、审计一次拉齐） |
 
@@ -95,7 +95,7 @@
 | 两条连接一张收件箱 | 用户号的群聊/私信（Worker 长连接）与官方 Bot 的私信/群消息（Webhook）统一落进 `dialogs` / `messages` |
 | 实时推送 | WebSocket 只推当前打开的会话；断线自动重连并按会话补订阅 |
 | IM 级阅读体验 | 消息按时间正序、日期分隔、失败态重发、无限上翻、未读分隔线、会话内搜索 |
-| AI 草稿 | 按内部资料生成一段回复，**停在输入框**，员工点发送才出去（未配置 AI 时给引导文案，不报错弹窗） |
+| AI 草稿 | 按资料库生成一段回复，**停在输入框**，员工点发送才出去（未配置 AI 时给引导文案，不报错弹窗） |
 | 发送二分支 | 用户号 → `pending` + 任务（非正常状态会明确拒绝并说明原因）；Bot → 直接调 Bot API 发回原聊天 |
 
 ### 任务中心
@@ -511,7 +511,7 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 - [ ] 会话标签与备注（需要后端加字段）
 - [ ] 告警直达企业微信 / 钉钉 / 飞书机器人
 - [ ] 英文文档
-- [ ] 多租户字段（当前按内部一套使用，不拆商户）
+- [ ] 多租户字段（当前单租户使用，不拆商户）
 
 ## 赞助
 
@@ -547,11 +547,12 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 
 ## 许可证
 
-当前为**内部使用 / 保留所有权利**：可以自由地在自己公司内部部署使用，不需要额外授权；
-**未经授权不得二次分发或商用**。
+**许可证待定**：作者正在为开源发布选定协议（常见选择：AGPL-3.0 或 MIT）。
+在 `LICENSE` 文件落地之前，你可以自由地自托管部署并使用本项目的全部功能；
+对外二次分发或商用请先联系仓库作者。
 
-如果要公开或开源，仓库作者只需做两件事：加入所选许可证的 `LICENSE` 文件，并把本 README 顶部的
-license 徽章从「内部使用」改成对应协议（常见选择：AGPL-3.0 或 MIT）。在此之前，对外分发请先联系作者。
+选定协议后只需两步：把所选协议的 `LICENSE` 文件加入仓库根目录，并把本 README 顶部的
+license 徽章从「待定」改成对应协议。
 
 ## 鸣谢
 

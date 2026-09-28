@@ -118,7 +118,7 @@ class ProfileUpdateRequest(BaseModel):
     photo_url: Optional[str] = Field(default=None, max_length=512)
 
 
-# ---------------- 内部工具 ----------------
+# ---------------- 模块内工具 ----------------
 
 def _digits(value: Optional[str]) -> str:
     return "".join(ch for ch in (value or "") if ch.isdigit())

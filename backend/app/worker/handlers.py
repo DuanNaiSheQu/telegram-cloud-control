@@ -283,7 +283,7 @@ def sender_name_of(event: Any) -> str:
 def make_new_message_handler(
     *, worker_id: str, account_id: uuid.UUID, redis: Any
 ) -> Callable[[Any], Awaitable[None]]:
-    """给一个号造 NewMessage 处理器；内部兜住所有异常，不打挂 Worker。"""
+    """给一个号造 NewMessage 处理器；兜住所有异常，不打挂 Worker。"""
 
     async def _handler(event: Any) -> None:
         try:

@@ -168,7 +168,7 @@ export function EditAccountModal({
           <Input.TextArea rows={2} />
         </Form.Item>
         <Typography.Text type="secondary">
-          分组是内部标签，代理是这个号固定的出站地址，Worker 认领时读取。
+          分组是自定义标签，代理是这个号固定的出站地址，Worker 认领时读取。
         </Typography.Text>
       </Form>
     </Modal>

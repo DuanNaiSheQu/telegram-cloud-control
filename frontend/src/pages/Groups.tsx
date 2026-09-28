@@ -177,7 +177,7 @@ export default function Groups() {
   return (
     <PageContainer
       title="账号分组"
-      description="分组是内部标签，用来把号分给同事；一个号同一时间只属于一个分组。"
+      description="分组是自定义标签，用来把号分给同事；一个号同一时间只属于一个分组。"
       actions={
         <Space>
           <Button

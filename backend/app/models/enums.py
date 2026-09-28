@@ -19,7 +19,7 @@ class AccountStatus(str, enum.Enum):
     frozen = "frozen"          # 冻结：被 Telegram 限制，不再替它发送
     invalid = "invalid"        # 失效：会话打不开
     dead = "dead"              # 永久双向：只留记录，不再认领
-    disabled = "disabled"      # 内部停用：人工下线
+    disabled = "disabled"      # 人工停用：手动下线
 
 
 #: 可被 Worker 认领的状态（dead 与 disabled 不再认领）

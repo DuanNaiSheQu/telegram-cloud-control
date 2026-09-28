@@ -34,7 +34,7 @@ def _enum(enum_cls, name: str):
 
 
 class AccountGroup(Base, TimestampMixin):
-    """账号分组：内部标签，用来把号分给同事。"""
+    """账号分组：自定义标签，用来把号分给同事。"""
 
     __tablename__ = "account_groups"
 

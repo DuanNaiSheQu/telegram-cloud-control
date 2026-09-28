@@ -83,7 +83,7 @@ export default function Login() {
               <span className="login-brand-point-title" style={{ color: 'var(--tg-color-text-primary)' }}>
                 Telegram 云控
               </span>
-              <span className="login-brand-point-desc">内部运维控制台</span>
+              <span className="login-brand-point-desc">Telegram 运营控制台</span>
             </span>
           </div>
 
@@ -91,7 +91,7 @@ export default function Login() {
 
           <div className="login-card-head">
             <h1 className="login-title">欢迎回来</h1>
-            <p className="login-subtitle">使用员工账号登录，登录后可查看你被分配的账号与会话。</p>
+            <p className="login-subtitle">使用你的账号登录，登录后可查看你被分配的账号与会话。</p>
           </div>
 
           {!hintDismissed ? (

@@ -138,7 +138,7 @@ export function AppShell() {
         <main className="app-content">
           <div className="app-content-inner">
             {/* 每个页面各自一个错误边界：某个页面崩了，外壳和其它页面照常可用。
-                路由级懒加载的骨架放在外壳内部，切页时侧栏/顶栏不闪。 */}
+                路由级懒加载的骨架放在外壳内，切页时侧栏/顶栏不闪。 */}
             <ErrorBoundary key={location.pathname}>
               <Suspense fallback={<PageSkeleton />}>
                 <Outlet />

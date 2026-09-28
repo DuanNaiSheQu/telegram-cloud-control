@@ -194,7 +194,7 @@ function MaterialsTab() {
       <Card size="small" title="新建文字素材">
         <Space.Compact style={{ width: '100%' }}>
           <Input
-            placeholder="素材名（内部识别用）"
+            placeholder="素材名（便于识别，例如：八月活动话术）"
             value={name}
             onChange={(event) => setName(event.target.value)}
             style={{ width: 240 }}

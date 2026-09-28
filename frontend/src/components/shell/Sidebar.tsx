@@ -222,7 +222,7 @@ export function Sidebar({
         {!collapsed ? (
           <span className="app-logo-text">
             Telegram 云控
-            <span className="app-logo-sub">内部运维控制台</span>
+            <span className="app-logo-sub">Telegram 运营控制台</span>
           </span>
         ) : null}
       </div>

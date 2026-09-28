@@ -15,7 +15,7 @@ const FEATURES: Feature[] = [
   { title: '账号矩阵托管', desc: '登录、检测、同步、发送由 Worker 长连接托管' },
   { title: '消息中转', desc: '会话消息实时转发到员工群，员工回复送回原会话' },
   { title: '批量运营', desc: '私信、群发、素材、加退群、吵群与拟人发言按批次执行' },
-  { title: '权限与审计', desc: '员工只看到分配的号，谁在什么时候做了什么都有记录' },
+  { title: '权限与审计', desc: '成员只看到分配给自己的号，谁在什么时候做了什么都有记录' },
 ];
 
 /** Telegram 纸飞机标记（白描边，用于品牌区与迷你品牌头） */
@@ -46,7 +46,7 @@ export default function BrandPanel() {
           </span>
           <span className="login-brand-name-text">
             <span className="login-brand-name-main">Telegram 云控</span>
-            <span className="login-brand-name-sub">内部运维控制台</span>
+            <span className="login-brand-name-sub">开源 · 可自托管</span>
           </span>
         </div>
 
@@ -74,7 +74,7 @@ export default function BrandPanel() {
           <span className="login-brand-status-dot" aria-hidden />
           控制台服务运行中
         </span>
-        <span>内部系统 · 仅限授权员工使用 · v1.0.0</span>
+        <span>开源项目 · 数据留在自己的服务器 · v1.0.0</span>
       </div>
     </section>
   );

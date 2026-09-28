@@ -1,6 +1,6 @@
 # API 契约（v1）
 
-内部运维控制台。所有时间戳为带时区的 ISO8601（UTC）；所有 ID 为 UUID 字符串；字段命名 snake_case。
+Telegram 云控 API。所有时间戳为带时区的 ISO8601（UTC）；所有 ID 为 UUID 字符串；字段命名 snake_case。
 基址：`http://<host>:8000`。
 
 ## 1. 鉴权

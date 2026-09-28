@@ -19,7 +19,7 @@ class AIUnavailable(RuntimeError):
 
 
 DRAFT_SYSTEM_PROMPT = (
-    "你是 Telegram 会话助理，为内部员工生成一段可直接发送的回复草稿。"
+    "你是 Telegram 会话助理，为运营人员生成一段可直接发送的回复草稿。"
     "要求：语气自然、简短、与上下文语言一致；不要编造未提供的事实；"
     "不要寒暄解释，只输出要发送的正文。"
 )
@@ -94,7 +94,7 @@ class AIService:
         history: Sequence[Message],
         instruction: str = "",
     ) -> str:
-        """按内部资料生成一段回复草稿，交给员工确认。"""
+        """按资料库生成一段回复草稿，交给运营人员确认。"""
         self._ensure()
         context_lines = [
             f"会话类型：{'群聊' if str(getattr(dialog.kind, 'value', dialog.kind)) == 'group' else '私信'}",
@@ -115,7 +115,7 @@ class AIService:
     ) -> str:
         """官方 Bot 用自己的资料自动回复，身份是 Bot。"""
         self._ensure()
-        persona = (bot.persona_text or "").strip() or "这是一个内部使用的服务号，请礼貌地说明你无法回答该问题。"
+        persona = (bot.persona_text or "").strip() or "这是一个自动应答的服务号，请礼貌地说明你无法回答该问题。"
         system = (
             f"{BOT_SYSTEM_PROMPT}\n\n=== 本 Bot 资料 ===\n{persona}\n=== 资料结束 ===\n"
             f"会话：{dialog.title}；对方：{dialog.peer_display or dialog.tg_chat_id}"

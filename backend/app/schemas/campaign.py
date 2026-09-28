@@ -256,7 +256,7 @@ class CampaignBatchListResponse(BaseModel):
 # ---------------- 素材 ----------------
 
 class MaterialCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=128, description="素材名（内部识别用）")
+    name: str = Field(min_length=1, max_length=128, description="素材名（便于识别，例如：八月活动话术）")
     kind: MaterialKind = MaterialKind.text
     text: Optional[str] = Field(default=None, description="文字内容；媒体素材可作为 caption")
     file_name: Optional[str] = Field(default=None, description="已上传文件的存储名（由上传接口回填）")

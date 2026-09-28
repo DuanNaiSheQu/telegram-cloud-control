@@ -105,7 +105,7 @@ class DraftBody(BaseModel):
     instruction: str = Field(default="", max_length=500)
 
 
-# ---------------- 内部工具 ----------------
+# ---------------- 模块内工具 ----------------
 
 async def _load_dialog(session: AsyncSession, dialog_id: uuid.UUID) -> Dialog:
     dialog = await session.scalar(select(Dialog).where(Dialog.id == dialog_id))
