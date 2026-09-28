@@ -1,0 +1,23 @@
+# GitHub 赞助按钮配置（出现在仓库右上角「Sponsor」按钮）
+#
+# 生效条件：仓库 Settings → Features 里勾选 Sponsorships，
+# 且 GitHub Sponsors 已开通（https://github.com/sponsors）。
+#
+# 下面只启用了 GitHub Sponsors 与自定义链接；没开通的平台保持注释状态，
+# 开通后取消对应行的注释即可（custom 里可以放爱发电 / 微信收款页 / 支付宝收款页等）。
+
+github: [cafinxnull]
+
+# 其他平台（按需取消注释，键名必须是 GitHub 支持的平台名）
+# patreon: your-patreon
+# open_collective: your-collective
+# ko_fi: your-kofi
+# buy_me_a_coffee: your-bmc
+# polar: your-polar
+# thanks_dev: u/gh/your-name
+
+custom:
+  # 爱发电（把下面替换成你的主页地址后取消注释）
+  # - "https://afdian.com/a/cafinxnull"
+  # 自定义赞助说明页（默认指向仓库内的赞助页）
+  - "https://github.com/cafinxnull/telegram-cloud-control/blob/main/docs/SPONSOR.md"

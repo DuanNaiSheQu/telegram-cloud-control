@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="支付宝收款码占位图">
+  <rect width="240" height="240" rx="16" fill="#FFFFFF"/>
+  <rect x="8" y="8" width="224" height="224" rx="12" fill="none" stroke="#1677FF" stroke-width="3" stroke-dasharray="10 8"/>
+  <text x="120" y="98" text-anchor="middle" font-family="-apple-system, PingFang SC, sans-serif" font-size="18" font-weight="600" fill="#1677FF">支付宝收款码</text>
+  <text x="120" y="126" text-anchor="middle" font-family="-apple-system, PingFang SC, sans-serif" font-size="13" fill="#666666">这里是占位图</text>
+  <text x="120" y="150" text-anchor="middle" font-family="-apple-system, PingFang SC, sans-serif" font-size="12" fill="#999999">docs/assets/sponsor/alipay.svg</text>
+  <text x="120" y="174" text-anchor="middle" font-family="-apple-system, PingFang SC, sans-serif" font-size="12" fill="#999999">替换成真实收款码</text>
+</svg>
