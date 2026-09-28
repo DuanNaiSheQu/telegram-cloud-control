@@ -499,6 +499,24 @@ a:hover {
 
 /* ---------------------------------------------------------------- 工具类 */
 
+/* 表格单元格里的单行截断：自定义 render 返回元素时 antd 的 ellipsis 不生效，
+   必须由元素自己是块级 + 有确定宽度才能截断，否则长文本（例如失败原因）会撑破列宽遮挡别的列 */
+.tg-clamp-cell {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-text-danger {
+  color: var(--tg-color-danger);
+}
+
+.tg-text-success {
+  color: var(--tg-color-success);
+}
+
 .ellipsis,
 .tg-ellipsis {
   overflow: hidden;

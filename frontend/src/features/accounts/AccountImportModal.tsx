@@ -10,7 +10,7 @@
  * - 可顺手绑定代理与分组，并按「养号起点从今天算」入库（新号从最严档开始限速）。
  */
 import { useMemo, useState } from 'react';
-import { Alert, Button, Form, Input, Modal, Segmented, Select, Space, Switch, Table, Tag, Typography, Upload } from 'antd';
+import { Alert, Button, Form, Input, Modal, Segmented, Select, Space, Switch, Table, Tag, Typography, Upload, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { InboxOutlined, RocketOutlined } from '@ant-design/icons';
 import { accountImportApi, groupApi, proxyApi } from '../../api/endpoints';
@@ -120,7 +120,16 @@ export default function AccountImportModal({ open, onClose, onImported }: Props)
     {
       title: '解析结果',
       dataIndex: 'error',
-      render: (value: string | null) => (value ? <span style={{ color: 'var(--tg-color-danger)' }}>{value}</span> : '可以导入'),
+      width: 320,
+      ellipsis: { showTitle: false },
+      render: (value: string | null) => {
+        const text = value || '可以导入';
+        return (
+          <Tooltip title={text} placement="topLeft">
+            <span className={value ? 'tg-clamp-cell tg-text-danger' : 'tg-clamp-cell'}>{text}</span>
+          </Tooltip>
+        );
+      },
     },
   ];
 

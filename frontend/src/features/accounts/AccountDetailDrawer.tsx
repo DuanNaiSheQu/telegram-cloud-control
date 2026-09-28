@@ -4,7 +4,7 @@
  * 分区：基本信息 / 状态与租约 / 统计 / 最近会话 / 最近消息 / 最近任务 / 最近审计；
  * 底部操作条由页面传入 handler（返回 Promise 时抽屉自动重新加载概览）。
  */
-import { Button, Space } from 'antd';
+import { Button, Space, Tooltip } from 'antd';
 import {
   CloudSyncOutlined,
   DeleteOutlined,
@@ -138,7 +138,17 @@ export default function AccountDetailDrawer({ accountId, handlers, onClose }: Pr
                   },
                   { label: '租约状态', value: overview?.lease?.active ? '持有中' : '未持有' },
                   { label: '最近检测', value: formatTime(account.last_checked_at) },
-                  { label: '最近错误', value: account.last_error || '—', span: 'full' },
+                  {
+                    label: '最近错误',
+                    span: 'full',
+                    value: account.last_error ? (
+                      <Tooltip title={account.last_error} placement="topLeft">
+                        <span className="tg-clamp-cell tg-text-danger">{account.last_error}</span>
+                      </Tooltip>
+                    ) : (
+                      '—'
+                    ),
+                  },
                 ],
               },
             ]

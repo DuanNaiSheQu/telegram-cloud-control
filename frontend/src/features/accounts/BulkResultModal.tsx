@@ -4,7 +4,7 @@
  * 输入是 /api/accounts/bulk/* 的统一响应 BulkResultOut；
  * 命中上限截断（truncated）时在顶部给黄色提示，引导缩小范围。
  */
-import { Modal, Alert, Table, Typography } from 'antd';
+import { Modal, Alert, Table, Typography, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Link } from 'react-router-dom';
 import type { BulkItemResult, BulkResultOut } from '../../api/types';
@@ -37,7 +37,13 @@ export default function BulkResultModal({ open, result, onClose }: Props) {
     {
       title: '说明',
       dataIndex: 'message',
-      render: (value: string) => value || <span className="tg-muted">—</span>,
+      width: 340,
+      ellipsis: { showTitle: false },
+      render: (value: string) => (
+        <Tooltip title={value || ''} placement="topLeft">
+          <span className="tg-clamp-cell">{value || '—'}</span>
+        </Tooltip>
+      ),
     },
     {
       title: '检测状态',

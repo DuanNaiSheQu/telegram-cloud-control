@@ -251,12 +251,11 @@ export default function Tasks() {
         title: '失败原因',
         key: 'error',
         dataIndex: 'error',
+        width: 320,
         render: (value: string) =>
           value ? (
             <Tooltip title={<div style={{ maxWidth: 520, whiteSpace: 'pre-wrap' }}>{value}</div>}>
-              <span className="ellipsis" style={{ display: 'inline-block', maxWidth: 300, color: 'var(--tg-color-danger)' }}>
-                {value}
-              </span>
+              <span className="tg-clamp-cell tg-text-danger">{value}</span>
             </Tooltip>
           ) : (
             <Typography.Text type="secondary">—</Typography.Text>

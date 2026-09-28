@@ -19,6 +19,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -187,11 +188,16 @@ export default function GroupIntel() {
     {
       title: '目标',
       dataIndex: 'link',
+      width: 300,
       render: (value: string | null, record) => (
         <span className="tg-stack" style={{ gap: 2 }}>
-          <span className="tg-ellipsis" style={{ maxWidth: 320, display: 'inline-block' }}>{value || record.title || '—'}</span>
+          <Tooltip title={value || record.title || ''} placement="topLeft">
+            <span className="tg-clamp-cell tg-mono">{value || record.title || '—'}</span>
+          </Tooltip>
           {record.title ? (
-            <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-xs)' }}>{record.title}</span>
+            <span className="tg-muted tg-clamp-cell" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
+              {record.title}
+            </span>
           ) : null}
         </span>
       ),
@@ -224,9 +230,16 @@ export default function GroupIntel() {
     {
       title: '说明',
       dataIndex: 'detail',
-      ellipsis: true,
-      render: (value: string, record) =>
-        record.error ? <span style={{ color: 'var(--tg-color-danger)' }}>{record.error}</span> : value || '—',
+      width: 380,
+      ellipsis: { showTitle: false },
+      render: (value: string, record) => {
+        const text = record.error || value || '—';
+        return (
+          <Tooltip title={text} placement="topLeft">
+            <span className={record.error ? 'tg-clamp-cell tg-text-danger' : 'tg-clamp-cell'}>{text}</span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: '更新',
@@ -406,6 +419,8 @@ export default function GroupIntel() {
         <Table<CollectJob>
           size="small"
           rowKey="task_id"
+          tableLayout="fixed"
+          scroll={{ x: 1080 }}
           style={{ marginTop: 'var(--tg-space-md)' }}
           columns={jobColumns}
           dataSource={jobs.data?.jobs ?? []}
