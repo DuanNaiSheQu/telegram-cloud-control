@@ -118,7 +118,7 @@ export default function Network() {
           <span className="tg-flex" style={{ alignItems: 'center', gap: 'var(--tg-space-sm)' }}>
             <span className="tg-num">{record.account_count} 个</span>
             {health && health.abnormal > 0 ? (
-              <Tooltip title="绑定账号里有异常状态（needs_code / frozen / invalid / dead / disabled），建议排查账号或换代理">
+              <Tooltip title="绑定账号里有异常状态（要验证码 / 冻结 / 失效 / 永久双向 / 停用），建议排查账号或换代理">
                 <SoftTag tone="danger" size="sm">
                   <ThunderboltOutlined /> {health.abnormal} 个异常
                 </SoftTag>

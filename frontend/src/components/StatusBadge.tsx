@@ -40,7 +40,9 @@ export function StatusBadge({
   style,
 }: StatusBadgeProps) {
   const key = status ?? 'disabled';
-  const text = label || (status ? ACCOUNT_STATUS_LABELS[status] : '') || status || '未知';
+  // 后端将来新增状态时，宁可显示「未知状态」也不要把英文枚举裸露给值班同事；原始值放 title 供排查
+  const rawUnknown = status && !ACCOUNT_STATUS_LABELS[status] ? status : null;
+  const text = label || (status ? ACCOUNT_STATUS_LABELS[status] : '') || (status ? '未知状态' : '未知');
   const known = Boolean(status);
 
   const colorFg = known ? `var(--tg-color-account-${key}-fg)` : 'var(--tg-color-neutral)';
@@ -57,6 +59,7 @@ export function StatusBadge({
 
   const badge = (
     <span
+      title={rawUnknown ? `未知状态（原始值：${rawUnknown}）` : reason || undefined}
       className={['tg-status-badge', className].filter(Boolean).join(' ')}
       style={{
         height: size === 'sm' ? 20 : 24,

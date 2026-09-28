@@ -29,6 +29,7 @@ const Detection = lazy(() => import('./pages/Detection'));
 const Network = lazy(() => import('./pages/Network'));
 const Dialogs = lazy(() => import('./pages/Dialogs'));
 const Tasks = lazy(() => import('./pages/Tasks'));
+const Campaigns = lazy(() => import('./pages/Campaigns'));
 const Relay = lazy(() => import('./pages/Relay'));
 const Bots = lazy(() => import('./pages/Bots'));
 const Assignments = lazy(() => import('./pages/Assignments'));
@@ -88,6 +89,7 @@ function ThemedApp() {
                 >
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/tasks" element={<Tasks />} />
+                  <Route path="/campaigns" element={<Campaigns />} />
                   <Route path="/accounts" element={<Accounts />} />
                   <Route path="/groups" element={<Groups />} />
                   <Route path="/detection" element={<Detection />} />

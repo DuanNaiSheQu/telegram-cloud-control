@@ -331,7 +331,7 @@ export default function Accounts() {
   return (
     <PageContainer
       title="账号管理"
-      description="状态、分组、心跳、当前任务；异常口径与工作台一致（非 healthy 且非 pending）。"
+      description="状态、分组、心跳、当前任务；异常口径与工作台一致（不等于「正常」，也不是「待登录」）。"
       actions={
         <Space>
           <Button icon={<KeyOutlined />} onClick={() => { setWizardAccount(null); setWizardOpen(true); }}>
@@ -345,8 +345,8 @@ export default function Accounts() {
     >
       <StatGrid>
         <StatCard title="账号总数" value={summary?.total ?? accounts.data?.total ?? 0} tone="primary" icon={<UserSwitchOutlined />} hint="含停用与待登录" onClick={() => q.reset()} />
-        <StatCard title="正常" value={summary?.healthy ?? 0} tone="success" icon={<SafetyCertificateOutlined />} hint="healthy" onClick={() => q.setFilter('status', 'healthy')} />
-        <StatCard title="异常" value={summary?.abnormal ?? 0} tone={summary?.abnormal ? 'danger' : 'success'} icon={<ThunderboltOutlined />} hint="needs_code / frozen / invalid / dead / disabled" />
+        <StatCard title="正常" value={summary?.healthy ?? 0} tone="success" icon={<SafetyCertificateOutlined />} hint="租约有效、心跳正常" onClick={() => q.setFilter('status', 'healthy')} />
+        <StatCard title="异常" value={summary?.abnormal ?? 0} tone={summary?.abnormal ? 'danger' : 'success'} icon={<ThunderboltOutlined />} hint="要验证码 / 冻结 / 失效 / 永久双向 / 停用" />
         <StatCard
           title="本周新增"
           value={summary?.new_this_week ?? 0}

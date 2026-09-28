@@ -2262,3 +2262,156 @@ body .ant-spin-container::after {
     overflow: visible;
   }
 }
+
+/* ============================================================================
+   工作台：任务队列磁贴 / 快捷入口（新增，2026-09-28）
+   与 .tg-stat-card 同一套变量与交互语言：hover 抬升 1px + 阴影升级 + focus 环。
+   ============================================================================ */
+.tg-queue-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tg-space-md);
+}
+
+.tg-queue-tile {
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-xs);
+  padding: var(--tg-space-lg) var(--tg-space-xl);
+  background: var(--tg-color-bg-sunken);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-lg);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.tg-queue-tile:hover {
+  background: var(--tg-color-bg-card);
+  border-color: var(--tg-color-border);
+  box-shadow: var(--tg-shadow-md);
+  transform: translateY(-1px);
+}
+
+.tg-queue-tile:focus-visible {
+  outline: none;
+  box-shadow: var(--tg-shadow-focus);
+}
+
+.tg-queue-tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--tg-radius-md);
+  font-size: 14px;
+  background: var(--tg-color-neutral-bg);
+  color: var(--tg-color-neutral);
+}
+
+.tg-queue-tile-icon.is-primary { background: var(--tg-color-primary-bg); color: var(--tg-color-primary); }
+.tg-queue-tile-icon.is-success { background: var(--tg-color-success-bg); color: var(--tg-color-success); }
+.tg-queue-tile-icon.is-warning { background: var(--tg-color-warning-bg); color: var(--tg-color-warning); }
+.tg-queue-tile-icon.is-danger  { background: var(--tg-color-danger-bg);  color: var(--tg-color-danger); }
+.tg-queue-tile-icon.is-info    { background: var(--tg-color-info-bg);    color: var(--tg-color-info); }
+
+.tg-queue-tile-label {
+  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size-sm);
+  font-weight: var(--tg-font-weight-medium);
+}
+
+.tg-queue-tile-value {
+  font-size: var(--tg-font-size-title);
+  font-weight: var(--tg-font-weight-semibold);
+  color: var(--tg-color-text);
+  line-height: 1.2;
+}
+
+.tg-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--tg-space-md);
+}
+
+.tg-quick-link {
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  padding: var(--tg-space-md) var(--tg-space-lg);
+  background: var(--tg-color-bg-sunken);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-lg);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.tg-quick-link:hover {
+  background: var(--tg-color-bg-card);
+  border-color: var(--tg-color-border);
+  box-shadow: var(--tg-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.tg-quick-link:focus-visible {
+  outline: none;
+  box-shadow: var(--tg-shadow-focus);
+}
+
+.tg-quick-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: var(--tg-radius-md);
+  font-size: 15px;
+  background: var(--tg-color-neutral-bg);
+  color: var(--tg-color-neutral);
+}
+
+.tg-quick-link-icon.is-primary { background: var(--tg-color-primary-bg); color: var(--tg-color-primary); }
+.tg-quick-link-icon.is-success { background: var(--tg-color-success-bg); color: var(--tg-color-success); }
+.tg-quick-link-icon.is-warning { background: var(--tg-color-warning-bg); color: var(--tg-color-warning); }
+.tg-quick-link-icon.is-danger  { background: var(--tg-color-danger-bg);  color: var(--tg-color-danger); }
+.tg-quick-link-icon.is-info    { background: var(--tg-color-info-bg);    color: var(--tg-color-info); }
+
+.tg-quick-link-label {
+  color: var(--tg-color-text);
+  font-size: var(--tg-font-size-sm);
+  font-weight: var(--tg-font-weight-medium);
+  display: block;
+}
+
+.tg-quick-link-desc {
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-xs);
+  display: block;
+  min-width: 0;
+}
+
+.tg-notify-item {
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  display: flex;
+  gap: var(--tg-space-lg);
+  align-items: flex-start;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--tg-color-divider);
+  padding: var(--tg-space-lg) var(--tg-space-xl);
+  transition: background 0.16s ease;
+}
+
+.tg-notify-item:hover {
+  background: var(--tg-color-bg-hover);
+}
+
+.tg-notify-item:focus-visible {
+  outline: none;
+  box-shadow: var(--tg-shadow-focus);
+}

@@ -76,7 +76,7 @@ export function TaskStatusTag({
 }: TagBaseProps & { status?: TaskStatus | null; label?: string | null }) {
   if (!status) return <SoftTag tone="neutral" size={size}>{label || '未知'}</SoftTag>;
   const key = status;
-  const text = label || TASK_STATUS_LABELS[status] || status;
+  const text = label || TASK_STATUS_LABELS[status] || '未知状态';
   const tag = (
     <span
       className={['tg-status-badge', className].filter(Boolean).join(' ')}
@@ -116,7 +116,7 @@ export function TaskTypeTag({
   style,
 }: TagBaseProps & { type?: TaskType | string | null; label?: string | null }) {
   if (!type) return <span className="tg-muted">—</span>;
-  const text = label || TASK_TYPE_LABELS[type as TaskType] || type;
+  const text = label || TASK_TYPE_LABELS[type as TaskType] || '未知类型';
   return (
     <SoftTag
       tone="info"
@@ -138,7 +138,7 @@ export function CurrentTaskTag({
   style,
 }: TagBaseProps & { task?: CurrentTask | null; label?: string | null }) {
   if (!task) return <span className="tg-muted">—</span>;
-  const text = label || CURRENT_TASK_LABELS[task] || task;
+  const text = label || CURRENT_TASK_LABELS[task] || '未知任务';
   if (task === 'idle') {
     return (
       <SoftTag tone="neutral" size={size} className={className} style={style}>
@@ -162,7 +162,7 @@ export function MessageStatusTag({
   style,
 }: TagBaseProps & { status?: MessageStatus | null; label?: string | null }) {
   if (!status) return null;
-  const text = label || MESSAGE_STATUS_LABELS[status] || status;
+  const text = label || MESSAGE_STATUS_LABELS[status] || '未知状态';
   return (
     <SoftTag tone={MESSAGE_STATUS_TONE[status]} size={size} showDot className={className} style={style}>
       {text}

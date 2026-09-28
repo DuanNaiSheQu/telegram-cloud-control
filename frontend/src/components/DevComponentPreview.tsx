@@ -259,7 +259,7 @@ export function DevComponentPreview() {
               失败
             </Button>
             <Button onClick={() => toast.info('已复制')}>信息</Button>
-            <Button onClick={() => toast.notify('error', '任务失败', { description: '单条发送：账号不在 healthy 状态' })}>
+            <Button onClick={() => toast.notify('error', '任务失败', { description: '单条发送：账号不在正常状态' })}>
               横幅通知
             </Button>
           </Space>

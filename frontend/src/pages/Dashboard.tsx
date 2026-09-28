@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Button, Segmented, Space, Switch, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -7,9 +8,15 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   FieldTimeOutlined,
+  GlobalOutlined,
+  MessageOutlined,
   ReloadOutlined,
   RiseOutlined,
+  SafetyCertificateOutlined,
+  ScheduleOutlined,
+  SendOutlined,
   ThunderboltOutlined,
+  UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
 import { dashboardApi, metricsApi, notificationApi } from '../api/endpoints';
@@ -28,6 +35,7 @@ import {
   TaskTypeTag,
 } from '../components';
 import type { FailedTaskOut, MetricsWindow, NotificationOut, WorkerStatus } from '../api/types';
+import type { Tone } from '../constants';
 import TrendChart from '../features/dashboard/TrendChart';
 
 const REFRESH_MS = 15_000;
@@ -41,13 +49,13 @@ function deltaOf(points: { v: number }[]): number | null {
   return Math.round(((last - prev) / prev) * 100);
 }
 
-const QUICK_LINKS: { path: string; label: string; desc: string }[] = [
-  { path: '/accounts', label: '账号管理', desc: '状态、分组、心跳' },
-  { path: '/detection', label: '账号检测', desc: '连得上 / 要验证码 / 失效' },
-  { path: '/network', label: '网络', desc: '代理与出站地址' },
-  { path: '/tasks', label: '任务中心', desc: '队列与失败重试' },
-  { path: '/dialogs', label: '会话', desc: '私信与群聊' },
-  { path: '/audit', label: '操作记录', desc: '谁在什么时候做了什么' },
+const QUICK_LINKS: { path: string; label: string; desc: string; icon: ReactNode; tone: Tone }[] = [
+  { path: '/accounts', label: '账号管理', desc: '状态、分组、心跳', icon: <UserOutlined />, tone: 'primary' },
+  { path: '/detection', label: '账号检测', desc: '连得上 / 要验证码 / 失效', icon: <SafetyCertificateOutlined />, tone: 'success' },
+  { path: '/network', label: '网络', desc: '代理与出站地址', icon: <GlobalOutlined />, tone: 'info' },
+  { path: '/tasks', label: '任务中心', desc: '队列进度与失败重试', icon: <ScheduleOutlined />, tone: 'warning' },
+  { path: '/campaigns', label: '营销中心', desc: '批量私信 / 群发 / 加退群', icon: <SendOutlined />, tone: 'danger' },
+  { path: '/dialogs', label: '会话', desc: '私信与群聊', icon: <MessageOutlined />, tone: 'primary' },
 ];
 
 export default function Dashboard() {
@@ -196,10 +204,10 @@ export default function Dashboard() {
   };
 
   const queueItems = [
-    { key: 'pending', label: '待执行 pending', value: data?.tasks_pending ?? 0, tone: 'info' as const, icon: <ClockCircleOutlined /> },
-    { key: 'running', label: '执行中 running', value: data?.tasks_running ?? 0, tone: 'primary' as const, icon: <RiseOutlined /> },
-    { key: 'overdue', label: '到期未执行 overdue', value: data?.tasks_overdue ?? 0, tone: 'warning' as const, icon: <FieldTimeOutlined /> },
-    { key: 'stuck', label: '卡住 stuck', value: data?.tasks_stuck ?? 0, tone: 'danger' as const, icon: <ExclamationCircleOutlined /> },
+    { key: 'pending', label: '待执行', value: data?.tasks_pending ?? 0, tone: 'info' as const, icon: <ClockCircleOutlined /> },
+    { key: 'running', label: '执行中', value: data?.tasks_running ?? 0, tone: 'primary' as const, icon: <RiseOutlined /> },
+    { key: 'overdue', label: '到期未领', value: data?.tasks_overdue ?? 0, tone: 'warning' as const, icon: <FieldTimeOutlined /> },
+    { key: 'stuck', label: '卡住', value: data?.tasks_stuck ?? 0, tone: 'danger' as const, icon: <ExclamationCircleOutlined /> },
   ];
 
   return (
@@ -240,7 +248,7 @@ export default function Dashboard() {
           icon={<WarningOutlined />}
           delta={abnormalDelta === null ? undefined : { value: abnormalDelta, goodWhen: 'down' }}
           trend={trendByKey.get('abnormal_accounts')}
-          hint="needs_code / frozen / invalid / dead / disabled"
+          hint="要验证码 / 冻结 / 失效 / 永久双向 / 停用"
           onClick={() => navigate('/accounts?status=abnormal')}
         />
         <StatCard
@@ -355,45 +363,22 @@ export default function Dashboard() {
             error={error}
             onRetry={() => void reload()}
           >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                gap: 'var(--tg-space-lg)',
-              }}
-            >
+            <div className="tg-queue-grid">
               {queueItems.map((item) => (
                 <button
                   key={item.key}
                   type="button"
+                  className="tg-queue-tile"
                   onClick={() => navigate(`/tasks?status=${item.key}`)}
-                  style={{
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    background: 'var(--tg-color-bg-sunken)',
-                    border: '1px solid var(--tg-color-border-subtle)',
-                    borderRadius: 'var(--tg-radius-lg)',
-                    padding: 'var(--tg-space-lg) var(--tg-space-xl)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 'var(--tg-space-xs)',
-                  }}
                 >
-                  <span
-                    className="tg-flex"
-                    style={{ alignItems: 'center', gap: 'var(--tg-space-sm)', color: `var(--tg-color-${item.tone})`, fontSize: 'var(--tg-font-size-sm)' }}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </span>
-                  <span className="tg-num" style={{ fontSize: 'var(--tg-font-size-title)', fontWeight: 'var(--tg-font-weight-semibold)' }}>
-                    {item.value}
-                  </span>
+                  <span className={`tg-queue-tile-icon is-${item.tone}`}>{item.icon}</span>
+                  <span className="tg-queue-tile-label">{item.label}</span>
+                  <span className="tg-queue-tile-value tg-num">{item.value}</span>
                 </button>
               ))}
             </div>
             <Typography.Paragraph type="secondary" style={{ marginTop: 'var(--tg-space-lg)', marginBottom: 0, fontSize: 'var(--tg-font-size-sm)' }}>
-              overdue = 过了 next_run_at 还没被认领；stuck = running 超过阈值未完成，优先人工介入。
+              到期未领：已过计划执行时间、仍没有被 Worker 认领；卡住：执行中超时未完成，需要优先人工介入。
             </Typography.Paragraph>
           </SectionCard>
 
@@ -420,19 +405,8 @@ export default function Dashboard() {
                 <button
                   key={item.id}
                   type="button"
+                  className="tg-notify-item"
                   onClick={() => void markRead(item)}
-                  style={{
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: '1px solid var(--tg-color-divider)',
-                    padding: 'var(--tg-space-lg) var(--tg-space-xl)',
-                    width: '100%',
-                    display: 'flex',
-                    gap: 'var(--tg-space-lg)',
-                    alignItems: 'flex-start',
-                  }}
                 >
                   <span
                     aria-hidden
@@ -462,35 +436,18 @@ export default function Dashboard() {
           </SectionCard>
 
           <SectionCard title="快捷入口" subtitle="常用页面一键跳转">
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                gap: 'var(--tg-space-md)',
-              }}
-            >
+            <div className="tg-quick-grid">
               {QUICK_LINKS.map((item) => (
                 <button
                   key={item.path}
                   type="button"
+                  className="tg-quick-link"
                   onClick={() => navigate(item.path)}
-                  style={{
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    background: 'var(--tg-color-bg-sunken)',
-                    border: '1px solid var(--tg-color-border-subtle)',
-                    borderRadius: 'var(--tg-radius-md)',
-                    padding: 'var(--tg-space-md) var(--tg-space-lg)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 'var(--tg-space-xxs)',
-                  }}
                 >
-                  <span style={{ color: 'var(--tg-color-text-link)', fontWeight: 'var(--tg-font-weight-medium)', fontSize: 'var(--tg-font-size-sm)' }}>
-                    {item.label}
-                  </span>
-                  <span className="tg-muted tg-ellipsis" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
-                    {item.desc}
+                  <span className={`tg-quick-link-icon is-${item.tone}`}>{item.icon}</span>
+                  <span className="tg-stack" style={{ gap: 'var(--tg-space-xxs)', minWidth: 0 }}>
+                    <span className="tg-quick-link-label">{item.label}</span>
+                    <span className="tg-quick-link-desc tg-ellipsis">{item.desc}</span>
                   </span>
                 </button>
               ))}

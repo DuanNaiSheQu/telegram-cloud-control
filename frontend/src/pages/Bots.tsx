@@ -205,7 +205,7 @@ export default function Bots() {
             {record.relay_target_chat_id ? (
               <CopyableText value={record.relay_target_chat_id} mono />
             ) : (
-              <Typography.Text type="secondary">chat_id 未设置</Typography.Text>
+              <Typography.Text type="secondary">未设置目标会话</Typography.Text>
             )}
           </div>
         ) : (

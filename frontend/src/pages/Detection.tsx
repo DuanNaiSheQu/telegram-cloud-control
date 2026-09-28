@@ -202,7 +202,7 @@ export default function Detection() {
   return (
     <PageContainer
       title="账号检测"
-      description="检测会写一条 account_check 任务，Worker 读到后回写状态；结果为「连得上 / 要验证码 / 会话失效」。"
+      description="检测会写一条账号检测任务，Worker 读到后回写状态；结果为「连得上 / 要验证码 / 会话失效」。"
       actions={
         <Space wrap>
           <Button
