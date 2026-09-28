@@ -12,7 +12,7 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.5-2AABEE.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.6-2AABEE.svg" alt="Version"></a>
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新记录-blue.svg" alt="Changelog"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
@@ -39,9 +39,36 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="#部署与运维">部署</a> ·
   <a href="#开发与测试">开发</a> ·
-  <a href="#赞助商">赞助商</a> ·
-  <a href="#文档索引">文档</a>
+  <a href="#赞助商">赞助商</a>
 </p>
+
+---
+
+<div align="center">
+
+### 赞助商
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="https://cafinx.com"><img src="docs/assets/sponsor/cafinx.png" width="76" alt="CAFINX 虚拟卡"></a><br>
+      <b><a href="https://cafinx.com">CAFINX 虚拟卡</a></b><br>
+      <sub>跨境收付虚拟卡 · cafinx.com</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="https://cafinxsim.com">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinxsim-white.png">
+          <img src="docs/assets/sponsor/cafinxsim.png" width="196" alt="CAFINXSIM">
+        </picture>
+      </a><br>
+      <b><a href="https://cafinxsim.com">CAFINXSIM</a></b><br>
+      <sub>全球 eSIM 流量卡 · cafinxsim.com</sub>
+    </td>
+  </tr>
+</table>
+
+</div>
 
 ---
 
@@ -102,6 +129,7 @@
 
 ## 目录
 
+- [赞助商](#赞助商)
 - [最新更新](#最新更新)
 - [功能特性](#功能特性)
 - [界面预览](#界面预览)
@@ -114,11 +142,9 @@
 - [部署与运维](#部署与运维)
 - [范围与合规边界](#范围与合规边界)
 - [路线图](#路线图)
-- [赞助商](#赞助商)
 - [贡献](#贡献)
 - [许可证](#许可证)
 - [鸣谢](#鸣谢)
-- [文档索引](#文档索引)（完整版：[docs/README.md](docs/README.md)）
 
 ## 功能特性
 
@@ -591,32 +617,6 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 - [ ] 英文文档
 - [ ] 多租户字段（当前单租户使用，不拆商户）
 
-## 赞助商
-
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <a href="https://cafinx.com"><img src="docs/assets/sponsor/cafinx.png" width="88" alt="CAFINX 虚拟卡"></a><br>
-      <b><a href="https://cafinx.com">CAFINX 虚拟卡</a></b><br>
-      <sub>跨境收付虚拟卡 · cafinx.com</sub><br>
-      <sub>绑卡订阅、小额多笔付款、多号分账</sub>
-    </td>
-    <td align="center" width="50%">
-      <a href="https://cafinxsim.com">
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinxsim-white.png">
-          <img src="docs/assets/sponsor/cafinxsim.png" width="210" alt="CAFINXSIM">
-        </picture>
-      </a><br>
-      <b><a href="https://cafinxsim.com">CAFINXSIM</a></b><br>
-      <sub>全球 eSIM 流量卡 · cafinxsim.com</sub><br>
-      <sub>一机一号一出口，海外号养号与固定 IP</sub>
-    </td>
-  </tr>
-</table>
-
-赞助商的 Logo 展示位与素材规格见 [docs/SPONSOR.md](docs/SPONSOR.md)。
-
 ## 贡献
 
 - 提 Issue 请带上：版本（commit）、部署方式（Compose / 本地）、复现步骤、期望与实际、相关日志（JSON 一行一条，注意先脱敏手机号与 Token）。
@@ -638,38 +638,6 @@ license 徽章从「待定」改成对应协议。
 - [Telethon](https://github.com/LonamiWebs/Telethon)、[aiogram](https://github.com/aiogram/aiogram)、[FastAPI](https://github.com/fastapi/fastapi)、[SQLAlchemy](https://github.com/sqlalchemy/sqlalchemy)、[Alembic](https://github.com/sqlalchemy/alembic)、[antd](https://github.com/ant-design/ant-design)、[Vite](https://github.com/vitejs/vite)、[Prometheus](https://github.com/prometheus/prometheus)
 - 界面设计与工程实现由本仓库的 Agent Teams 分工完成：设计底座、后端接口、三组页面分队、独立验收
 - 以及所有赞助者（名单见 [docs/SPONSOR.md](docs/SPONSOR.md#鸣谢墙)）
-
-## 文档索引
-
-完整索引：[**docs/README.md**](docs/README.md)。
-
-| 我想…… | 文档 |
-|---|---|
-| 把它跑起来、登录第一个号 | [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) |
-| 知道这套系统能做什么 | [docs/FEATURES.md](docs/FEATURES.md) |
-| 管账号：导入、验活、防封、群情报采集 | [docs/ACCOUNT_MATRIX.md](docs/ACCOUNT_MATRIX.md) |
-| 部署到服务器、备份、升级 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
-| 搞清密钥、权限与数据边界 | [docs/SECURITY.md](docs/SECURITY.md) |
-| 线上出问题了 | [docs/OPERATIONS.md](docs/OPERATIONS.md) |
-| 看每个版本改了什么 | [CHANGELOG.md](CHANGELOG.md)（版本号真源 [VERSION](VERSION)） |
-| 赞助商 | [docs/SPONSOR.md](docs/SPONSOR.md) |
-
-<details>
-<summary><b>工程与协作文档（开发/运维时再看）</b></summary>
-
-| 文档 | 内容 |
-|---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 进程职责、数据模型（21 张表）、任务队列与租约、状态口径 |
-| [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | HTTP / WebSocket / Webhook 契约、任务载荷、错误与权限 |
-| [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | 验收范围、关键不变量、可复跑命令 |
-| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | 开发环境、代码约定、验收门槛、发版流程 |
-| [规划.md](规划.md) | 产品口径：范围、状态定义、页面结构、不做清单 |
-| [AGENTS.md](AGENTS.md) | 仓库约定：远程仓库、凭据隔离、本地运行排障 |
-| [deploy/postgres-backup.md](deploy/postgres-backup.md) | 数据库备份产物、PITR 恢复步骤、演练清单 |
-| [frontend/src/components/README.md](frontend/src/components/README.md) | 通用组件清单与用法（改 UI 前先看） |
-| [frontend/src/theme/README.md](frontend/src/theme/README.md) | 设计 token 与主题机制（改样式前先看） |
-
-</details>
 
 <div align="center">
   <br>
