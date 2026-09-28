@@ -89,7 +89,8 @@ function ThemedApp() {
                 >
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/tasks" element={<Tasks />} />
-                  <Route path="/campaigns" element={<Campaigns />} />
+                  <Route path="/campaigns" element={<Navigate to="/campaigns/materials" replace />} />
+                  <Route path="/campaigns/:section" element={<Campaigns />} />
                   <Route path="/accounts" element={<Accounts />} />
                   <Route path="/groups" element={<Groups />} />
                   <Route path="/detection" element={<Detection />} />

@@ -5,6 +5,7 @@
  * 结果弹窗复用 BulkResultModal；执行进度看「批次进度」或任务中心。
  */
 import { useEffect, useState } from 'react';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -17,7 +18,6 @@ import {
   Space,
   Switch,
   Table,
-  Tabs,
   Tag,
   Typography,
   Upload,
@@ -435,7 +435,8 @@ function ActionTab({ title, description, submit, buildPayload, children }: Actio
 // ---------------------------------------------------------------- 页面
 
 export default function Campaigns() {
-  const tabs = [
+  const { section } = useParams<{ section: string }>();
+  const sections = [
     { key: 'materials', label: '素材库', children: <MaterialsTab /> },
     {
       key: 'bulk-pm',
@@ -746,12 +747,27 @@ export default function Campaigns() {
     { key: 'batches', label: '批次进度', children: <BatchesTab /> },
   ];
 
+  const navigate = useNavigate();
+  const current = sections.find((item) => item.key === section);
+  if (section && !current) return <Navigate to="/campaigns/materials" replace />;
+  const active = current ?? sections[0];
+
   return (
     <PageContainer
-      title="营销中心"
-      description="批量私信 / 群发 / 素材群发 / 加群退群 / 强拉 / 批量改资料 / 吵群 / 拟人发言。任务按「一 号一任务」入队，进度在批次页查看。"
+      title={active.label}
+      description="批量运营：提交后按「一 号一任务」错峰入队，由 Worker 执行；进度与取消在「批次进度」页。左侧「营销中心」子菜单可切换功能。"
+      actions={
+        <Select
+          size="small"
+          style={{ width: 176 }}
+          value={active.key}
+          onChange={(key) => navigate(`/campaigns/${key}`)}
+          options={sections.map((item) => ({ value: item.key, label: item.label }))}
+          aria-label="切换营销中心功能"
+        />
+      }
     >
-      <Tabs defaultActiveKey="materials" items={tabs} />
+      {active.children}
     </PageContainer>
   );
 }

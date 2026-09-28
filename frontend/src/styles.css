@@ -713,16 +713,6 @@ a:hover {
   margin-top: var(--tg-space-lg);
 }
 
-.app-nav-group-title {
-  padding: 0 var(--tg-space-md) var(--tg-space-xs);
-  color: var(--tg-color-text-tertiary);
-  font-size: var(--tg-font-size-xs);
-  font-weight: var(--tg-font-weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .app-nav-item {
   position: relative;
   display: flex;
@@ -736,8 +726,21 @@ a:hover {
   font-size: var(--tg-font-size);
   cursor: pointer;
   user-select: none;
+  /* 同一套样式要同时服务 <a>（叶子项）与 <button>（含子项的父项）：
+     按钮的浏览器默认灰底 / 居中文字必须显式清掉，否则父项会变成一块灰疙瘩 */
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-weight: inherit;
+  text-align: left;
+  width: calc(100% - var(--tg-space-xs) * 2);
   transition: background-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard),
     color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.app-nav-item:focus-visible {
+  outline: none;
+  box-shadow: var(--tg-shadow-focus);
 }
 
 .app-nav-item:hover {
@@ -2414,4 +2417,128 @@ body .ant-spin-container::after {
 .tg-notify-item:focus-visible {
   outline: none;
   box-shadow: var(--tg-shadow-focus);
+}
+
+/* ============================================================================
+   子菜单式导航（2026-09-28 迭代）
+   分组标题可折叠、含子项的菜单可展开（营销中心 → 素材库 / 批量私信 / … / 批次进度）。
+   复用 .app-nav-item 的既有交互语言，只补层级与折叠相关的部分。
+   ============================================================================ */
+.app-nav-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-sm);
+  width: calc(100% - var(--tg-space-xs) * 2);
+  margin: 0 var(--tg-space-xs);
+  padding: 0 var(--tg-space-md);
+  height: 30px;
+  background: transparent;
+  border: none;
+  border-radius: var(--tg-radius-sm);
+  cursor: pointer;
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-xs);
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: 0.03em;
+  transition: color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.app-nav-group-title:hover {
+  color: var(--tg-color-text-secondary);
+}
+
+.app-nav-group.is-collapsed .app-nav-group-body {
+  display: none;
+}
+
+.app-nav-group-divider {
+  height: 1px;
+  margin: var(--tg-space-md) var(--tg-space-lg) var(--tg-space-xs);
+  background: var(--tg-color-divider);
+}
+
+.app-nav-chevron {
+  flex: 0 0 auto;
+  font-size: 10px;
+  opacity: 0.55;
+  transition: transform var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.app-nav-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* 含子项的菜单项：与叶子项同款，只是右侧多一个折叠箭头 */
+.app-nav-item.is-parent .app-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 展开时父项不整块变蓝：只把图标与箭头提亮，避免视觉过重 */
+.app-nav-item.is-parent[aria-expanded='true'] {
+  color: var(--tg-color-text-primary);
+}
+
+.app-nav-item.is-parent[aria-expanded='true'] .app-nav-chevron {
+  color: var(--tg-color-primary);
+  opacity: 1;
+}
+
+.app-nav-item.is-parent:hover {
+  background: var(--tg-color-bg-sider-hover);
+  color: var(--tg-color-text-primary);
+}
+
+/* 子菜单容器：整块缩进 + 左侧引导线 */
+.app-nav-sub {
+  position: relative;
+  margin: 2px 0 var(--tg-space-xs);
+  padding-left: var(--tg-space-lg);
+}
+
+.app-nav-sub::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--tg-space-lg) + var(--tg-space-xs) + var(--tg-space-md));
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--tg-color-divider);
+}
+
+/* 二级项：更紧凑，图标更小，避开引导线 */
+.app-nav-item.is-sub {
+  height: 32px;
+  margin: 1px var(--tg-space-xs) 1px 0;
+  padding-left: var(--tg-space-xl);
+  gap: var(--tg-space-md);
+  font-size: var(--tg-font-size-sm);
+}
+
+.app-nav-item.is-sub .app-nav-icon {
+  width: 16px;
+  font-size: 13px;
+}
+
+.app-nav-item.is-sub.is-active::before {
+  left: -2px;
+}
+
+/* 侧栏整体折叠时不留子菜单视觉 */
+.app-sider.is-collapsed .app-nav-sub,
+.app-sider.is-collapsed .app-nav-group-title {
+  display: none;
+}
+
+.app-breadcrumb-link {
+  color: var(--tg-color-text-secondary);
+  transition: color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.app-breadcrumb-link:hover {
+  color: var(--tg-color-primary);
 }

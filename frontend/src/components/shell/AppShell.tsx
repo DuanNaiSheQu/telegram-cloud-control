@@ -16,7 +16,7 @@ import { Badge, Drawer } from 'antd';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import GlobalSearch from './GlobalSearch';
-import { matchNav } from './nav';
+import { matchNavTrail } from './nav';
 import { useShellData } from './useShellData';
 import { useAuth } from '../../auth/AuthContext';
 import { useBreakpoint } from '../../hooks/useMediaQuery';
@@ -67,9 +67,18 @@ export function AppShell() {
     setDrawerOpen(false);
   }, [location.pathname]);
 
-  const matched = matchNav(location.pathname);
+  // 面包屑走完整链：运营 / 营销中心 / 素材库（子菜单模式的层级在这里也看得见，前级可点击）
+  const matched = matchNavTrail(location.pathname);
   const breadcrumb = matched
-    ? [{ title: matched.group.title }, { title: matched.item.label }]
+    ? [
+        { title: matched.group.title },
+        ...matched.trail.map((node, index) => ({
+          title: node.label,
+          // 前级给可跳转地址：父节点（营销中心）进它的第一个子页面
+          href:
+            index < matched.trail.length - 1 ? node.children?.[0]?.path ?? node.path : undefined,
+        })),
+      ]
     : [{ title: '控制台' }];
 
   const sidebar = (

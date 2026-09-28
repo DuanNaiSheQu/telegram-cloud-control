@@ -14,6 +14,7 @@
  * │ user             │ UserMenu 的一组 props（透传）                             │
  * └──────────────────┴──────────────────────────────────────────────────────────┘
  */
+import { Link } from 'react-router-dom';
 import { Tooltip } from 'antd';
 import { MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined } from '@ant-design/icons';
 import ConnectionStatus from './ConnectionStatus';
@@ -63,6 +64,10 @@ export function Topbar({
               {index > 0 ? <span className="app-breadcrumb-sep">/</span> : null}
               {index === breadcrumb.length - 1 ? (
                 <span className="app-breadcrumb-current">{crumb.title}</span>
+              ) : crumb.href ? (
+                <Link to={crumb.href} className="app-breadcrumb-link">
+                  {crumb.title}
+                </Link>
               ) : (
                 <span>{crumb.title}</span>
               )}
