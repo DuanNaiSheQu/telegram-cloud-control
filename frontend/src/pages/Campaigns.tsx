@@ -443,7 +443,7 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="批量私信"
-          description="一批号各向目标逐个发消息；texts 给多条时按账号顺序分配，让不同号说的话不一样。目标支持 @username / 手机号 / 数字 user_id，一行一个或逗号分隔。"
+          description="一批号各向目标逐个发消息；文本池给多条时按账号顺序分配给不同号，说的话不重样。目标支持 @用户名、手机号或数字用户 ID，一行一个或逗号分隔。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
             targets: splitField(values.targets),
@@ -459,7 +459,7 @@ export default function Campaigns() {
             <Input.TextArea placeholder="@user1\n@user2\n+8613800138000" autoSize={{ minRows: 3, maxRows: 6 }} />
           </Form.Item>
           <Form.Item label="文本（所有号同一句）" name="text">
-            <Input.TextArea placeholder="填了 text 就忽略文本池" autoSize={{ minRows: 2, maxRows: 4 }} />
+            <Input.TextArea placeholder="填了统一文本就忽略文本池" autoSize={{ minRows: 2, maxRows: 4 }} />
           </Form.Item>
           <Form.Item label="文本池（按账号取模分配，每行一条）" name="texts">
             <Input.TextArea placeholder="第一号发这句\n第二号发这句\n…" autoSize={{ minRows: 3, maxRows: 6 }} />
@@ -484,7 +484,7 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="批量群发"
-          description="一批号各向指定群发一条。目标群支持 @username / 数字 chat_id / 已同步会话的 dialog_id。"
+          description="一批号各向指定群发一条。目标群支持 @用户名、数字群 ID 或已同步的会话 ID。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
             target_group: String(values.target_group ?? '').trim(),
@@ -495,7 +495,7 @@ export default function Campaigns() {
           submit={(payload) => campaignApi.groupBroadcast(payload as unknown as GroupBroadcastRequest)}
         >
           <Form.Item label="目标群" name="target_group" rules={[{ required: true, message: '必填' }]}>
-            <Input placeholder="@username 或 chat_id 或 dialog_id" />
+            <Input placeholder="@用户名 / 群 ID / 会话 ID" />
           </Form.Item>
           <Form.Item label="文本（所有号同一句）" name="text">
             <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
@@ -515,7 +515,7 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="素材群发"
-          description="把素材库里的文字或媒体发给目标：给 target_group 发群里；给 targets 则逐个私信。"
+          description="把素材库里的文字或媒体发给目标：填目标群就发到群里；填私信目标则逐个私信。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
             material_id: String(values.material_id ?? ''),
@@ -530,7 +530,7 @@ export default function Campaigns() {
             <MaterialSelect />
           </Form.Item>
           <Form.Item label="目标群（二选一）" name="target_group">
-            <Input placeholder="@username 或 chat_id 或 dialog_id" />
+            <Input placeholder="@用户名 / 群 ID / 会话 ID" />
           </Form.Item>
           <Form.Item label="私信目标（二选一，每行一个）" name="targets">
             <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
@@ -552,7 +552,7 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="批量加群"
-          description="一批号加入同一个群：邀请链接（t.me/+...）或公开群 @username。已加入的号自动跳过。"
+          description="一批号加入同一个群：邀请链接（t.me/+...）或 @公开群用户名。已加入的号自动跳过。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
             target: String(values.target ?? '').trim(),
@@ -560,7 +560,7 @@ export default function Campaigns() {
           submit={(payload) => campaignApi.joinGroup(payload as unknown as JoinGroupRequest)}
         >
           <Form.Item label="邀请链接或公开群" name="target" rules={[{ required: true, message: '必填' }]}>
-            <Input placeholder="https://t.me/+xxxx 或 @public_group" />
+            <Input placeholder="邀请链接 t.me/+xxxx 或 @公开群用户名" />
           </Form.Item>
         </ActionTab>
       ),
@@ -571,7 +571,7 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="批量退群"
-          description="一批号退出同一个群。@username / 数字 chat_id / 会话 dialog_id 均可。"
+          description="一批号退出同一个群。支持 @用户名、数字群 ID 或会话 ID。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
             target: String(values.target ?? '').trim(),
@@ -580,7 +580,7 @@ export default function Campaigns() {
           submit={(payload) => campaignApi.leaveGroup(payload as unknown as LeaveGroupRequest)}
         >
           <Form.Item label="要退的群" name="target" rules={[{ required: true, message: '必填' }]}>
-            <Input placeholder="@username 或 chat_id 或 dialog_id" />
+            <Input placeholder="@用户名 / 群 ID / 会话 ID" />
           </Form.Item>
           <Form.Item label="退出后删除该会话记录" name="delete_history" valuePropName="checked" initialValue={true}>
             <Switch />
@@ -594,7 +594,7 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="强拉进群"
-          description="把成员拉进目标群。执行号必须是该群管理员（普通群需成员为执行号的联系人）。成员：@username / 手机号 / user_id，每行一个，最多 50。"
+          description="把成员拉进目标群。执行号必须是该群管理员（普通群需成员为执行号的联系人）。成员：@用户名、手机号或数字用户 ID，每行一个，最多 50。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
             group: String(values.group ?? '').trim(),
@@ -603,7 +603,7 @@ export default function Campaigns() {
           submit={(payload) => campaignApi.forceAdd(payload as unknown as ForceAddRequest)}
         >
           <Form.Item label="目标群" name="group" rules={[{ required: true, message: '必填' }]}>
-            <Input placeholder="@username 或 chat_id 或 dialog_id" />
+            <Input placeholder="@用户名 / 群 ID / 会话 ID" />
           </Form.Item>
           <Form.Item label="要拉进的成员（每行一个）" name="members" rules={[{ required: true, message: '至少一个成员' }]}>
             <Input.TextArea placeholder="@user1\n@user2" autoSize={{ minRows: 3, maxRows: 8 }} />
@@ -638,7 +638,7 @@ export default function Campaigns() {
               <Input placeholder="Last name" />
             </Form.Item>
             <Form.Item label="用户名（@ 后面部分）" name="username">
-              <Input placeholder="username" />
+              <Input placeholder="用户名（不含 @）" />
             </Form.Item>
           </Space>
           <Form.Item label="简介" name="bio">
@@ -656,7 +656,7 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="吵群"
-          description="一批号在同一个群里按随机间隔轮流发文本池里的话（每轮随机挑一句），可配置每轮回复群内最近消息的概率。总时长 = rounds × max_interval，不能超过 25 分钟。"
+          description="一批号在同一个群里按随机间隔轮流发文本池里的话（每轮随机挑一句），可配置每轮回复群内最近消息的概率。总时长 = 轮数 × 最大间隔，不能超过 25 分钟。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
             group: String(values.group ?? '').trim() || null,
@@ -669,7 +669,7 @@ export default function Campaigns() {
           submit={(payload) => campaignApi.storm(payload as unknown as StormRequest)}
         >
           <Form.Item label="目标群" name="group" rules={[{ required: true, message: '必填' }]}>
-            <Input placeholder="@username 或 chat_id" />
+            <Input placeholder="@用户名 或 群 ID" />
           </Form.Item>
           <Form.Item label="文本池（每轮随机挑一句，每行一条）" name="texts" rules={[{ required: true, message: '至少一句' }]}>
             <Input.TextArea placeholder="这句不错\n顶一下\n有道理" autoSize={{ minRows: 4, maxRows: 8 }} />
@@ -712,7 +712,7 @@ export default function Campaigns() {
           submit={(payload) => campaignApi.persona(payload as unknown as PersonaRequest)}
         >
           <Form.Item label="目标群" name="group" rules={[{ required: true, message: '必填' }]}>
-            <Input placeholder="@username 或 chat_id" />
+            <Input placeholder="@用户名 或 群 ID" />
           </Form.Item>
           <Form.Item label="人设（给 AI 的角色设定）" name="persona" rules={[{ required: true, message: '必填' }]}>
             <Input.TextArea

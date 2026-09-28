@@ -80,7 +80,7 @@ export function TestMessageModal({ open, botLabel, botId, chatId, onClose }: Tes
           type="warning"
           showIcon
           style={{ marginBottom: 'var(--tg-space-lg)' }}
-          message="请先在表单里选择 Bot 并填写员工群 chat_id，再发测试消息。"
+          message="请先在表单里选择 Bot 并填写员工群（chat_id），再发测试消息。"
         />
       )}
 

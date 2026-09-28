@@ -147,7 +147,7 @@ export function BotFormModal({
           <Form.Item label="目标类型" name="relay_target_kind" style={{ flex: '0 0 160px' }}>
             <Select options={RELAY_TARGET_KIND_OPTIONS} />
           </Form.Item>
-          <Form.Item label="员工群 chat_id" name="relay_target_chat_id" style={{ flex: 1 }}>
+          <Form.Item label="员工群（chat_id）" name="relay_target_chat_id" style={{ flex: 1 }}>
             <InputNumber style={{ width: '100%' }} placeholder="-1001234567890" />
           </Form.Item>
         </Space>
@@ -159,7 +159,7 @@ export function BotFormModal({
         >
           <Switch />
         </Form.Item>
-        <Form.Item label="自动回复资料 persona_text" name="persona_text">
+        <Form.Item label="自动回复资料（persona_text）" name="persona_text">
           <Input.TextArea rows={4} maxLength={2000} showCount placeholder="这个 Bot 的身份和说话方式，自动回复时喂给模型（选填）。" />
         </Form.Item>
         <Form.Item label="备注" name="remark">

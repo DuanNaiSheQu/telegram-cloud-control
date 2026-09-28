@@ -356,9 +356,9 @@ export default function Tasks() {
     () => ({
       expandedRowRender: (record: TaskOut) => (
         <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)', padding: 'var(--tg-space-md) 0' }}>
-          <JsonBlock title="payload（入队参数）" value={record.payload} maxHeight={200} />
+          <JsonBlock title="入队参数（payload）" value={record.payload} maxHeight={200} />
           <JsonBlock
-            title="result（执行结果）"
+            title="执行结果（result）"
             value={record.result ?? null}
             emptyText="（还没有结果）"
             maxHeight={200}

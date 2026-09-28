@@ -152,9 +152,9 @@ export function RelayRouteFormModal({
             <Select placeholder="选择 Bot" options={bots} showSearch optionFilterProp="label" />
           </Form.Item>
           <Form.Item
-            label="员工群 chat_id"
+            label="员工群（chat_id）"
             name="staff_chat_id"
-            rules={[{ required: true, message: '请填写员工群 chat_id' }]}
+            rules={[{ required: true, message: '请填写员工群（chat_id）' }]}
             extra="转发的消息由所选 Bot 发到这个 chat（群或私聊）。"
           >
             <InputNumber style={{ width: '100%' }} placeholder="-1001234567890" />

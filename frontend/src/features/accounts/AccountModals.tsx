@@ -248,19 +248,19 @@ export function ProfileModal({
         key={account?.id}
         initialValues={{ first_name: account?.display_name ?? '' }}
       >
-        <Form.Item label="名称 first_name" name="first_name">
+        <Form.Item label="名称（first_name）" name="first_name">
           <Input placeholder="名称" allowClear />
         </Form.Item>
-        <Form.Item label="姓氏 last_name" name="last_name">
+        <Form.Item label="姓氏（last_name）" name="last_name">
           <Input placeholder="姓氏（可选）" allowClear />
         </Form.Item>
-        <Form.Item label="简介 bio" name="bio">
+        <Form.Item label="简介（bio）" name="bio">
           <Input.TextArea rows={2} placeholder="简介（可选）" />
         </Form.Item>
-        <Form.Item label="用户名 username" name="username">
+        <Form.Item label="用户名（username）" name="username">
           <Input placeholder="不带 @ 的用户名（可选）" allowClear />
         </Form.Item>
-        <Form.Item label="头像 URL photo_url" name="photo_url">
+        <Form.Item label="头像地址（photo_url）" name="photo_url">
           <Input placeholder="https://…（可选）" allowClear />
         </Form.Item>
       </Form>

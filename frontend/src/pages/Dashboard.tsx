@@ -308,7 +308,11 @@ export default function Dashboard() {
             error={error}
             onRetry={() => void reload()}
             bodyPadding="none"
-            empty={!loading && !error && !(data?.workers?.length)}
+            empty={
+              !loading && !error && !(data?.workers?.length)
+                ? { art: 'network', title: '还没有 Worker 上报心跳', description: '启动 Worker 后这里会出现心跳记录。' }
+                : false
+            }
           >
             {staleWorkers.length ? (
               <Alert
@@ -316,7 +320,7 @@ export default function Dashboard() {
                 showIcon
                 style={{ margin: 'var(--tg-space-lg) var(--tg-space-lg) 0' }}
                 message={`${staleWorkers.length} 个 Worker 超过 60 秒无心跳`}
-                description="处置：到部署机确认 worker 进程是否存活（看进程列表与日志），必要时重启；Worker 死后租约到期会被重新认领，账号数据不受影响。"
+                description="处置：到部署机确认 Worker 进程是否存活（看进程列表与日志），必要时重启；Worker 死后租约到期会被重新认领，账号数据不受影响。"
               />
             ) : null}
             <DataTable<WorkerStatus>

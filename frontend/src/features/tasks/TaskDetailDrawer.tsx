@@ -143,11 +143,11 @@ export function TaskDetailDrawer({ taskId, onClose, onRetry, onCancel }: TaskDet
               </div>
             </div>
           ) : null}
-          <JsonBlock title="payload（入队参数）" value={task.payload} />
+          <JsonBlock title="入队参数（payload）" value={task.payload} />
           {task.result !== null && task.result !== undefined ? (
-            <JsonBlock title="result（执行结果）" value={task.result} />
+            <JsonBlock title="执行结果（result）" value={task.result} />
           ) : (
-            <JsonBlock title="result（执行结果）" value={null} emptyText="（还没有结果：任务未完成或未写入）" />
+            <JsonBlock title="执行结果（result）" value={null} emptyText="（还没有结果：任务未完成或未写入）" />
           )}
         </div>
       ) : null}
