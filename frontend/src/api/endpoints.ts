@@ -15,6 +15,7 @@ import type {
   AccountMatrixState,
   BulkAccountRequest,
   BulkAction,
+  CollectJobsResponse,
   CollectLinkRequest,
   GroupCollectRequest,
   GroupEventListResponse,
@@ -311,6 +312,12 @@ export const groupIntelApi = {
   /** 按群链接采集：粘贴链接，自动解析群 + 采群员（可选先加入、采完退出） */
   collectByLink: (payload: CollectLinkRequest) =>
     api.post<BulkResultOut>('/api/group-intel/collect-link', payload),
+  /** 采集进度：每条任务的阶段、已采人数、失败原因（页面每 5 秒轮询） */
+  jobs: (query?: { limit?: number; batch_id?: string; only_active?: boolean }) =>
+    api.get<CollectJobsResponse>('/api/group-intel/jobs', { ...query }),
+  /** 采集结果打包下载（zip：群总表 + 每群成员 + 事件 + 清单） */
+  exportZip: (query?: { profile_ids?: string; batch_id?: string; account_id?: UUID; include_events?: boolean }) =>
+    api.download('/api/group-intel/export.zip', { ...query }),
   /** 群档案列表 */
   profiles: (query: { q?: string; account_id?: UUID | null; min_members?: number; page?: number; page_size?: number }) =>
     api.get<GroupProfileListResponse>('/api/group-intel/profiles', { ...query }),

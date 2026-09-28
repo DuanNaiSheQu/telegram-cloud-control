@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import logging
+import re
+import uuid
+import zipfile
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -21,19 +25,22 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session, visible_account_ids
-from app.api.routers import build_order_by, publish_task_safely
+from app.api.routers import build_order_by, enum_value, publish_task_safely
 from app.api.routers.accounts_bulk import _empty, _item, _resolve_accounts, _response
 from app.config import settings
 from app.core.audit import write_audit
 from app.core.tasks import enqueue_task
 from app.models import (
     GROUP_EVENT_LABELS,
+    TASK_STATUS_LABELS,
     Dialog,
     DialogChannel,
     DialogKind,
     GroupEvent,
     GroupMember,
     GroupProfile,
+    Task,
+    TaskStatus,
     TaskType,
     TgAccount,
     User,
@@ -227,6 +234,7 @@ async def collect_by_link(
 
     items = []
     task_ids: List[uuid.UUID] = []
+    batch_id = str(uuid.uuid4())
     for index, link in enumerate(payload.links):
         # 轮询分配账号：一个号连续进太多群是最容易被风控盯上的形态
         account = accounts[index % len(accounts)]
@@ -237,6 +245,8 @@ async def collect_by_link(
                 account_id=account.id,
                 payload={
                     "link": link,
+                    # 同一批链接共享 batch_id：进度面板与「采集后打包」都按它聚合
+                    "batch_id": batch_id,
                     "join_if_missing": payload.join_if_missing,
                     "leave_after": payload.leave_after,
                     "member_limit": payload.member_limit,
@@ -264,6 +274,7 @@ async def collect_by_link(
         target_type="account_batch",
         target_id=scope,
         detail={
+            "batch_id": batch_id,
             "links": len(payload.links),
             "tasks": len(task_ids),
             "join_if_missing": payload.join_if_missing,
@@ -280,7 +291,7 @@ async def collect_by_link(
         accounts,
         items,
         message=(
-            f"已排队采集 {len(payload.links)} 个链接（{len(task_ids)} 条任务）"
+            f"批次 {batch_id[-8:]}：已排队采集 {len(payload.links)} 个链接（{len(task_ids)} 条任务）"
             + ("；不在群里的号会先加入" if payload.join_if_missing else "；只采已经在群里的号")
             + ("，采完自动退出" if payload.leave_after else "")
         ),
@@ -614,4 +625,268 @@ async def export_members(
         iter([buffer.getvalue()]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="group-members.csv"'},
+    )
+
+# ---------------- 采集进度与打包 ----------------
+
+@router.get("/jobs", summary="采集进度（正在跑什么、跑到哪一步）")
+async def collect_jobs(
+    limit: int = Query(default=50, ge=1, le=200),
+    batch_id: Optional[str] = Query(default=None, description="只看某一批链接"),
+    only_active: bool = Query(default=False, description="只看排队与执行中的"),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """页面「采集进度」的数据源：每条采集任务当前阶段、已采人数、失败原因。
+
+    阶段来自 Worker 写进 `task.result` 的进度快照（resolving / joined / fetching / done）。
+    """
+    ids = await visible_account_ids(session, user)
+    collect_types = (
+        TaskType.collect_group.value,
+        TaskType.collect_members.value,
+        TaskType.collect_link.value,
+    )
+    conditions = [Task.type.in_([TaskType.collect_group, TaskType.collect_members, TaskType.collect_link])]
+    if ids is not None:
+        conditions.append(Task.account_id.in_(ids))
+    if batch_id:
+        conditions.append(Task.payload["batch_id"].astext == batch_id)
+    if only_active:
+        conditions.append(Task.status.in_([TaskStatus.pending, TaskStatus.running]))
+
+    tasks = list(
+        (
+            await session.scalars(
+                select(Task)
+                .where(*conditions)
+                .order_by(Task.created_at.desc(), Task.id.desc())
+                .limit(limit)
+            )
+        ).all()
+    )
+    account_ids = {task.account_id for task in tasks if task.account_id}
+    accounts = {
+        row.id: row
+        for row in (await session.scalars(select(TgAccount).where(TgAccount.id.in_(account_ids)))).all()
+    } if account_ids else {}
+
+    jobs = []
+    stage_counts: dict[str, int] = {}
+    for task in tasks:
+        result = task.result if isinstance(task.result, dict) else {}
+        stage = str(result.get("stage") or ("queued" if task.status == TaskStatus.pending else "running"))
+        if task.status == TaskStatus.failed:
+            stage = "failed"
+        if task.status in (TaskStatus.cancelled,):
+            stage = "cancelled"
+        stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        account = accounts.get(task.account_id)
+        jobs.append(
+            {
+                "task_id": str(task.id),
+                "type": enum_value(task.type),
+                "type_label": "按链接采集" if enum_value(task.type) == "collect_link" else (
+                    "采集群档案" if enum_value(task.type) == "collect_group" else "采集群成员"
+                ),
+                "status": enum_value(task.status),
+                "status_label": TASK_STATUS_LABELS.get(enum_value(task.status), ""),
+                "stage": stage,
+                "detail": result.get("detail") or "",
+                "title": result.get("title") or "",
+                "tg_chat_id": result.get("tg_chat_id"),
+                "fetched": result.get("fetched"),
+                "target_count": result.get("target_count"),
+                "joined_now": result.get("joined_now"),
+                "left_after": result.get("left_after"),
+                "link": (task.payload or {}).get("link"),
+                "batch_id": (task.payload or {}).get("batch_id"),
+                "account_label": account.phone_masked if account else "",
+                "error": task.error or "",
+                "attempts": int(task.attempts or 0),
+                "started_at": task.started_at,
+                "completed_at": task.completed_at,
+                "created_at": task.created_at,
+                "updated_at": task.updated_at,
+            }
+        )
+    done = sum(1 for job in jobs if job["status"] == "completed")
+    failed = sum(1 for job in jobs if job["status"] == "failed")
+    active = sum(1 for job in jobs if job["status"] in ("pending", "running"))
+    fetched_total = sum(int(job["fetched"] or 0) for job in jobs)
+    return {
+        "jobs": jobs,
+        "summary": {
+            "total": len(jobs),
+            "active": active,
+            "completed": done,
+            "failed": failed,
+            "members_collected": fetched_total,
+            "stages": stage_counts,
+        },
+    }
+
+
+@router.get("/export.zip", summary="采集结果打包下载（zip：群档案 + 每群成员 + 事件 + 清单）")
+async def export_zip(
+    profile_ids: Optional[str] = Query(default=None, description="要打包的群档案 id，逗号分隔；不给则按下面条件"),
+    batch_id: Optional[str] = Query(default=None, description="打包某一批链接采集到的群"),
+    account_id: Optional[uuid.UUID] = Query(default=None, description="只打包某个号采集到的群"),
+    include_events: bool = Query(default=True, description="是否带上入退群事件"),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """把采集结果打成一个 zip：群总表、每群成员明细、事件流与清单文件，直接交给运营同学。"""
+    ids = await visible_account_ids(session, user)
+    conditions = []
+    if ids is not None:
+        conditions.append(GroupProfile.account_id.in_(ids))
+
+    profiles: list[GroupProfile] = []
+    if profile_ids:
+        wanted = [item.strip() for item in profile_ids.split(",") if item.strip()]
+        parsed_ids = []
+        for item in wanted:
+            try:
+                parsed_ids.append(uuid.UUID(item))
+            except ValueError:
+                continue
+        if not parsed_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="profile_ids 里没有合法的 id")
+        profiles = list(
+            (await session.scalars(select(GroupProfile).where(GroupProfile.id.in_(parsed_ids)))).all()
+        )
+    elif batch_id:
+        # 这一批采集任务命中的群：从任务的实时进度快照里取 tg_chat_id
+        tasks = list(
+            (
+                await session.scalars(
+                    select(Task).where(
+                        Task.type == TaskType.collect_link,
+                        Task.payload["batch_id"].astext == batch_id,
+                        *([Task.account_id.in_(ids)] if ids is not None else []),
+                    )
+                )
+            ).all()
+        )
+        chat_ids = {
+            int((task.result or {}).get("tg_chat_id"))
+            for task in tasks
+            if (task.result or {}).get("tg_chat_id")
+        }
+        if not chat_ids:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="这一批还没有采到群：等任务跑完再打包，或改用 profile_ids 指定",
+            )
+        profiles = list(
+            (await session.scalars(select(GroupProfile).where(GroupProfile.tg_chat_id.in_(chat_ids)))).all()
+        )
+    else:
+        conditions.append(GroupProfile.collected_at.is_not(None))
+        if account_id is not None:
+            conditions.append(GroupProfile.account_id == account_id)
+        profiles = list(
+            (await session.scalars(select(GroupProfile).where(*conditions).order_by(GroupProfile.collected_at.desc()).limit(200))).all()
+        )
+
+    if not profiles:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="没有可打包的群：先采集，或用 profile_ids 指定")
+
+    chat_ids = [profile.tg_chat_id for profile in profiles]
+    member_conditions = [GroupMember.tg_chat_id.in_(chat_ids)]
+    if ids is not None:
+        member_conditions.append(GroupMember.account_id.in_(ids))
+    members = list((await session.scalars(select(GroupMember).where(*member_conditions))).all())
+    members_by_chat: dict[int, list[GroupMember]] = {}
+    for member in members:
+        members_by_chat.setdefault(member.tg_chat_id, []).append(member)
+
+    events: list[GroupEvent] = []
+    if include_events:
+        event_conditions = [GroupEvent.tg_chat_id.in_(chat_ids)]
+        if ids is not None:
+            event_conditions.append(GroupEvent.account_id.in_(ids))
+        events = list(
+            (await session.scalars(select(GroupEvent).where(*event_conditions).order_by(GroupEvent.occurred_at.desc()).limit(50000))).all()
+        )
+
+    def _safe(name: str, fallback: str) -> str:
+        cleaned = re.sub(r'[\\/:*?"<>|\s]+', "_", (name or "").strip())
+        return (cleaned or fallback)[:60]
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as bundle:
+        # 群总表
+        groups_csv = io.StringIO()
+        writer = csv.writer(groups_csv)
+        writer.writerow(["群ID", "群名", "用户名", "类型", "成员数", "已采成员", "是否公开", "邀请链接", "采集时间", "简介"])
+        for profile in profiles:
+            writer.writerow([
+                profile.tg_chat_id, profile.title, profile.username or "", profile.kind,
+                profile.member_count or "", len(members_by_chat.get(profile.tg_chat_id, [])),
+                "是" if profile.is_public else "否", profile.invite_link or "",
+                profile.collected_at.isoformat() if profile.collected_at else "", profile.about or "",
+            ])
+        bundle.writestr("groups.csv", "﻿" + groups_csv.getvalue())
+
+        # 每群一份成员明细
+        for profile in profiles:
+            rows = members_by_chat.get(profile.tg_chat_id, [])
+            sheet = io.StringIO()
+            writer = csv.writer(sheet)
+            writer.writerow(["用户ID", "用户名", "昵称", "是否机器人", "是否会员", "是否管理员", "状态", "来源", "入群时间", "最近出现", "发言数"])
+            for member in rows:
+                writer.writerow([
+                    member.tg_user_id, member.username or "", member.display_name,
+                    "是" if member.is_bot else "否", "是" if member.is_premium else "否",
+                    "是" if member.is_admin else "否", member.status, member.source,
+                    member.joined_at.isoformat() if member.joined_at else "",
+                    member.last_seen_at.isoformat() if member.last_seen_at else "",
+                    member.message_count,
+                ])
+            bundle.writestr(f"members/{_safe(profile.title, str(profile.tg_chat_id))}_{profile.tg_chat_id}.csv", "﻿" + sheet.getvalue())
+
+        # 事件流
+        if include_events:
+            events_csv = io.StringIO()
+            writer = csv.writer(events_csv)
+            writer.writerow(["群ID", "群名", "事件", "用户ID", "成员", "用户名", "被谁拉进来", "是否机器人", "时间"])
+            titles = {profile.tg_chat_id: profile.title for profile in profiles}
+            for event in events:
+                writer.writerow([
+                    event.tg_chat_id, titles.get(event.tg_chat_id, ""), GROUP_EVENT_LABELS.get(event.event_type, event.event_type),
+                    event.tg_user_id or "", event.user_display, event.username or "",
+                    event.actor_tg_id or "", "是" if event.is_bot else "否",
+                    event.occurred_at.isoformat() if event.occurred_at else "",
+                ])
+            bundle.writestr("events.csv", "﻿" + events_csv.getvalue())
+
+        manifest = {
+            "exported_at": _now().isoformat(),
+            "groups": len(profiles),
+            "members": len(members),
+            "events": len(events) if include_events else 0,
+            "filters": {"profile_ids": profile_ids, "batch_id": batch_id, "account_id": str(account_id) if account_id else None},
+            "files": ["groups.csv", "members/*.csv"] + (["events.csv"] if include_events else []),
+            "note": "由 Telegram 云控「群情报」导出；CSV 为 UTF-8 BOM，Excel 可直接打开",
+        }
+        bundle.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+
+    buffer.seek(0)
+    filename = f"group-intel-{_now().strftime('%Y%m%d-%H%M%S')}.zip"
+    logger.info("群情报打包导出 群=%s 成员=%s 事件=%s by=%s", len(profiles), len(members), len(events), user.username)
+    await write_audit(
+        session,
+        action="group_intel.export_zip",
+        user_id=user.id,
+        target_type="account_batch",
+        target_id=batch_id or (profile_ids or "all"),
+        detail={"groups": len(profiles), "members": len(members), "events": len(events) if include_events else 0},
+    )
+    await session.commit()
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -22,15 +22,18 @@ import {
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { CloudDownloadOutlined, LinkOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { CloudDownloadOutlined, FileZipOutlined, LinkOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { Progress } from 'antd';
 import { PageContainer, StatCard, StatGrid, RelativeTime, SoftTag } from '../components';
-import { toast } from '../utils/feedback';
+import { notifyError, toast } from '../utils/feedback';
+import { downloadBlob, filenameFromDisposition } from '../utils/download';
 import BulkResultModal from '../features/accounts/BulkResultModal';
 import { groupIntelApi } from '../api/endpoints';
-import { useAsyncData } from '../hooks/useAsyncData';
+import { useAsyncData, useInterval } from '../hooks/useAsyncData';
 import { notifySuccess } from '../utils/feedback';
 import type {
   BulkResultOut,
+  CollectJob,
   GroupEventOut,
   GroupMemberOut,
   GroupProfileOut,
@@ -58,6 +61,12 @@ export default function GroupIntel() {
   const [linkForm] = Form.useForm();
 
   const stats = useAsyncData(() => groupIntelApi.stats(), []);
+  // 采集进度：进行中时每 5 秒刷新一次，避免黑盒等待
+  const jobs = useAsyncData(() => groupIntelApi.jobs({ limit: 30 }), []);
+  const [exporting, setExporting] = useState(false);
+  useInterval(() => {
+    if ((jobs.data?.summary.active ?? 0) > 0) void jobs.reload();
+  }, 5000);
   const profiles = useAsyncData(
     () => groupIntelApi.profiles({ q: keyword || undefined, page, page_size: 20 }),
     [keyword, page],
@@ -147,6 +156,85 @@ export default function GroupIntel() {
       setLinkBusy(false);
     }
   };
+
+  const runExport = async (query?: { batch_id?: string; profile_ids?: string }) => {
+    setExporting(true);
+    try {
+      const res = await groupIntelApi.exportZip({ ...query, include_events: true });
+      const filename = filenameFromDisposition(null, 'group-intel.zip');
+      downloadBlob(res.blob, filename);
+      notifySuccess(`已打包 ${res.total ?? ''} 行数据，浏览器正在下载`);
+    } catch {
+      notifyError('打包导出失败，稍后重试');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const STAGE_LABEL: Record<string, string> = {
+    queued: '排队中',
+    resolving: '解析链接',
+    resolved: '已定位群',
+    joined: '已加入群',
+    fetching: '采集中',
+    done: '已完成',
+    failed: '失败',
+    cancelled: '已取消',
+    running: '执行中',
+  };
+
+  const jobColumns: ColumnsType<CollectJob> = [
+    {
+      title: '目标',
+      dataIndex: 'link',
+      render: (value: string | null, record) => (
+        <span className="tg-stack" style={{ gap: 2 }}>
+          <span className="tg-ellipsis" style={{ maxWidth: 320, display: 'inline-block' }}>{value || record.title || '—'}</span>
+          {record.title ? (
+            <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-xs)' }}>{record.title}</span>
+          ) : null}
+        </span>
+      ),
+    },
+    { title: '执行号', dataIndex: 'account_label', width: 120 },
+    {
+      title: '阶段',
+      dataIndex: 'stage',
+      width: 110,
+      render: (value: string) => (
+        <SoftTag
+          tone={value === 'done' ? 'success' : value === 'failed' ? 'danger' : value === 'fetching' ? 'info' : 'warning'}
+          size="sm"
+        >
+          {STAGE_LABEL[value] ?? value}
+        </SoftTag>
+      ),
+    },
+    {
+      title: '进度',
+      dataIndex: 'fetched',
+      width: 120,
+      render: (value: number | null, record) => (
+        <span className="tg-num">
+          {value ?? 0}
+          {record.target_count ? ` / ${record.target_count}` : ''}
+        </span>
+      ),
+    },
+    {
+      title: '说明',
+      dataIndex: 'detail',
+      ellipsis: true,
+      render: (value: string, record) =>
+        record.error ? <span style={{ color: 'var(--tg-color-danger)' }}>{record.error}</span> : value || '—',
+    },
+    {
+      title: '更新',
+      dataIndex: 'updated_at',
+      width: 120,
+      render: (value: string | null, record) => <RelativeTime value={value ?? record.completed_at ?? record.created_at} />,
+    },
+  ];
 
   const profileColumns: ColumnsType<GroupProfileOut> = [
     {
@@ -278,6 +366,55 @@ export default function GroupIntel() {
         <StatCard title="今日退群" value={stats.data?.leaves_today ?? 0} tone={stats.data?.leaves_today ? 'warning' : 'neutral'} hint="含被移除" />
       </StatGrid>
 
+      <Card
+        size="small"
+        title="采集进度"
+        extra={
+          <Space>
+            <SoftTag tone="info" size="sm">进行中 {jobs.data?.summary.active ?? 0}</SoftTag>
+            <SoftTag tone="success" size="sm">完成 {jobs.data?.summary.completed ?? 0}</SoftTag>
+            {(jobs.data?.summary.failed ?? 0) > 0 ? (
+              <SoftTag tone="danger" size="sm">失败 {jobs.data?.summary.failed ?? 0}</SoftTag>
+            ) : null}
+            <Button size="small" icon={<ReloadOutlined />} onClick={() => void jobs.reload()}>
+              刷新
+            </Button>
+            <Button
+              size="small"
+              type="primary"
+              icon={<FileZipOutlined />}
+              loading={exporting}
+              onClick={() => void runExport()}
+            >
+              打包导出
+            </Button>
+          </Space>
+        }
+      >
+        <Progress
+          percent={
+            jobs.data && jobs.data.summary.total > 0
+              ? Math.round((jobs.data.summary.completed / jobs.data.summary.total) * 100)
+              : 0
+          }
+          size="small"
+          status={(jobs.data?.summary.failed ?? 0) > 0 ? 'exception' : 'active'}
+          format={(percent) =>
+            `${percent}%（已采 ${jobs.data?.summary.members_collected ?? 0} 人，共 ${jobs.data?.summary.total ?? 0} 条任务）`
+          }
+        />
+        <Table<CollectJob>
+          size="small"
+          rowKey="task_id"
+          style={{ marginTop: 'var(--tg-space-md)' }}
+          columns={jobColumns}
+          dataSource={jobs.data?.jobs ?? []}
+          loading={jobs.loading}
+          pagination={{ pageSize: 6, size: 'small' }}
+          locale={{ emptyText: '还没有采集任务：用「按链接采集」粘贴链接，或点「采集群情报」' }}
+        />
+      </Card>
+
       {stats.data && !stats.data.watching ? (
         <Alert
           type="warning"
@@ -353,6 +490,9 @@ export default function GroupIntel() {
           title={`${selected.title || '未命名群'} · 情报详情`}
           extra={
             <Space>
+              <Button size="small" onClick={() => void runExport({ profile_ids: selected.id })} loading={exporting}>
+                打包这个群
+              </Button>
               <Button size="small" href={groupIntelApi.membersCsvUrl(selected.id)} target="_blank">
                 导出成员 CSV
               </Button>

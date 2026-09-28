@@ -1246,6 +1246,43 @@ export interface CollectLinkRequest extends CampaignScopeRequest {
   member_limit?: number;
 }
 
+export interface CollectJob {
+  task_id: UUID;
+  type: string;
+  type_label: string;
+  status: TaskStatus;
+  status_label: string;
+  /** 阶段：queued / resolving / joined / resolved / fetching / done / failed / cancelled */
+  stage: string;
+  detail: string;
+  title: string;
+  tg_chat_id?: number | null;
+  fetched?: number | null;
+  target_count?: number | null;
+  joined_now?: boolean | null;
+  left_after?: boolean | null;
+  link?: string | null;
+  batch_id?: string | null;
+  account_label: string;
+  error: string;
+  attempts: number;
+  started_at?: ISODateTime | null;
+  completed_at?: ISODateTime | null;
+  created_at?: ISODateTime | null;
+}
+
+export interface CollectJobsResponse {
+  jobs: CollectJob[];
+  summary: {
+    total: number;
+    active: number;
+    completed: number;
+    failed: number;
+    members_collected: number;
+    stages: Record<string, number>;
+  };
+}
+
 export interface GroupCollectRequest extends CampaignScopeRequest {
   dialog_ids?: UUID[] | null;
   limit_groups?: number;

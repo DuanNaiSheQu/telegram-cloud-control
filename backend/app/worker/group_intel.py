@@ -130,6 +130,29 @@ def make_chat_action_handler(
 class GroupIntelMixin:
     """采集任务：群档案（`collect_group`）、成员名单（`collect_members`）、按链接采集（`collect_link`）。"""
 
+    async def _report_progress(
+        self, session: Any, task: Task, *, stage: str, detail: str = "", **extra: Any
+    ) -> None:
+        """把采集进度写进 `task.result` 并推 Redis 事件——页面的「采集进度」看的就是这里。
+
+        运行中写 result 是安全的：任务真正结束时 `complete_task` 会用最终结果整体覆盖。
+        """
+        snapshot = {
+            "stage": stage,
+            "detail": detail,
+            "updated_at": _now().isoformat(),
+            **{key: value for key, value in extra.items() if value is not None},
+        }
+        try:
+            task.result = {**(task.result or {}), **snapshot}
+            await session.flush()
+        except Exception:  # noqa: BLE001 - 进度写不进去不能影响采集本身
+            logger.debug("写入采集进度失败 task_id=%s", getattr(task, "id", ""))
+        try:
+            await self._publish_task_event(task, ok=True, detail=detail or stage)
+        except Exception:  # noqa: BLE001
+            logger.debug("推送采集进度失败 task_id=%s", getattr(task, "id", ""))
+
     async def _collect_group(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """采集群档案：资料 + 成员数 + 邀请链接；可选顺带抽样前 N 个成员。"""
         assert account is not None
@@ -150,6 +173,7 @@ class GroupIntelMixin:
             raise TaskFailure(f"拉群资料失败：{describe_exception(exc)}", retryable=True) from exc
 
         fields = profile_fields_from_entity(entity, full)
+        await self._report_progress(session, task, stage="fetching", detail="已读到群资料，正在写档案", tg_chat_id=tg_chat_id)
         profile = await upsert_profile(
             session,
             account_id=account.id,
@@ -173,7 +197,13 @@ class GroupIntelMixin:
         sample_limit = int(payload.get("sample_members") or 0)
         if sample_limit > 0:
             sampled = await self._fetch_members(
-                session, account=account, client=client, profile=profile, entity=entity, limit=sample_limit
+                session,
+                account=account,
+                client=client,
+                profile=profile,
+                entity=entity,
+                limit=sample_limit,
+                task=task,
             )
             profile.member_sampled = int(profile.member_sampled or 0) + sampled
             profile.member_synced_at = _now()
@@ -236,8 +266,17 @@ class GroupIntelMixin:
                 await self._resolve_entity(client, dialog) if dialog is not None else await client.get_entity(profile.tg_chat_id)
             )
 
+        await self._report_progress(
+            session, task, stage="fetching", detail=f"开始拉成员名单（上限 {limit} 人）", tg_chat_id=profile.tg_chat_id
+        )
         fetched = await self._fetch_members(
-            session, account=account, client=client, profile=profile, entity=profile_entity, limit=limit
+            session,
+            account=account,
+            client=client,
+            profile=profile,
+            entity=profile_entity,
+            limit=limit,
+            task=task,
         )
         profile.member_synced_at = _now()
         profile.member_sampled = int(profile.member_sampled or 0) + fetched
@@ -269,6 +308,7 @@ class GroupIntelMixin:
         if not link:
             raise TaskFailure("缺少群链接", retryable=False)
         client = self._client(account.id)
+        await self._report_progress(session, task, stage="resolving", detail=f"正在解析链接：{link}")
 
         entity, joined_now, preview = await self._resolve_link(
             client, link, join_if_missing=bool(payload.get("join_if_missing")), account=account, task=task
@@ -277,6 +317,14 @@ class GroupIntelMixin:
         if not tg_chat_id:
             raise TaskFailure(f"链接解析不出群实体：{link}", retryable=False)
 
+        await self._report_progress(
+            session,
+            task,
+            stage="joined" if joined_now else "resolved",
+            detail=("已加入群，正在读资料" if joined_now else "号已在群里，正在读资料"),
+            tg_chat_id=tg_chat_id,
+            joined_now=joined_now,
+        )
         try:
             full = await self._full_chat(client, entity)
         except Exception as exc:  # noqa: BLE001 - 拿不到完整资料不算失败，档案字段能填多少填多少
@@ -322,9 +370,25 @@ class GroupIntelMixin:
 
         limit = min(int(payload.get("member_limit") or 200), settings.group_intel_max_members_per_task)
         fetched = 0
+        await self._report_progress(
+            session,
+            task,
+            stage="fetching",
+            detail=f"开始拉成员名单（上限 {limit} 人）",
+            tg_chat_id=tg_chat_id,
+            title=profile.title,
+            target_count=limit,
+            fetched=0,
+        )
         if limit > 0:
             fetched = await self._fetch_members(
-                session, account=account, client=client, profile=profile, entity=entity, limit=limit
+                session,
+                account=account,
+                client=client,
+                profile=profile,
+                entity=entity,
+                limit=limit,
+                task=task,
             )
             profile.member_synced_at = _now()
             profile.member_sampled = int(profile.member_sampled or 0) + fetched
@@ -341,6 +405,18 @@ class GroupIntelMixin:
             except Exception:  # noqa: BLE001 - 退出失败不影响已采到的数据
                 logger.warning("采完退出群失败 tg_chat_id=%s", tg_chat_id)
 
+        await self._report_progress(
+            session,
+            task,
+            stage="done",
+            detail=f"采集完成：{profile.title or tg_chat_id} 共 {fetched} 人" + ("（已退出该群）" if left else ""),
+            tg_chat_id=tg_chat_id,
+            title=profile.title,
+            fetched=fetched,
+            target_count=limit,
+            joined_now=joined_now,
+            left_after=left,
+        )
         logger.info(
             "按链接采集完成",
             extra={
@@ -463,8 +539,9 @@ class GroupIntelMixin:
         profile: Any,
         entity: Any,
         limit: int,
+        task: Any = None,
     ) -> int:
-        """分页拉成员并写库。页与页之间 sleep `GROUP_INTEL_PAGE_INTERVAL_SECONDS`。"""
+        """分页拉成员并写库。页与页之间 sleep `GROUP_INTEL_PAGE_INTERVAL_SECONDS`，并逐页上报进度。"""
         if limit <= 0:
             return 0
         page_size = max(1, min(settings.group_intel_page_size, limit))
@@ -522,6 +599,17 @@ class GroupIntelMixin:
                 except Exception:  # noqa: BLE001 - 单个成员失败不中断整页
                     continue
             offset += len(users)
+            if task is not None:
+                await self._report_progress(
+                    session,
+                    task,
+                    stage="fetching",
+                    detail=f"已采 {fetched}/{limit} 人",
+                    tg_chat_id=profile.tg_chat_id,
+                    title=profile.title,
+                    fetched=fetched,
+                    target_count=limit,
+                )
             if len(users) < want:
                 break
             if fetched < limit:

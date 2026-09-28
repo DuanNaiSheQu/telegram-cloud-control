@@ -175,3 +175,46 @@ t.me/+AbCdEfGh1234          （私有群邀请链接）
 
 验收：`cd backend && .venv/bin/python -m tests.collect_link_check`（7 项：四种链接形态入队、
 payload 正确、空链接/超量 422、重复去重、多链接批量）。
+
+## 9. 批量加群采集：进度可见 + 采集后打包
+
+**批量加群采集**就是第 8 节的按链接采集，把一批链接一次交出去：多链接 round-robin 分给不同账号，
+不在群里的号按需加入，采完可选退出。真正让这套东西好用的是下面两件配套能力。
+
+### 进度与日志（不再黑盒）
+
+采集任务执行过程中，Worker 会把阶段快照写进 `task.result` 并推 Redis 事件，页面的「采集进度」
+卡片每 5 秒轮询一次：
+
+| 阶段 | 含义 |
+|---|---|
+| `queued` | 已排队，等 Worker 认领 |
+| `resolving` | 正在解析链接（邀请链接会先 CheckChatInvite 预览） |
+| `resolved` / `joined` | 已定位到群 / 本次已加入群 |
+| `fetching` | 正在拉成员名单，`已采 N/M 人` 逐页刷新 |
+| `done` | 完成，带上群名与总人数 |
+| `failed` | 失败，`detail`/`error` 里是可直接读的原因（例如「该号不在群里」） |
+
+`GET /api/group-intel/jobs?batch_id=&only_active=` 返回每条任务的阶段、已采人数、目标人数、
+执行号、失败原因与时间；汇总里给出 total / active / completed / failed / members_collected。
+页面顶部是进度条与三个计数标签，下面逐条列出「目标链接 → 阶段 → 进度 → 说明」。
+
+### 采集后打包
+
+`GET /api/group-intel/export.zip` 直接把结果打成 zip（页面「打包导出」按钮，或群里详情里的「打包这个群」）：
+
+```
+group-intel-20260929-005530.zip
+├── groups.csv        群总表：群ID/群名/用户名/类型/成员数/已采成员/是否公开/邀请链接/采集时间/简介
+├── members/
+│   ├── 群名_群ID.csv  每群一份成员明细（用户ID/用户名/昵称/机器人/会员/管理员/状态/来源/入群时间/最近出现/发言数）
+│   └── ...
+├── events.csv        入退群事件（含被谁拉进来）
+└── manifest.json     导出时间、筛选条件、各表行数、文件清单
+```
+
+三种打包范围：`profile_ids`（指定几个群）、`batch_id`（刚跑完的那一批链接采到的群）、
+不带参数则打包全部已采集的群（最近 200 个）。CSV 带 UTF-8 BOM，Excel 直接双击打开不乱码。
+
+验收：`cd backend && .venv/bin/python -m tests.collect_progress_check`（13 项：进度端点结构、
+三种任务状态的阶段快照与失败原因、汇总口径、只看进行中、zip 内容与行数一致性、按批次打包、空批次 404）。
