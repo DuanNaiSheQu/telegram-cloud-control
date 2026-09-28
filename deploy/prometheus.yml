@@ -1,0 +1,80 @@
+# Prometheus 抓取配置（挂到 /etc/prometheus/prometheus.yml）
+#
+# 只抓四类目标：
+#   api               :8000/metrics（API 侧账号/任务计数）
+#   worker           :9101/metrics（在线号、重连、任务成功失败、租约续期失败、心跳年龄）
+#   postgres-exporter :9187/metrics（库大小、连接数，供「磁盘/备份」告警）
+#   pushgateway      :9091（备份脚本推上来的「最近一次成功备份时间」）
+#
+# 规则文件在同一目录的 alert.rules.yml，告警发给 alertmanager:9093。
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: tgcc
+    deployment: telegram-cloud-control
+
+rule_files:
+  - /etc/prometheus/alert.rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["127.0.0.1:9090"]
+
+  - job_name: api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
+
+  # Worker 是多副本、容器内端口固定 9101（宿主才做 9101-9110 的区间映射）。
+  # static_configs 不支持端口区间，同一个 host:port 写多遍也会被去重，所以用 DNS 服务发现：
+  # Docker 内嵌 DNS 对 compose 服务名返回该服务**所有副本**的 A 记录，一条记录一个 target。
+  # 前提：prometheus 与 worker 在同一 compose 网络（默认满足）——不需要 network_mode: host，
+  # 也不需要 extra_hosts。副本身份看指标自带的 worker_id 标签（不要写死 WORKER_ID）。
+  - job_name: worker
+    metrics_path: /metrics
+    dns_sd_configs:
+      - names: ["worker"]
+        type: A
+        port: 9101
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: compose_service
+
+  # 备用抓法（DNS SD 解析不到时改用这一份，与上面二选一）：
+  # 走宿主已发布的端口区间，需要 prometheus 服务带 extra_hosts: ["host.docker.internal:host-gateway"]，
+  # 并且 worker 端口映射保持 WORKER_METRICS_PORT_RANGE=9101-9110。
+  # 缺点：端口是静态列表，多写的 target 会一直是 up=0，需要人工跟着副本数改。
+  #
+  # - job_name: worker
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ["host.docker.internal:9101"]
+  #     - targets: ["host.docker.internal:9102"]
+  #     - targets: ["host.docker.internal:9103"]
+
+  # 抓自己：告警发不出去时（Alertmanager 挂了）也需要有一条告警
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  - job_name: postgres-exporter
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  # 备份脚本从这里读回自己的上报值；honor_labels 保住脚本写的 job="backup"
+  - job_name: pushgateway
+    honor_labels: true
+    static_configs:
+      - targets: ["pushgateway:9091"]

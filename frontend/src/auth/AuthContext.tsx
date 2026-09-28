@@ -9,9 +9,31 @@ import {
   type ReactNode,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getToken, onUnauthorized, setToken as persistToken } from '../api/client';
+import { ApiError, getToken, onUnauthorized, setToken as persistToken } from '../api/client';
 import { authApi } from '../api/endpoints';
+import { notifyError } from '../utils/feedback';
 import type { UserOut } from '../api/types';
+
+const USER_KEY = 'tgcc_user';
+
+/** 缓存当前用户（只用于展示；权限一律以后端为准） */
+function readCachedUser(): UserOut | null {
+  try {
+    const raw = window.localStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as UserOut) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedUser(user: UserOut | null): void {
+  try {
+    if (user) window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+    else window.localStorage.removeItem(USER_KEY);
+  } catch {
+    /* 忽略 */
+  }
+}
 
 interface AuthContextValue {
   user: UserOut | null;
@@ -29,8 +51,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [token, setTokenState] = useState<string | null>(() => getToken());
-  const [user, setUser] = useState<UserOut | null>(null);
-  const [ready, setReady] = useState<boolean>(() => !getToken());
+  // 有 token 时先用上次缓存的用户渲染，避免刷新页面时闪一下登录页
+  const [user, setUser] = useState<UserOut | null>(() => (getToken() ? readCachedUser() : null));
+  const [ready, setReady] = useState<boolean>(() => !getToken() || Boolean(readCachedUser()));
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -42,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearSession = useCallback(() => {
     persistToken(null); // WS 连接由 useWebSocket 在 token 清空后自行断开
+    writeCachedUser(null);
     setTokenState(null);
     setUser(null);
     setReady(true);
@@ -66,16 +90,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const me = await authApi.me();
       if (!mountedRef.current) return;
       setUser(me);
+      writeCachedUser(me);
       setTokenState(current);
-    } catch {
+    } catch (err) {
       if (!mountedRef.current) return;
-      persistToken(null);
-      setTokenState(null);
-      setUser(null);
+      const status = err instanceof ApiError ? err.status : 0;
+      if (status === 401 || status === 403) {
+        // 令牌确实失效：清干净回登录页（401 已由 client 广播）
+        clearSession();
+      } else if (!readCachedUser()) {
+        // 既没有缓存用户、又拿不到 /me：只能让用户重新登录
+        clearSession();
+      } else {
+        // 后端 5xx / 网络抖动：不要把人踢下线，先用上次身份继续值班
+        notifyError(`无法校验登录状态（${(err as Error).message}），先用上次的身份继续`);
+      }
     } finally {
       if (mountedRef.current) setReady(true);
     }
-  }, []);
+  }, [clearSession]);
 
   // 首次进入：有 token 就换回当前用户
   useEffect(() => {
@@ -85,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const result = await authApi.login(username.trim(), password);
     persistToken(result.access_token);
+    writeCachedUser(result.user);
     setTokenState(result.access_token);
     setUser(result.user);
     setReady(true);

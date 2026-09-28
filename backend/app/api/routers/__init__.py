@@ -25,8 +25,6 @@ from app.models import (
     AccountGroup,
     Bot,
     Dialog,
-    DialogChannel,
-    DialogKind,
     Message,
     Proxy,
     Task,

@@ -12,7 +12,8 @@ module.exports = {
   plugins: ['@typescript-eslint', 'react-refresh'],
   ignorePatterns: ['dist', 'node_modules', '.eslintrc.cjs'],
   rules: {
-    'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    // Context + hook、常量与组件同文件是本项目的既定结构，不按 HMR 粒度拆分
+    'react-refresh/only-export-components': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
   },

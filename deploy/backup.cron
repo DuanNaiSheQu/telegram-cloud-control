@@ -1,0 +1,35 @@
+# Telegram 云控 —— Postgres 备份 crontab 片段
+#
+# 装法（在仓库根目录执行，宿主 cron）：
+#   crontab -l 2>/dev/null > /tmp/tgcc.cron
+#   cat deploy/backup.cron >> /tmp/tgcc.cron
+#   crontab /tmp/tgcc.cron && rm -f /tmp/tgcc.cron
+#   crontab -l        # 确认已装上
+#
+# 装之前先手动跑一遍确认能成功（会打日志、也会往 pushgateway 上报）：
+#   cd /path/to/telegram云控 && deploy/backup.sh all
+#
+# 注意：
+#   1. cron 的环境变量很少，脚本不依赖 PATH 里的 docker 之外的任何东西；
+#      docker 不在 /usr/bin/docker 时，把下面的 PATH 改成自己的路径。
+#   2. BACKUP_MODE=docker 需要当前用户在 docker 组里（能免 sudo 跑 docker）。
+#   3. 不想用宿主 cron，也可以让容器跑：写进宿主 cron 的一行命令换成
+#      docker compose run --rm -T api /app/entrypoint.sh ... 不合适（api 镜像里没有
+#      pg_dump 客户端），所以仍推荐宿主 cron + BACKUP_MODE=docker（借 postgres 容器里的客户端）。
+#   4. 日志固定写到 /var/log/tgcc-backup.log（需可写；改路径记得同步 logrotate）。
+#   5. 服务器时区不是 Asia/Shanghai 时，cron 的时间按服务器本地时区解释。
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# 仓库根目录：改成你自己的路径（目录名含中文没问题，但要原样写）
+TGCC_HOME=/srv/telegram-cloud-control
+
+# 每天 03:10 逻辑备份（pg_dump -Fc），保留 7 份
+10 3 * * * cd "$TGCC_HOME" && BACKUP_MODE=docker BACKUP_DIR="$TGCC_HOME/backups" ./deploy/backup.sh daily >> /var/log/tgcc-backup.log 2>&1
+
+# 每周日 03:40 基础备份（pg_basebackup，按时间点恢复的起点），保留 4 份
+40 3 * * 0 cd "$TGCC_HOME" && BACKUP_MODE=docker BACKUP_DIR="$TGCC_HOME/backups" ./deploy/backup.sh base >> /var/log/tgcc-backup.log 2>&1
+
+# 可选：每月 1 号 04:30 把 WAL 归档卷一起同步到备份存储。
+# 基础备份 + WAL 归档才构成可恢复的备份，归档卷单独丢了一样恢复不了。
+# 30 4 1 * * cd "$TGCC_HOME" && docker run --rm -v tgcc_pg_wal_archive:/wal:ro -v "$TGCC_HOME/backups":/out alpine tar -czf /out/wal-archive-$(date +\%Y\%m\%d).tar.gz -C /wal . >> /var/log/tgcc-backup.log 2>&1

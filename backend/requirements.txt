@@ -16,6 +16,9 @@ redis>=5.0,<6
 # --- Telegram ---
 telethon>=1.36,<1.39
 aiogram>=3.13,<3.20
+# 用户号走代理（socks5/socks4/http）必需：Telethon 只声明 cryptg extra，
+# 不装它在配了代理的号上会 import 失败，Telethon 会退化成直连（泄露真实出口 IP）
+python-socks[asyncio]>=2.4,<3
 
 # --- Security ---
 cryptography>=43,<45

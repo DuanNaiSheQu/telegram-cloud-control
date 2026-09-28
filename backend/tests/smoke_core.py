@@ -247,11 +247,17 @@ async def main() -> int:
 
         relay_tasks = await relay.enqueue_relays(session, dialog=dialog, message=message)
         await session.commit()
-        check("命中转发规则写出 relay_to_staff 任务", len(relay_tasks) == 1 and relay_tasks[0].bot_id == bot_id)
+        mine = [t for t in relay_tasks if str(t.payload.get("route_id")) == str(route.id)]
+        # 只断言「自己这条规则」命中了；共用开发库里可能存在别人的全局规则
+        check("命中转发规则写出 relay_to_staff 任务", len(mine) == 1 and mine[0].bot_id == bot_id,
+              f"总任务 {len(relay_tasks)}、本规则 {len(mine)}")
 
         again_tasks = await relay.enqueue_relays(session, dialog=dialog, message=message)
         await session.commit()
-        check("同一消息不重复转发", len(again_tasks) == 1 and again_tasks[0].id == relay_tasks[0].id)
+        mine_again = [t for t in again_tasks if str(t.payload.get("route_id")) == str(route.id)]
+        check("同一消息不重复转发",
+              len(mine_again) == 1 and mine_again[0].id == mine[0].id,
+              f"首次 {mine[0].id if mine else 'n/a'} / 再次 {mine_again[0].id if mine_again else 'n/a'}")
 
         outgoing, out_msg, _ = await inbound.ingest_message(
             session,

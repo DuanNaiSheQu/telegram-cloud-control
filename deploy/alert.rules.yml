@@ -1,0 +1,298 @@
+# 告警规则（挂到 /etc/prometheus/alert.rules.yml）
+#
+# 对应 规划.md「运维 → 告警四条」，分组如下：
+#   1) tgcc-worker-heartbeat   某个 Worker 超过 60 秒没有心跳
+#   2) tgcc-online-accounts    在线号比例突然下降
+#   3) tgcc-tasks              tasks 里失败或到期未执行的行持续增加
+#   4) tgcc-database-backup    数据库磁盘或备份失败
+# 另外补了两组：tgcc-app（API 挂了就没人能看控制台）、tgcc-monitoring（采集链路自身）
+# —— 否则上面的规则可能在无人察觉的情况下静默失效。
+#
+# ── 指标契约（以 backend/app/api/metrics.py、backend/app/worker/metrics.py 为准）──
+# API :8000/metrics（job="api"，每 10 秒刷一次内存 Gauge）
+#   tgcc_api_up                                   API 存活
+#   tgcc_accounts{status="pending|healthy|needs_code|frozen|invalid|dead|disabled"}
+#   tgcc_tasks{status="pending|running|failed|completed|cancelled|pending_confirmation"}
+#   tgcc_tasks{status="overdue"}                  pending 且 next_run_at 已过 5 分钟以上
+#   tgcc_tasks{status="stuck"}                    running 且 started_at 已过 30 分钟以上
+#   tgcc_dialogs_unread / tgcc_bots
+# Worker :9101/metrics（job="worker"；指标不带 worker_id 标签，
+#   副本靠抓取时自动加的 instance 区分，instance → worker_id 的对应方法见 docs/OPERATIONS.md）
+#   tgcc_online_accounts                          本副本在线号数量
+#   tgcc_leased_accounts
+#   tgcc_reconnects_total
+#   tgcc_tasks_total{type,outcome="ok|failed|retried|skipped"}
+#   tgcc_task_duration_seconds{type}
+#   tgcc_lease_renew_failures_total
+#   tgcc_account_status{status}                   全库账号状态（与本副本在线数无关）
+#   tgcc_worker_heartbeat_age_seconds             本副本最近一次心跳距今秒数
+# pushgateway（deploy/backup.sh 推送，job="backup"）
+#   tgcc_last_successful_backup_timestamp_seconds         每日备份最近成功时间（失败推 0）
+#   tgcc_last_successful_basebackup_timestamp_seconds     周基础备份最近成功时间
+#
+# 阈值都写成常量，改阈值直接改本文件（Prometheus 规则文件不支持环境变量）。
+
+groups:
+
+  # ------------------------------------------------------------ 录制规则
+  - name: tgcc-recording
+    interval: 30s
+    rules:
+      # 在线号先跨副本求和再算比例：扩容 / 滚动重启会让租约在副本间重分配，
+      # 逐实例跟自己的历史比会误报（某个副本号变少，只是被别的副本接管了）。
+      - record: tgcc:online_accounts:sum
+        expr: sum(tgcc_online_accounts)
+
+  # ------------------------------------------------------------ 告警 1/4：Worker 心跳
+  - name: tgcc-worker-heartbeat
+    interval: 30s
+    rules:
+      - alert: TgccWorkerHeartbeatStale
+        # 心跳年龄由 Worker 自己按「最近一次成功续租时间」打点；> 60 秒即认为这个进程卡死
+        expr: tgcc_worker_heartbeat_age_seconds > 60
+        for: 1m
+        labels:
+          severity: critical
+          component: worker
+        annotations:
+          summary: 'Worker {{ $labels.instance }} 超过 60 秒没有心跳（当前 {{ $value | printf "%.0f" }} 秒）'
+          description: '该副本卡死或与 Postgres 断连，它持有的号不会续租（30 秒后会被别的副本接管）。处置：docker compose ps worker 看进程状态；docker compose logs --tail=200 worker 看最后一条日志；docker compose restart worker。要把这个 instance 对到具体 worker_id：docker compose exec postgres psql -U cloudctl -d cloudctl -c "SELECT worker_id, count(*) FROM leases GROUP BY 1;"。详见 docs/OPERATIONS.md。'
+
+      - alert: TgccWorkerTargetDown
+        # 抓取失败：进程退出、9101 没监听 0.0.0.0，或指标服务启动失败（端口被占）
+        expr: up{job="worker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: worker
+        annotations:
+          summary: 'Worker 抓取目标 {{ $labels.instance }} 不可达（up=0）'
+          description: 'Worker 的 9101/metrics 没响应：进程已退出或指标服务没起来。处置：docker compose ps worker；docker compose logs --tail=200 worker 搜「指标」；副本数不够时 docker compose up -d --scale worker=<N>。'
+
+      - alert: TgccWorkerTargetsMissing
+        # 一个副本都没起来时 DNS 服务发现拿不到 target，上面的 up==0 也不会触发，单独兜一条
+        expr: absent(up{job="worker"})
+        for: 2m
+        labels:
+          severity: critical
+          component: worker
+        annotations:
+          summary: '一个 Worker 抓取目标都没有（job="worker" 为空）'
+          description: 'worker 服务没有任何运行中的副本，或 Prometheus 的 DNS 服务发现解析不到服务名 worker。处置：docker compose ps worker；docker compose logs --tail=200 worker；确认 prometheus 与 worker 在同一 compose 网络（见 deploy/prometheus.yml 里 worker job 的说明）。'
+
+  # ------------------------------------------------------------ 告警 2/4：在线号比例下降
+  - name: tgcc-online-accounts
+    interval: 30s
+    rules:
+      - alert: TgccOnlineAccountsDrop
+        # 近 5 分钟均值相对近 1 小时均值下降超过 30%（clamp_min 防 0 除）
+        expr: >-
+          (
+            avg_over_time(tgcc:online_accounts:sum[1h]) - avg_over_time(tgcc:online_accounts:sum[5m])
+          ) / clamp_min(avg_over_time(tgcc:online_accounts:sum[1h]), 1) > 0.30
+        for: 5m
+        labels:
+          severity: critical
+          component: accounts
+        annotations:
+          summary: '在线号总量 5 分钟内相对 1 小时基线下降超过 30%（当前 {{ $value | humanizePercentage }}）'
+          description: '成批掉线，常见原因：一批号被 Telegram 限制（冻结）、代理挂了、Worker 全部重启且租约还没被接管。处置：看控制台工作台的在线数/异常数；docker compose exec postgres psql -U cloudctl -d cloudctl -c "SELECT status, count(*) FROM tg_accounts GROUP BY 1;"；再查 Worker 心跳是否同时告警。注：Worker 全挂时本规则取不到近 5 分钟样本，由 TgccWorkerTargetsMissing / TgccAllAccountsOffline 兜住。'
+
+      - alert: TgccOnlineAccountsDropEarly
+        # 同一个表达式放宽到 15%，早一点知道，不升级为 critical
+        expr: >-
+          (
+            avg_over_time(tgcc:online_accounts:sum[1h]) - avg_over_time(tgcc:online_accounts:sum[5m])
+          ) / clamp_min(avg_over_time(tgcc:online_accounts:sum[1h]), 1) > 0.15
+        for: 10m
+        labels:
+          severity: warning
+          component: accounts
+        annotations:
+          summary: '在线号总量相对 1 小时基线下降超过 15%（当前 {{ $value | humanizePercentage }}）'
+          description: '还没到 30% 的告警线。先确认是正常收工（人工停用号）还是异常掉线：GET /api/dashboard，或 SELECT status, count(*) FROM tg_accounts GROUP BY 1;'
+
+      - alert: TgccAllAccountsOffline
+        # 兜底：1 小时基线也是 0 时比例表达式恒为 0，不会告警，所以补一条绝对判断
+        # （sum() 之后两边都是无标签序列，用 and 直接匹配）
+        expr: sum(tgcc_online_accounts) == 0 and sum(tgcc_accounts{status="healthy"}) > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: accounts
+        annotations:
+          summary: '一个在线号都没有，但库里存在 healthy 的号'
+          description: '数据库里标记正常的号全部失去连接/租约。处置：docker compose ps worker；确认 Worker 是否在反复重启（看 tgcc_reconnects_total 是否在涨）；查 leases 表是否还有有效租约。'
+
+  # ------------------------------------------------------------ 告警 3/4：任务失败或到期未执行堆积
+  - name: tgcc-tasks
+    interval: 30s
+    rules:
+      - alert: TgccTasksFailedIncreasing
+        # 30 分钟内 failed 行数净增超过 5 条，持续 10 分钟
+        expr: delta(tgcc_tasks{status="failed"}[30m]) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: tasks
+        annotations:
+          summary: '失败任务持续增加（30 分钟新增 {{ $value | printf "%.0f" }} 条）'
+          description: '任务重试到上限仍失败。处置：控制台「任务中心」按失败筛选看 error；常见原因是会话失效（要重新验证码）、号被冻结、代理不通。SQL：SELECT type, error, count(*) FROM tasks WHERE status=''failed'' GROUP BY 1,2 ORDER BY 3 DESC;'
+
+      - alert: TgccTasksOverdue
+        # 口径见 api/metrics.py：pending 且 next_run_at 已经过去 5 分钟以上
+        expr: tgcc_tasks{status="overdue"} > 20
+        for: 5m
+        labels:
+          severity: warning
+          component: tasks
+        annotations:
+          summary: '到期未执行的任务 {{ $value | printf "%.0f" }} 条（阈值 20）'
+          description: '没有 Worker/API 来领这些任务，或租约都被占满。处置：先看 Worker 心跳与副本数；确认没有号长期占着租约（SELECT worker_id, count(*) FROM leases GROUP BY 1）；需要更多并发就 docker compose up -d --scale worker=<N>。'
+
+      - alert: TgccTasksStuck
+        # 口径见 api/metrics.py：running 且 started_at 已经过去 30 分钟
+        expr: tgcc_tasks{status="stuck"} > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: tasks
+        annotations:
+          summary: '执行中超过 30 分钟的任务 {{ $value | printf "%.0f" }} 条（阈值 5）'
+          description: 'Worker 领了任务没写回结果（Telegram 调用卡住、进程被 SIGKILL、租约被抢）。处置：看 Worker 日志里对应 task_id；控制台任务中心点重试；确认 tgcc_lease_renew_failures_total 是否在涨。'
+
+      - alert: TgccTaskQueueStalled
+        # 有积压且最近 15 分钟一条都没完成 = 队列没人消费
+        expr: sum(tgcc_tasks{status="pending"}) > 50 and sum(delta(tgcc_tasks{status="completed"}[15m])) <= 0
+        for: 15m
+        labels:
+          severity: warning
+          component: tasks
+        annotations:
+          summary: '任务队列积压超过 50 条且 15 分钟没有任何任务完成'
+          description: '队列完全没被消费。处置：docker compose ps（api / worker 是否在跑）；docker compose logs --tail=200 api worker；确认任务领取依赖的租约表正常。'
+
+  # ------------------------------------------------------------ 告警 4/4：数据库磁盘 / 备份失败
+  - name: tgcc-database-backup
+    interval: 30s
+    rules:
+      - alert: TgccDatabaseSizeLarge
+        # 单库超过 20 GiB（20 * 1024^3；PromQL 没有幂运算符，写成连乘）。改阈值改这两个常量
+        expr: pg_database_size_bytes{datname!~"template.*"} > 20 * 1024 * 1024 * 1024
+        for: 30m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: '数据库 {{ $labels.datname }} 已占用 {{ $value | humanize1024 }}（阈值 20GiB）'
+          description: '处置：SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class ORDER BY pg_total_relation_size(oid) DESC LIMIT 10; 看是哪张表涨（通常是 messages / audit_logs）；宿主上 df -h 确认卷剩余空间。清理与扩容见 docs/OPERATIONS.md「容量与扩容」。'
+
+      - alert: TgccDatabaseGrowthFast
+        # 按最近 6 小时趋势外推，7 天后会超过 40 GiB
+        expr: >-
+          predict_linear(pg_database_size_bytes{datname!~"template.*"}[6h], 7 * 24 * 3600)
+          > 40 * 1024 * 1024 * 1024
+        for: 1h
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: '数据库 {{ $labels.datname }} 按当前增速 7 天内会超过 40GiB'
+          description: '提前扩容或清理历史消息（消息表按时间分区/归档），别等写满卷。'
+
+      - alert: TgccBackupFailed
+        # backup.sh 失败时推 0，收到 0 就说明最近一次备份没成功
+        expr: tgcc_last_successful_backup_timestamp_seconds == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: backup
+        annotations:
+          summary: '最近一次 Postgres 备份失败（backup.sh 上报 0）'
+          description: '上一次 deploy/backup.sh 以非 0 退出。处置：看 /var/log/tgcc-backup.log 里的中文错误；手动 make backup 复现；确认 BACKUP_DIR 可写、磁盘没满、postgres 容器健康。恢复步骤见 deploy/postgres-backup.md。'
+
+      - alert: TgccBackupOverdue
+        # 超过 24 小时没有成功的每日备份（backup.cron 每天 03:10）
+        expr: time() - tgcc_last_successful_backup_timestamp_seconds > 86400
+        for: 15m
+        labels:
+          severity: critical
+          component: backup
+        annotations:
+          summary: '超过 24 小时没有成功的数据库备份'
+          description: '处置：crontab -l 确认 backup.cron 已装；确认 pushgateway 容器在跑（make monitoring）；手动执行 make backup。备份缺失期间不要做危险迁移。'
+
+      - alert: TgccBackupNeverReported
+        # 指标整体缺失：从没成功推过，或 pushgateway 数据被清空
+        expr: absent_over_time(tgcc_last_successful_backup_timestamp_seconds[25h])
+        for: 10m
+        labels:
+          severity: warning
+          component: backup
+        annotations:
+          summary: '25 小时内没有收到任何备份上报（指标缺失）'
+          description: '不是「失败」而是「根本没跑/没推」。处置：确认 cron 已安装、BACKUP_PUSHGATEWAY_URL 可达、pushgateway 在 monitoring profile 下运行。'
+
+      - alert: TgccBaseBackupOverdue
+        # 周基础备份（PITR 的起点）超过 8 天没成功
+        expr: time() - tgcc_last_successful_basebackup_timestamp_seconds > 8 * 86400
+        for: 1h
+        labels:
+          severity: warning
+          component: backup
+        annotations:
+          summary: '超过 8 天没有成功的 pg_basebackup（按时间点恢复不可用）'
+          description: 'PITR = 基础备份 + WAL 归档，缺一不可。处置：BACKUP_KIND=base deploy/backup.sh；确认 Postgres archive_mode=on（脚本会检查并告警）；SELECT * FROM pg_stat_archiver; 看 failed_count 是否在涨。'
+
+      # 可选：WAL 归档失败会让 PITR 失效，归档堵住还会撑满磁盘。
+      # postgres-exporter 默认不开 archiver 采集，先确认指标名再启用：
+      #   curl -s localhost:9187/metrics | grep archiver
+      #
+      # - alert: TgccWalArchiveFailing
+      #   expr: increase(pg_stat_archiver_failed_count[15m]) > 0
+      #   for: 5m
+      #   labels:
+      #     severity: critical
+      #     component: database
+      #   annotations:
+      #     summary: 'WAL 归档连续失败，按时间点恢复会断档'
+      #     description: '检查 archive_command 是否可执行、wal-archive 目录是否可写、磁盘是否已满。'
+
+  # ------------------------------------------------------------ 应用与采集链路
+  - name: tgcc-app
+    interval: 30s
+    rules:
+      - alert: TgccApiDown
+        # API 挂了：控制台打不开、Bot Webhook 收不到、Bot 任务没人领
+        expr: up{job="api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: 'API 不可达（up{job="api"}=0）'
+          description: '处置：docker compose ps api 看是否在重启；docker compose logs --tail=200 api；关注 /ready 是 503 还是进程整个没了；数据库/Redis 不通也会让 api 起不来。'
+
+  - name: tgcc-monitoring
+    interval: 30s
+    rules:
+      - alert: TgccExporterDown
+        # 采集侧挂了，上面「磁盘/备份」这类基于导出器的告警会静默失效
+        expr: up{job=~"postgres-exporter|pushgateway|prometheus"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: '监控采集目标 {{ $labels.job }} 不可达（up=0）'
+          description: '处置：docker compose --profile monitoring ps；docker compose --profile monitoring logs --tail=100 {{ $labels.job }}；postgres-exporter 连不上库时检查 DATA_SOURCE_NAME 与口令。'
+
+      - alert: TgccAlertmanagerDown
+        expr: up{job="alertmanager"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: 'Alertmanager 不可达，告警发不出去'
+          description: '处置：确认 alertmanager 容器在跑、9093 可达、deploy/alertmanager.yml 语法正确（docker compose --profile monitoring logs --tail=100 alertmanager）。修好之前人工看 Prometheus 的 /alerts 页面。'

@@ -2,6 +2,32 @@
 
 把 [规划.md](../规划.md) 的每一条落到具体产物和验证方式上。验证命令都能重跑。
 
+## 0. 本次落地实测记录（可复跑）
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 共享层冒烟（真实 Postgres 14 + Redis，任务队列/租约/入库/转发/去重） | `cd backend && .venv/bin/python -m tests.smoke_core` | **31/31 通过** |
+| AI 服务层（未配置报错、请求形状、Bot 资料进 system、上游报错冒泡） | `cd backend && .venv/bin/python -m tests.smoke_ai` | **12/12 通过** |
+| 数据库迁移（全新库升级 / 回滚 / 离线 SQL） | `alembic upgrade head` / `downgrade base` / `upgrade --sql` | 15 表建出、回滚剩版本表、离线 SQL 15 条 CREATE TABLE |
+| 端到端验收（API + Worker 双进程，41 项） | `make stack-up && make e2e` | **41 通过 / 0 失败 / 0 跳过** |
+| 优雅退出释放租约 | `make stack-down` | worker 日志「已释放 2 个租约，Worker 退出」，`leases` 归零 |
+| 前端生产构建 | `cd frontend && npm run build` | ✓ 3066 modules，`dist/` 产出（antd chunk 1.10 MB / gzip 342 kB，零告警） |
+| 部署产物静态校验（compose / 告警 / .env / nginx） | `make config-check` | **33/33 通过** |
+| 语法与类型检查 | `make check` | Python 编译 + 前端 `tsc --noEmit` 通过 |
+
+集成阶段修掉的真实问题（都有回归验证）：
+
+1. `claim_tasks` 领取任务时 SQL 自增与 ORM 同步叠加，`attempts` 变成 2 → 改为 `synchronize_session=False` + 单点自增。
+2. 会话类型被后续「默认 private」的入库调用降级（群聊变私信）→ 群聊类型改为粘性。
+3. API 侧 `tgcc_tasks` 与 Worker 侧 `tgcc_tasks_total` 装进同一进程时注册表撞名 → Worker 指标改用独立 `CollectorRegistry`。
+4. `PATCH /api/accounts/{id}` 过滤掉 null，导致**代理/分组无法解绑** → 改用 `exclude_unset` 语义（显式 null = 解绑）。
+5. 已有账号重新登录必须重填完整手机号 → `login/start` 支持只传 `account_id`，手机号从加密存储解出。
+6. 补历史消息会点亮未读角标 → `ingest_message(count_unread=False)`，补录不再算未读。
+7. 登录成功后不会自动拉会话 → Worker 登录收尾自动补 `sync_dialogs` 任务。
+8. `scripts/stack_local.sh` 的 `$!` 取到脚本自身 PID（`down` 会误杀自己）、macOS 无 `setsid`、bash 3.2 会把 `$VAR` 后紧跟的中文字节吞进变量名 → 三处都修好并复跑通过。
+9. 转发记录列表只有 ID → `RelayLinkOut` 回填原消息正文 / 会话名 / 归属号。
+10. 缺 `python-socks`（配了代理的号会退化成直连、暴露真实出口 IP）→ 加入 `requirements.txt` 并安装。
+
 ## 1. 范围（要做的）
 
 | 规划条目 | 落地产物 | 验证方式 |

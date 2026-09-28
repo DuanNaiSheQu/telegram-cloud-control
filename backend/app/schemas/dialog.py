@@ -87,12 +87,16 @@ class SyncDialogsRequest(BaseModel):
 
 
 class SyncMessagesRequest(BaseModel):
-    dialog_id: uuid.UUID
+    """路径带 dialog_id 时 body 里可以不再重复传（路由会以后者为准）。"""
+
+    dialog_id: Optional[uuid.UUID] = None
     limit: int = Field(default=50, ge=1, le=500)
 
 
 class DraftRequest(BaseModel):
-    dialog_id: uuid.UUID
+    """路径带 dialog_id 时 body 里可以不再重复传。"""
+
+    dialog_id: Optional[uuid.UUID] = None
     instruction: str = Field(default="", max_length=500)
 
 

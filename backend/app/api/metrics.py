@@ -37,6 +37,8 @@ TGCC_API_UP = Gauge("tgcc_api_up", "API 进程存活（1=存活）")
 
 async def refresh_once() -> None:
     """查一次库，把当前值写进 Gauge。"""
+    # 进程活着就先置 1：数据库/Redis 抖的时候它也不应该掉到 0（那会被误判成 API 挂了）
+    TGCC_API_UP.set(1)
     async with SessionFactory() as session:
         # 1) 任务：due_task_metrics 给的是告警口径（含 overdue / stuck）
         metrics = await due_task_metrics(session)
@@ -68,8 +70,6 @@ async def refresh_once() -> None:
         TGCC_DIALOGS_UNREAD.set(int(unread or 0))
         bots = await session.scalar(select(func.count()).select_from(Bot))
         TGCC_BOTS.set(int(bots or 0))
-
-    TGCC_API_UP.set(1)
 
 
 async def refresh_loop() -> None:

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getToken } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import type { WsServerEvent, WsStatus } from '../api/types';
+import type { WsRawEvent, WsServerEvent, WsStatus } from '../api/types';
 
 type EventListener = (event: WsServerEvent) => void;
 type StatusListener = (status: WsStatus) => void;
@@ -132,11 +132,11 @@ export class WsClient {
         return;
       }
       if (!payload || typeof payload !== 'object') return;
-      const data = payload as WsServerEvent;
-      if ((data as { op?: string }).op === 'pong') return;
+      const data = payload as WsRawEvent;
+      if ('op' in data && data.op === 'pong') return;
       this.listeners.forEach((listener) => {
         try {
-          listener(data);
+          listener(data as WsServerEvent);
         } catch {
           /* 单个订阅者异常不影响其它 */
         }

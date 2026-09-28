@@ -49,9 +49,17 @@ DELETE /api/accounts/{id}                                → {ok,message}
 POST   /api/accounts/{id}/release-lease                  → {ok,message}    # 单号异常时只清它的租约
 POST   /api/accounts/{id}/sync-dialogs                   → {ok,message,task_id}
 POST   /api/accounts/{id}/check                          → CheckResultOut
-POST   /api/accounts/check        {"account_ids":[...]|null,"scope":"selected|all|group:"} → [CheckResultOut]
+POST   /api/accounts/check        {"account_ids":[...]|null,"scope":"selected|all|group:<uuid>"} → [CheckResultOut]
 POST   /api/accounts/{id}/profile {"first_name","last_name","bio","username","photo_url"}   → {ok,message,task_id}
 ```
+
+`PATCH /api/accounts/{id}` 的字段语义（`exclude_unset`）：
+
+| 字段 | 传 null 的含义 |
+|---|---|
+| `group_id` / `proxy_id` | **解绑**（显式传 `null` 才解绑；不传该字段表示不改） |
+| `remark` / `display_name` | 不可空文本，传 `null` 视为「没改」 |
+| `status` | 只允许 `disabled`（停用）或 `healthy`（启用），其它状态由 Worker 按实况写回 |
 
 `AccountSummary`：`{total, healthy, abnormal, new_this_week, online, leased}`
 （页面四块汇总：总数、正常、异常、本周新增）。
@@ -59,14 +67,20 @@ POST   /api/accounts/{id}/profile {"first_name","last_name","bio","username","ph
 ### 单号登录（验证码只走这个号自己）
 
 ```
-POST /api/accounts/login/start    {"phone","group_id","proxy_id","account_id"?} → LoginStepResponse
-POST /api/accounts/login/code     {"account_id","code"}                          → LoginStepResponse
-POST /api/accounts/login/password {"account_id","password"}                      → LoginStepResponse
+POST /api/accounts/login/start    {"phone"?,"group_id"?,"proxy_id"?,"account_id"?} → LoginStepResponse
+POST /api/accounts/login/code     {"account_id","code"}                           → LoginStepResponse
+POST /api/accounts/login/password {"account_id","password"}                       → LoginStepResponse
 ```
+
+`phone` 与 `account_id` 至少给一个：
+- 只给 `phone`：先建档（手机号重复则复用已有号）再发码；
+- 只给 `account_id`：已有号重新登录，手机号从库里加密保存的 `phone_enc` 解出来，
+  值班的人不必对着脱敏号（`861****2551`）重敲一遍。
 
 `LoginStepResponse`：`{account_id, step: "code_required"|"password_required"|"done", message, task_id}`
 步骤由 Worker 执行 Telethon 登录：`login_start` 发验证码，`login_code` 提交，若开了两步验证返回
-`password_required`，否则 `done` 并把会话加密写回 `tg_accounts.session_enc`。
+`password_required`，否则 `done` 并把会话加密写回 `tg_accounts.session_enc`；
+登录成功后 Worker 会**自动补一条 `sync_dialogs` 任务**（规划第一步：登录后拉出已有群和私信）。
 
 ### 账号检测
 
@@ -157,7 +171,13 @@ POST   /api/relays               RelayRouteCreate → RelayRouteOut
 PATCH  /api/relays/{id}          RelayRouteUpdate → RelayRouteOut
 DELETE /api/relays/{id}                                → {ok,message}
 GET    /api/relays/links?route_id=&page=&page_size=    → {items:[RelayLinkOut], total}
+GET    /api/audit?action=&user_id=&account_id=&page=   → {items:[AuditOut], total, page, page_size}
 ```
+
+`RelayLinkOut` 除了表上的列，还带列表页要用的上下文（由路由回填）：
+`origin_body`（原消息正文，截断 500 字）、`origin_sender_name`、`origin_dialog_title`、
+`account_label`（脱敏手机号；Bot 会话为 null）、`origin_created_at`。
+这样「已转发记录」能看出转的是什么，而不是一串 ID。
 
 `BotOut.token_masked` 只回 `123456...abcd`，永不回明文。
 

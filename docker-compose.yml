@@ -1,0 +1,283 @@
+# Telegram 云控 —— 部署编排（Docker Compose v2，无 version: 关键字）
+#
+# 默认启动：postgres / redis / api / worker / frontend
+# 监控栈（prometheus / alertmanager / pushgateway / postgres-exporter）在 profiles: monitoring 下，
+# 需要显式打开：docker compose --profile monitoring up -d
+#
+# 用法速查见 README.md，告警与故障处置见 docs/OPERATIONS.md。
+# 说明：项目名固定为 tgcc（目录名是中文，交给 Compose 自动推导会得到非法项目名）。
+
+name: tgcc
+
+# 所有服务的日志驱动统一限制大小，避免 json-file 把宿主磁盘写满
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+
+  # ---------------------------------------------------------------- 基础服务
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cloudctl}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cloudctl}
+      POSTGRES_DB: ${POSTGRES_DB:-cloudctl}
+      # 数据目录放子目录，避免 PGDATA 与挂载点根目录混在一起
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Asia/Shanghai}
+    # 自定义 entrypoint 只做一件事：把 WAL 归档目录建好并交给 postgres 用户，然后交回官方
+    # docker-entrypoint.sh（它检测到 root 会自己 gosu 到 postgres 并 chown PGDATA）。
+    # 少了这一步，命名卷挂到镜像里不存在的路径时属主是 root，archive_command 会一直失败。
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mkdir -p /var/lib/postgresql/wal-archive
+        chown -R postgres:postgres /var/lib/postgresql/wal-archive
+        chmod 700 /var/lib/postgresql/wal-archive
+        exec docker-entrypoint.sh postgres \
+          -c wal_level=replica \
+          -c archive_mode=on \
+          -c "archive_command=test ! -f /var/lib/postgresql/wal-archive/%f && cp %p /var/lib/postgresql/wal-archive/%f" \
+          -c archive_timeout=300 \
+          -c wal_keep_size=${POSTGRES_WAL_KEEP_SIZE:-512MB} \
+          -c max_connections=${POSTGRES_MAX_CONNECTIONS:-200} \
+          -c shared_buffers=${POSTGRES_SHARED_BUFFERS:-512MB} \
+          -c work_mem=${POSTGRES_WORK_MEM:-8MB} \
+          -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-128MB} \
+          -c log_min_duration_statement=${POSTGRES_LOG_MIN_DURATION_MS:-1000} \
+          -c timezone=UTC
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # WAL 归档卷：pg_basebackup + 归档日志 = 按时间点恢复（PITR）
+      - pg_wal_archive:/var/lib/postgresql/wal-archive
+    # 只在宿主 127.0.0.1 暴露，方便 psql / 图形客户端；要对外开放改 POSTGRES_PUBLISH
+    ports:
+      - "${POSTGRES_PUBLISH:-127.0.0.1:5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-cloudctl} -d ${POSTGRES_DB:-cloudctl}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    shm_size: 256mb
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    # 取舍：Redis 只存心跳缓存、页面订阅和 update_id 去重，丢了只影响页面推送，
+    # 事实（账号、消息、任务、租约）全在 Postgres。所以关掉 AOF 与 RDB，不占磁盘；
+    # 内存给上限 + LRU，防止去重键长期堆积把宿主内存吃光。
+    command:
+      - redis-server
+      - --appendonly
+      - "no"
+      - --save
+      - ""
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - allkeys-lru
+    ports:
+      - "${REDIS_PUBLISH:-127.0.0.1:6379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    logging: *default-logging
+
+  # ---------------------------------------------------------------- 应用
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: tgcc-backend:${TAG:-local}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ROLE: api
+      COMPONENT: api
+      # 租约只属于 Worker，API 侧强制留空，避免误用
+      WORKER_ID: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # entrypoint.sh（ROLE=api）先等库、跑 alembic upgrade head、按需建管理员，最后 exec 下面这条
+    command:
+      - uvicorn
+      - app.api.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - "*"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      # 契约：/health 只表示进程活着；就绪看 /ready
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    stop_grace_period: 30s
+    logging: *default-logging
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: tgcc-backend:${TAG:-local}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ROLE: worker
+      COMPONENT: worker
+      # 必须留空：每个副本用 hostname-pid 生成唯一 worker_id，
+      # 若在 .env 里写死会让所有副本共用一个 worker_id，租约互相覆盖。
+      WORKER_ID: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "app.worker.main"]
+    # 扩容：docker compose up -d --scale worker=3（一副本约 100 个在线号）
+    # 多副本时容器内端口固定 9101，宿主从下面的区间里逐个分配
+    ports:
+      - "${WORKER_METRICS_PORT_RANGE:-9101-9110}:9101"
+    # SIGTERM 后先释放租约再退出（释放租约 + 断连），给足 60 秒
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9101/metrics >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    logging: *default-logging
+
+  frontend:
+    # 由前端同学提供 frontend/Dockerfile（nginx 静态托管，内部把 /api 与 /api/ws 反代到 api:8000）
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: tgcc-frontend:${TAG:-local}
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    logging: *default-logging
+
+  # ---------------------------------------------------------------- 监控栈（默认不启动）
+
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - api
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --web.enable-lifecycle
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    # worker 的备用抓取方案（宿主端口）需要能解析宿主机名；正向 DNS SD 不需要
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging: *default-logging
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./deploy/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    # 示例配置里的接收端用了 host.docker.internal（宿主上跑接收服务时）
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging: *default-logging
+
+  # 备份脚本上报「最近一次成功备份时间」用；告警规则读的就是这里推上来的指标
+  pushgateway:
+    image: prom/pushgateway:latest
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    command:
+      - --persistence.file=/pushgateway/pushgateway.data
+      - --persistence.interval=5m
+    volumes:
+      - pushgateway_data:/pushgateway
+    ports:
+      - "${PUSHGATEWAY_PORT:-9091}:9091"
+    logging: *default-logging
+
+  # 数据库磁盘 / 连接数 / 归档情况（「数据库磁盘或备份失败」告警的数据源）
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-cloudctl}:${POSTGRES_PASSWORD:-cloudctl}@postgres:5432/${POSTGRES_DB:-cloudctl}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${POSTGRES_EXPORTER_PORT:-9187}:9187"
+    logging: *default-logging
+
+# ---------------------------------------------------------------- 卷与网络
+
+volumes:
+  pgdata:          # Postgres 数据目录
+  pg_wal_archive:  # WAL 归档（PITR 用）
+  prometheus_data:
+  alertmanager_data:
+  pushgateway_data:
+
+networks:
+  default:
+    name: ${COMPOSE_NETWORK:-tgcc-net}
+    driver: bridge

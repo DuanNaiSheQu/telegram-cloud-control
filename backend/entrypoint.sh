@@ -19,12 +19,27 @@
 
 set -euo pipefail
 
-APP_DIR=/app
-cd "$APP_DIR"
-
 DB_WAIT_ATTEMPTS="${DB_WAIT_ATTEMPTS:-60}"            # 60 * 2s = 120s，等 Postgres 起来
 DB_WAIT_INTERVAL="${DB_WAIT_INTERVAL:-2}"
 SCHEMA_WAIT_ATTEMPTS="${SCHEMA_WAIT_ATTEMPTS:-150}"   # 150 * 2s = 300s，等 api 跑完迁移
+
+# 工作目录 = 脚本所在目录（容器里是 /app：镜像把 app/、alembic/、alembic.ini 都放在那儿）。
+# 这样不写死 /app，本机也能直接跑这个脚本做冒烟。
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$APP_DIR"
+
+# 解释器：镜像里是 python，本机可能只有 python3（冒烟用）
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [ -z "$PYTHON_BIN" ]; then
+  if command -v python >/dev/null 2>&1; then
+    PYTHON_BIN=python
+  elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN=python3
+  else
+    printf '[entrypoint] 错误：找不到 python / python3\n' >&2
+    exit 1
+  fi
+fi
 
 log() { printf '[entrypoint] %s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"; }
 die() { printf '[entrypoint] 错误：%s\n' "$*" >&2; exit 1; }
@@ -48,10 +63,10 @@ USAGE
 # ---------------------------------------------------------------- 等待依赖
 
 wait_for_postgres() {
-  local i=1
+  local i=1 out
   log "等待 Postgres 就绪（最多 $((DB_WAIT_ATTEMPTS * DB_WAIT_INTERVAL)) 秒）..."
   while [ "$i" -le "$DB_WAIT_ATTEMPTS" ]; do
-    if python - <<'PY'
+    if out="$("$PYTHON_BIN" - 2>&1 <<'PY'
 import asyncio
 import sys
 
@@ -59,9 +74,13 @@ from app.db import ping_database
 
 sys.exit(0 if asyncio.run(ping_database()) else 1)
 PY
-    then
+)"; then
       log "Postgres 已就绪（第 ${i} 次探测）"
       return 0
+    fi
+    # 只在第 1 次和每 10 次打一行，避免反复刷同样的报错
+    if [ "$i" -eq 1 ] || [ $((i % 10)) -eq 0 ]; then
+      log "第 ${i} 次探测未就绪：$(printf '%s\n' "$out" | tail -n 1)"
     fi
     i=$((i + 1))
     sleep "$DB_WAIT_INTERVAL"
@@ -70,10 +89,10 @@ PY
 }
 
 wait_for_schema() {
-  local i=1
+  local i=1 out
   log "等待数据库迁移完成（alembic_version 出现，最多 $((SCHEMA_WAIT_ATTEMPTS * DB_WAIT_INTERVAL)) 秒）..."
   while [ "$i" -le "$SCHEMA_WAIT_ATTEMPTS" ]; do
-    if python - <<'PY'
+    if out="$("$PYTHON_BIN" - 2>&1 <<'PY'
 import asyncio
 import sys
 
@@ -95,9 +114,12 @@ async def main() -> int:
 
 sys.exit(asyncio.run(main()))
 PY
-    then
+)"; then
       log "数据库结构已就绪（第 ${i} 次探测）"
       return 0
+    fi
+    if [ "$i" -eq 1 ] || [ $((i % 10)) -eq 0 ]; then
+      log "第 ${i} 次探测未就绪（等迁移）：$(printf '%s\n' "$out" | tail -n 1)"
     fi
     i=$((i + 1))
     sleep "$DB_WAIT_INTERVAL"
@@ -134,7 +156,7 @@ bootstrap_admin() {
     return 0
   fi
   log "初始化管理员 ${BOOTSTRAP_ADMIN_USERNAME:-admin}（模式 ${mode}）"
-  python - "$mode" <<'PY'
+  "$PYTHON_BIN" - "$mode" <<'PY'
 import asyncio
 import sys
 
@@ -219,9 +241,10 @@ case "$ROLE" in
     check_secrets
     wait_for_postgres
     if [ "$RUN_MIGRATIONS" = "1" ]; then
+      # 用 python -m alembic：不依赖 PATH 里有没有 alembic 可执行文件
       log "执行 alembic upgrade head"
-      alembic upgrade head
-      log "迁移完成（当前版本：$(alembic current 2>/dev/null | tail -n 1 || echo '未知')）"
+      "$PYTHON_BIN" -m alembic upgrade head
+      log "迁移完成（当前版本：$("$PYTHON_BIN" -m alembic current 2>/dev/null | tail -n 1 || echo '未知')）"
       bootstrap_admin ensure
     else
       log "命令显式调用了 alembic，跳过自动迁移"

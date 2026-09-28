@@ -157,8 +157,17 @@ def main() -> int:
         check("按状态筛选生效", r.status_code == 200 and all(i["status"] == "pending" for i in r.json()["items"]))
         r = api.get("/api/accounts", params={"group_id": group_id, "page_size": 50})
         check("按分组筛选生效", r.status_code == 200 and len(r.json()["items"]) >= 2)
-        r = api.get("/api/accounts", params={"phone": "138", "page_size": 50})
-        check("按手机号筛选生效", r.status_code == 200 and len(r.json()["items"]) >= 2)
+        # 用真实脱敏值的前 3 位做关键词（形如 861****2551）：脱敏后前 3 位是国家码 + 号段开头
+        probe = api.get("/api/accounts", params={"page_size": 50}).json()["items"][0]["phone_masked"][:3]
+        r = api.get("/api/accounts", params={"phone": probe, "page_size": 50})
+        check("按手机号筛选生效", r.status_code == 200 and len(r.json()["items"]) >= 1, f"keyword={probe}")
+
+        # 契约没写解绑接口，前端走 PATCH 显式 null；这里验证后端确实按「显式设置」处理
+        r = api.patch(f"/api/accounts/{account_ids[0]}", json={"proxy_id": None})
+        check("代理解绑（PATCH 显式 null）生效",
+              r.status_code == 200 and r.json().get("proxy_id") is None, r.text[:160])
+        r = api.patch(f"/api/accounts/{account_ids[0]}", json={"proxy_id": proxy_id})
+        check("代理重新绑定生效", r.status_code == 200 and r.json().get("proxy_id") == proxy_id)
 
         r = api.post("/api/users", json={
             "username": f"e2e-op-{suffix}", "password": "op-pass-1234", "display_name": "验收员工",

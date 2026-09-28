@@ -1,0 +1,102 @@
+# Alertmanager 示例配置（挂到 /etc/alertmanager/alertmanager.yml）
+#
+# 默认按 severity 分流给三个 webhook 占位地址；上线前把 URL 换成你自己的接收端。
+# 改完先自检（容器里带 amtool）：
+#   docker compose --profile monitoring exec alertmanager amtool check-config /etc/alertmanager/alertmanager.yml
+# 校验并热加载：
+#   curl -X POST http://localhost:9093/-/reload
+#
+# ── 换成企业微信 / 钉钉 ────────────────────────────────────────────────
+# Alertmanager 只有 Slack / 邮件 / webhook 等通用通道，企业微信和钉钉要一个转发器：
+# 起一个 prometheus-webhook-dingtalk（同时支持钉钉和企业微信）容器，然后：
+#   receivers:
+#     - name: wecom
+#       webhook_configs:
+#         - url: 'http://webhook-relay:8060/wecom/send'      # 企业微信群机器人
+#           send_resolved: true
+#     - name: dingtalk
+#       webhook_configs:
+#         - url: 'http://webhook-relay:8060/dingtalk/tgcc/send'
+#           send_resolved: true
+# 只想最小改动的话，也可以自己写一个 20 行的 HTTP 服务接收 Alertmanager 的 JSON
+# （字段 alerts[].labels / annotations / status），再转成企业微信的 markdown 消息体。
+#
+# ── 换成 Slack ────────────────────────────────────────────────────────
+#   receivers:
+#     - name: slack
+#       slack_configs:
+#         - api_url: 'https://hooks.slack.com/services/XXX/YYY/ZZZ'
+#           channel: '#tgcc-alerts'
+#           send_resolved: true
+#           title: '{{ .Status | toUpper }} {{ .CommonLabels.alertname }}'
+#           text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+#
+# ── 换成邮件 ──────────────────────────────────────────────────────────
+# 打开上面的 global.smtp_*，再用：
+#   receivers:
+#     - name: email
+#       email_configs:
+#         - to: 'ops@example.com'
+#           send_resolved: true
+
+global:
+  resolve_timeout: 5m
+  # 邮件通道需要的 SMTP（用邮件接收人时才填）
+  # smtp_smarthost: 'smtp.example.com:465'
+  # smtp_from: 'tgcc-alert@example.com'
+  # smtp_auth_username: 'tgcc-alert@example.com'
+  # smtp_auth_password: '邮箱授权码'
+  # smtp_require_tls: true
+
+# 告警分流：critical 立刻发、发得勤；warning 合并后慢慢发
+route:
+  receiver: default-webhook
+  group_by: ['alertname', 'component', 'instance']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # 1) 严重：Worker 全掉、在线号暴跌、备份失败这类，10 秒后就发，1 小时重复一次
+    - matchers:
+        - severity="critical"
+      receiver: critical-webhook
+      group_wait: 10s
+      group_interval: 2m
+      repeat_interval: 1h
+      continue: false
+    # 2) 警告：趋势类、容量类，攒 1 分钟再发，12 小时才重复
+    - matchers:
+        - severity="warning"
+      receiver: warning-webhook
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 12h
+    # 3) 兜底：没有 severity 标签的告警也发到默认接收人
+    - matchers:
+        - severity=""
+      receiver: default-webhook
+
+# 抑制：同一组件已经 critical 时，压掉它的 warning，避免刷屏
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+    equal: ['component', 'alertname']
+
+receivers:
+  # ---- 占位 webhook：换成你自己的接收服务 ----
+  - name: default-webhook
+    webhook_configs:
+      - url: 'http://host.docker.internal:5000/tgcc-alert'
+        send_resolved: true
+
+  - name: critical-webhook
+    webhook_configs:
+      - url: 'http://host.docker.internal:5000/tgcc-alert/critical'
+        send_resolved: true
+
+  - name: warning-webhook
+    webhook_configs:
+      - url: 'http://host.docker.internal:5000/tgcc-alert/warning'
+        send_resolved: true

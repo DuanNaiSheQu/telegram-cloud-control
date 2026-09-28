@@ -60,9 +60,14 @@ export function asList<T>(payload: Paged<T> | T[] | null | undefined): T[] {
 
 export const authApi = {
   login: (username: string, password: string) =>
-    api.post<TokenResponse>('/api/auth/login', { username, password }, { silent: true }),
+    api.post<TokenResponse>(
+      '/api/auth/login',
+      { username, password },
+      // 口令错误也是 401，这里不能让封装当成「登录过期」处理
+      { silent: true, authRedirect: false },
+    ),
   me: () => api.get<UserOut>('/api/auth/me', undefined, { silent: true }),
-  logout: () => api.post<OkResponse>('/api/auth/logout', {}, { silent: true }),
+  logout: () => api.post<OkResponse>('/api/auth/logout', {}, { silent: true, authRedirect: false }),
 };
 
 // ---------------------------------------------------------------- 工作台
@@ -212,13 +217,14 @@ export const relayApi = {
 
 /**
  * 契约第 1~10 节没有给出审计列表路径（schemas/audit.py 已有 AuditListResponse）。
- * 这里先按 REST 习惯请求 /api/audit-logs，404 时回落到 /api/audit，并把可用路径记下来。
+ * 本机后端实测可用路径是 /api/audit，先请求它，404 时再回落到 /api/audit-logs，
+ * 并把命中的路径记下来，后续请求不再试探。
  */
 let resolvedAuditPath: string | null = null;
 
 export const auditApi = {
   list: async (query: AuditListQuery): Promise<AuditListResponse> => {
-    const candidates = resolvedAuditPath ? [resolvedAuditPath] : ['/api/audit-logs', '/api/audit'];
+    const candidates = resolvedAuditPath ? [resolvedAuditPath] : ['/api/audit', '/api/audit-logs'];
     let lastError: unknown = null;
     for (const path of candidates) {
       try {

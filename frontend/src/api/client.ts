@@ -63,6 +63,8 @@ export interface RequestOptions {
   /** 毫秒，默认 30s */
   timeoutMs?: number;
   signal?: AbortSignal;
+  /** 401 时是否清 token 跳登录（登录接口自己关掉） */
+  authRedirect?: boolean;
 }
 
 export function buildQuery(query?: Record<string, QueryValue>): string {
@@ -143,7 +145,15 @@ function emitUnauthorized(): void {
 const DEFAULT_TIMEOUT = 30_000;
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', query, body, silent, timeoutMs = DEFAULT_TIMEOUT, signal } = options;
+  const {
+    method = 'GET',
+    query,
+    body,
+    silent,
+    timeoutMs = DEFAULT_TIMEOUT,
+    signal,
+    authRedirect = true,
+  } = options;
 
   const headers: Record<string, string> = { Accept: 'application/json' };
   const token = getToken();
@@ -193,7 +203,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     const detail = extractDetail(payload);
     const message = messageForStatus(response.status, detail, path);
     const error = new ApiError(response.status, message, path, detail, payload);
-    if (response.status === 401) {
+    if (response.status === 401 && authRedirect) {
       setToken(null);
       emitUnauthorized();
     } else if (!silent) {

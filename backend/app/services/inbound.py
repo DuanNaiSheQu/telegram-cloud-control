@@ -112,6 +112,7 @@ async def ingest_message(
     raw: Optional[Any] = None,
     status: MessageStatus = MessageStatus.received,
     created_by: Optional[uuid.UUID] = None,
+    count_unread: bool = True,
 ) -> Tuple[Dialog, Message, bool]:
     """写入一条消息。返回 (会话, 消息, 是否新建)。已存在的 tg_message_id 不重复写。"""
     dialog = await upsert_dialog(
@@ -155,7 +156,9 @@ async def ingest_message(
     dialog.last_message_at = message.created_at or _now()
     dialog.last_message_preview = preview_of(body)
     if direction == MessageDirection.incoming:
-        dialog.unread_count = (dialog.unread_count or 0) + 1
+        # count_unread=False 用于补历史消息（sync_messages）：老消息不该再点亮未读角标
+        if count_unread:
+            dialog.unread_count = (dialog.unread_count or 0) + 1
     else:
         dialog.unread_count = 0
     await session.flush()

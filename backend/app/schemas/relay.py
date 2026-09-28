@@ -97,6 +97,12 @@ class RelayRouteOut(ORMModel):
 
 
 class RelayLinkOut(ORMModel):
+    """一条「原消息 ↔ 员工群里那条转发」。
+
+    后四个字段不是表上的列，是列表页要用的上下文（由路由回填），
+    否则「已转发记录」只能看到一串 ID，值班时没法判断转的是什么。
+    """
+
     id: uuid.UUID
     route_id: Optional[uuid.UUID] = None
     message_id: uuid.UUID
@@ -104,6 +110,12 @@ class RelayLinkOut(ORMModel):
     staff_chat_id: int
     staff_message_id: int
     created_at: Optional[datetime] = None
+
+    origin_body: Optional[str] = None
+    origin_sender_name: Optional[str] = None
+    origin_dialog_title: Optional[str] = None
+    account_label: Optional[str] = None
+    origin_created_at: Optional[datetime] = None
 
 
 class WebhookResult(BaseModel):

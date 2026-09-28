@@ -3,7 +3,6 @@ import { Alert, Empty, Input, Modal, Select, Space, Table, Tag, Typography } fro
 import type { ColumnsType } from 'antd/es/table';
 import { accountApi, groupApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
-import { ACCOUNT_STATUS_LABELS } from '../constants';
 import { formatTime } from '../utils/format';
 import StatusBadge from './StatusBadge';
 import type { AccountOut } from '../api/types';
@@ -116,7 +115,6 @@ export function AccountPickerModal({
       cancelText="取消"
       confirmLoading={confirmLoading}
       width={860}
-      destroyOnClose
     >
       <Space direction="vertical" size="small" style={{ width: '100%' }}>
         {hint ? <Alert type="info" showIcon message={hint} /> : null}

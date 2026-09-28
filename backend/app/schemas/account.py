@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.models.enums import AccountStatus, CurrentTask
 from app.schemas.common import ORMModel
@@ -77,12 +77,26 @@ class AccountListResponse(BaseModel):
 # ---------------- 登录 ----------------
 
 class LoginStartRequest(BaseModel):
-    phone: str = Field(min_length=5, max_length=32)
+    """登录第一步。
+
+    两种用法：
+    - 新号：只给 phone（会先建档）；
+    - 已有号重新登录：只给 account_id 即可，phone 用库里加密保存的号码，不必让值班的人
+      对着脱敏号（861****2551）重敲一遍。
+    """
+
+    phone: Optional[str] = Field(default=None, min_length=5, max_length=32)
     group_id: Optional[uuid.UUID] = None
     proxy_id: Optional[uuid.UUID] = None
     account_id: Optional[uuid.UUID] = Field(
-        default=None, description="对已有账号重新登录时传"
+        default=None, description="对已有账号重新登录时传；此时 phone 可省略"
     )
+
+    @model_validator(mode="after")
+    def _require_phone_or_account(self) -> "LoginStartRequest":
+        if not self.phone and not self.account_id:
+            raise ValueError("phone 与 account_id 至少要有一个")
+        return self
 
 
 class LoginStepResponse(BaseModel):

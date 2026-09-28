@@ -210,7 +210,7 @@ export interface ProxyCreate {
   remark?: string;
 }
 
-export interface ProxyUpdate extends Partial<ProxyCreate> {}
+export type ProxyUpdate = Partial<ProxyCreate>;
 
 // ---------------------------------------------------------------- 员工 / 分配
 
@@ -467,7 +467,7 @@ export interface RelayRouteCreate {
   remark?: string;
 }
 
-export interface RelayRouteUpdate extends Partial<RelayRouteCreate> {}
+export type RelayRouteUpdate = Partial<RelayRouteCreate>;
 
 export interface RelayLinkOut {
   id: UUID;
@@ -581,12 +581,11 @@ export type WsTaskEvent = {
 export type WsHelloEvent = { kind: 'hello'; dialogs: UUID[] };
 export type WsPongEvent = { op: 'pong' };
 
-export type WsServerEvent =
-  | WsAccountEvent
-  | WsMessageEvent
-  | WsTaskEvent
-  | WsHelloEvent
-  | WsPongEvent;
+/** 服务端会推的业务事件（pong 在客户端内部消化，不派发给页面） */
+export type WsServerEvent = WsAccountEvent | WsMessageEvent | WsTaskEvent | WsHelloEvent;
+
+/** 原始帧：业务事件 + pong */
+export type WsRawEvent = WsServerEvent | WsPongEvent;
 
 export type WsStatus = 'connecting' | 'open' | 'closed';
 

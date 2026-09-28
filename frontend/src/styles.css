@@ -1,0 +1,263 @@
+/* 全局样式：控制台外壳 + 会话气泡 */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Helvetica Neue', Arial, sans-serif;
+  background: #f5f6f8;
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  padding: 0 16px;
+  color: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.app-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2aabee, #229ed9);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.app-logo-text {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.app-content {
+  padding: 16px;
+  overflow: auto;
+}
+
+.app-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.page-toolbar-right {
+  margin-left: auto;
+}
+
+.stat-row {
+  margin-bottom: 16px;
+}
+
+.section-card {
+  margin-bottom: 16px;
+}
+
+/* ---------------- 会话页 ---------------- */
+
+.dialog-page {
+  display: flex;
+  gap: 12px;
+  height: calc(100vh - 120px);
+  min-height: 520px;
+}
+
+.dialog-list-pane {
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  flex: 0 0 360px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dialog-list-filters {
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dialog-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dialog-list-footer {
+  padding: 8px 12px;
+  border-top: 1px solid #f0f0f0;
+  text-align: right;
+}
+
+.dialog-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #fafafa;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dialog-item:hover {
+  background: #f7faff;
+}
+
+.dialog-item.active {
+  background: #e9f2ff;
+}
+
+.dialog-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialog-item-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.dialog-item-preview {
+  color: #8c8c8c;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialog-item-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 12px;
+  color: #8c8c8c;
+  flex: 0 0 auto;
+}
+
+.chat-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #f7f8fa;
+}
+
+.chat-bubble-row {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+.chat-bubble-row.outgoing {
+  justify-content: flex-end;
+}
+
+.chat-bubble {
+  max-width: 68%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #ececec;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.chat-bubble-row.outgoing .chat-bubble {
+  background: #d6e9ff;
+  border-color: #c3ddfd;
+}
+
+.chat-bubble-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.chat-composer {
+  padding: 10px 12px;
+  border-top: 1px solid #f0f0f0;
+  background: #fff;
+}
+
+.chat-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #8c8c8c;
+}
+
+.code-block {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
