@@ -50,6 +50,14 @@ BULK_RETRY_ALLOWED_TYPES = (
     TaskType.account_check,
     TaskType.update_profile,
     TaskType.relay_to_staff,
+    TaskType.bulk_pm,
+    TaskType.group_broadcast,
+    TaskType.material_send,
+    TaskType.join_group,
+    TaskType.leave_group,
+    TaskType.force_add_member,
+    TaskType.storm_chat,
+    TaskType.persona_chat,
 )
 
 #: 被类型过滤拦下时给前端的统一提示

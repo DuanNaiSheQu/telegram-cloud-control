@@ -576,3 +576,5 @@ GET /api/messages?q=&channel=&kind=&account_id=&dialog_id=&direction=&status=&pa
 | `tgcc:notifications:last-sync` | 通知聚合 | 20 秒节流，避免页面轮询每次都跑聚合 |
 | `tgcc:backup:last-result` | `deploy/backup.sh`（待接入） | 备份结果上报，`ok=false` 生成 `backup_failed` 通知 |
 
+
+

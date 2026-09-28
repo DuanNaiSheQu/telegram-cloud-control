@@ -347,6 +347,14 @@ export type TaskType =
   | 'login_start'
   | 'login_code'
   | 'login_password'
+  | 'bulk_pm'
+  | 'group_broadcast'
+  | 'material_send'
+  | 'join_group'
+  | 'leave_group'
+  | 'force_add_member'
+  | 'storm_chat'
+  | 'persona_chat'
   | 'relay_to_staff'
   | 'bot_reply'
   | 'reply_to_origin';
@@ -895,4 +903,140 @@ export interface RelayTestResponse {
   message: string;
   detail: string;
   staff_message_id?: number | null;
+}
+
+// ================================================================
+// 营销中心（批量私信 / 群发 / 素材 / 加群退群 / 强拉 / 改资料 / 吵群 / 拟人）
+// ================================================================
+
+export interface CampaignScopeRequest {
+  account_ids?: UUID[] | null;
+  scope?: 'selected' | 'all' | `group:${string}`;
+  limit?: number;
+}
+
+export interface BulkPmRequest extends CampaignScopeRequest {
+  targets: string[];
+  text?: string | null;
+  texts?: string[] | null;
+  naturalize?: boolean;
+  min_interval?: number;
+  max_interval?: number;
+}
+
+export interface GroupBroadcastRequest extends CampaignScopeRequest {
+  target_group: string;
+  text?: string | null;
+  texts?: string[] | null;
+  naturalize?: boolean;
+}
+
+export interface MaterialSendRequest extends CampaignScopeRequest {
+  material_id: UUID;
+  target_group?: string | null;
+  targets?: string[] | null;
+  min_interval?: number;
+  max_interval?: number;
+}
+
+export interface JoinGroupRequest extends CampaignScopeRequest {
+  target: string;
+}
+
+export interface LeaveGroupRequest extends CampaignScopeRequest {
+  target: string;
+  delete_history?: boolean;
+}
+
+export interface ForceAddRequest extends CampaignScopeRequest {
+  group: string;
+  members: string[];
+}
+
+export interface ProfileFields {
+  first_name?: string | null;
+  last_name?: string | null;
+  bio?: string | null;
+  username?: string | null;
+  photo_url?: string | null;
+}
+
+export interface ProfileBulkRequest extends CampaignScopeRequest {
+  profile: ProfileFields;
+  per_account?: Record<UUID, ProfileFields> | null;
+}
+
+export interface StormRequest extends CampaignScopeRequest {
+  dialog_id?: UUID | null;
+  group?: string | null;
+  rounds?: number;
+  min_interval?: number;
+  max_interval?: number;
+  texts: string[];
+  reply_probability?: number;
+}
+
+export interface PersonaRequest extends CampaignScopeRequest {
+  dialog_id?: UUID | null;
+  group?: string | null;
+  persona: string;
+  topic?: string | null;
+  use_ai?: boolean;
+  texts?: string[] | null;
+  rounds?: number;
+  min_interval?: number;
+  max_interval?: number;
+}
+
+export type MaterialKind = 'text' | 'photo' | 'video' | 'document';
+
+export interface MaterialOut {
+  id: UUID;
+  name: string;
+  kind: MaterialKind;
+  kind_label: string;
+  text: string;
+  file_name?: string | null;
+  original_name?: string | null;
+  size_bytes: number;
+  mime_type?: string | null;
+  created_by?: UUID | null;
+  created_at?: ISODateTime | null;
+}
+
+export interface MaterialListResponse {
+  items: MaterialOut[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface CampaignBatchItem {
+  account_id?: UUID | null;
+  account_label: string;
+  task_id: UUID;
+  type: string;
+  type_label: string;
+  status: TaskStatus;
+  status_label: string;
+  attempts: number;
+  error: string;
+  started_at?: ISODateTime | null;
+  completed_at?: ISODateTime | null;
+}
+
+export interface CampaignBatchOut {
+  batch_id: UUID;
+  created_at?: ISODateTime | null;
+  created_by_name?: string | null;
+  total: number;
+  counts: Record<string, number>;
+  items: CampaignBatchItem[];
+}
+
+export interface CampaignBatchListResponse {
+  items: CampaignBatchOut[];
+  total: number;
+  page: number;
+  page_size: number;
 }

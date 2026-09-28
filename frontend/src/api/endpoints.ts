@@ -14,7 +14,10 @@ import type {
   AccountUpdate,
   BulkAccountRequest,
   BulkAction,
+  BulkPmRequest,
   BulkResultOut,
+  CampaignBatchListResponse,
+  CampaignBatchOut,
   AssignmentOut,
   AuditListQuery,
   AuditListResponse,
@@ -28,9 +31,17 @@ import type {
   DialogListResponse,
   DialogOut,
   DraftOut,
+  ForceAddRequest,
+  GroupBroadcastRequest,
   GroupCreate,
   GroupOut,
+  JoinGroupRequest,
+  LeaveGroupRequest,
   LoginStartRequest,
+  MaterialKind,
+  MaterialListResponse,
+  MaterialOut,
+  MaterialSendRequest,
   LoginStepResponse,
   MessageListQuery,
   MessageListResponse,
@@ -42,6 +53,8 @@ import type {
   NotificationOut,
   OkResponse,
   Paged,
+  PersonaRequest,
+  ProfileBulkRequest,
   ProxyCreate,
   ProxyOut,
   ProxyUpdate,
@@ -50,6 +63,7 @@ import type {
   RelayRouteOut,
   RelayRouteUpdate,
   SendMessageResponse,
+  StormRequest,
   TaskActionResponse,
   TaskBulkRetryResponse,
   TaskListQuery,
@@ -250,6 +264,43 @@ export const taskApi = {
    * 空数组 → 400，超过 200 → 422。
    */
   bulkRetry: (taskIds: UUID[]) => api.post<TaskBulkRetryResponse>('/api/tasks/bulk/retry', { task_ids: taskIds }),
+};
+
+// ---------------------------------------------------------------- 营销中心（批量运营）
+
+export const campaignApi = {
+  bulkPm: (payload: BulkPmRequest) => api.post<BulkResultOut>('/api/campaigns/bulk-pm', payload),
+  groupBroadcast: (payload: GroupBroadcastRequest) => api.post<BulkResultOut>('/api/campaigns/group-broadcast', payload),
+  materialSend: (payload: MaterialSendRequest) => api.post<BulkResultOut>('/api/campaigns/material-send', payload),
+  joinGroup: (payload: JoinGroupRequest) => api.post<BulkResultOut>('/api/campaigns/join-group', payload),
+  leaveGroup: (payload: LeaveGroupRequest) => api.post<BulkResultOut>('/api/campaigns/leave-group', payload),
+  forceAdd: (payload: ForceAddRequest) => api.post<BulkResultOut>('/api/campaigns/force-add', payload),
+  profileUpdate: (payload: ProfileBulkRequest) => api.post<BulkResultOut>('/api/campaigns/profile-update', payload),
+  storm: (payload: StormRequest) => api.post<BulkResultOut>('/api/campaigns/storm', payload),
+  persona: (payload: PersonaRequest) => api.post<BulkResultOut>('/api/campaigns/persona', payload),
+  batches: (query?: { page?: number; page_size?: number }) =>
+    api.get<CampaignBatchListResponse>('/api/campaigns/batches', { ...query }),
+  batch: (batchId: UUID) => api.get<CampaignBatchOut>(`/api/campaigns/batches/${batchId}`),
+  cancelBatch: (batchId: UUID) => api.post<BulkResultOut>(`/api/campaigns/batches/${batchId}/cancel`),
+};
+
+// ---------------------------------------------------------------- 素材库
+
+export const materialApi = {
+  list: (query?: { kind?: MaterialKind | ''; q?: string; page?: number; page_size?: number }) =>
+    api.get<MaterialListResponse>('/api/materials', { ...query }),
+  create: (payload: { name: string; text?: string | null }) =>
+    api.post<MaterialOut>('/api/materials', { ...payload, kind: 'text' }),
+  upload: (name: string, file: File, caption?: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<MaterialOut>(
+      `/api/materials/upload?name=${encodeURIComponent(name)}${caption ? `&caption=${encodeURIComponent(caption)}` : ''}`,
+      form,
+    );
+  },
+  remove: (id: UUID) => api.del<OkResponse>(`/api/materials/${id}`),
+  downloadUrl: (id: UUID) => `/api/materials/${id}?download=true`,
 };
 
 

@@ -27,6 +27,7 @@ from app.models.enums import (
     UserRole,
 )
 from app.models.message import Message
+from app.models.material import MATERIAL_KIND_LABELS, Material, MaterialKind
 from app.models.metrics_sample import MetricsSample
 from app.models.notification import (
     NOTIFICATION_KIND_LABELS,
@@ -76,4 +77,7 @@ __all__ = [
     "NOTIFICATION_KIND_LABELS",
     "NOTIFICATION_KIND_LEVELS",
     "NOTIFICATION_LEVELS",
+    "Material",
+    "MaterialKind",
+    "MATERIAL_KIND_LABELS",
 ]
