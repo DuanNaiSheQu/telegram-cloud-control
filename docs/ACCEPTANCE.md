@@ -41,11 +41,6 @@
 | AI 草稿停在输入框，员工点发送才出去 | `reply_drafts` 表，`POST /api/dialogs/{id}/draft`、`POST /api/messages/send`（带 `draft_id`），审计记录 `sent_by` | `backend/tests/smoke_ai.py`（草稿生成）；`scripts/e2e_check.py` 第 5 节 |
 | 单个号在设置里改自己的名称和头像 | `update_profile` 任务 + `app/worker/task_runner.py` | 任务载荷见 API_CONTRACT 第 10 节；真机需登录后的号 |
 
-**不做清单**（批量私信、批量群发、素材群发、批量加群、批量退群、强拉进群、批量改资料、吵群、
-多号自动装真人）在代码里没有对应任务类型，`models/enums.TaskType` 里只有下列 11 种：
-`sync_dialogs`、`sync_messages`、`send_message`、`account_check`、`update_profile`、
-`login_start`、`login_code`、`login_password`、`relay_to_staff`、`bot_reply`、`reply_to_origin`。
-
 ## 2. 技术栈与进程
 
 | 规划条目 | 落地产物 | 验证方式 |

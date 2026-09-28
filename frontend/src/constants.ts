@@ -8,6 +8,8 @@ import type {
   CurrentTask,
   DialogChannel,
   DialogKind,
+  MessageStatus,
+  NotificationLevel,
   ProxyScheme,
   RelayTargetKind,
   TaskStatus,
@@ -94,6 +96,18 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
 export const TASK_TYPE_OPTIONS: SelectOption<TaskType>[] = (
   Object.keys(TASK_TYPE_LABELS) as TaskType[]
 ).map((value) => ({ value, label: TASK_TYPE_LABELS[value] }));
+
+/** 消息状态（与 backend/app/models/enums.py 对齐；后端有 status_label 时优先用后端的） */
+export const MESSAGE_STATUS_LABELS: Record<MessageStatus, string> = {
+  received: '已接收',
+  pending: '待发送',
+  sent: '已发送',
+  failed: '发送失败',
+};
+
+export const MESSAGE_STATUS_OPTIONS: SelectOption<MessageStatus>[] = (
+  Object.keys(MESSAGE_STATUS_LABELS) as MessageStatus[]
+).map((value) => ({ value, label: MESSAGE_STATUS_LABELS[value] }));
 
 export const DIALOG_CHANNEL_LABELS: Record<DialogChannel, string> = {
   user_account: '用户号',
@@ -199,3 +213,49 @@ export function optionLabel(
 export function isAbnormalStatus(status: AccountStatus): boolean {
   return status !== 'healthy' && status !== 'pending';
 }
+
+// ---------------------------------------------------------------- 语义色调
+// 组件里不要写死颜色：状态 → Tone → CSS 变量（--tg-color-*），换皮只改 tokens.ts。
+
+export type Tone = 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+
+/** 账号 7 态 → 语义色调（配色细节在 tokens.ts 的 color.account） */
+export const ACCOUNT_STATUS_TONE: Record<AccountStatus, Tone> = {
+  healthy: 'success',
+  pending: 'warning',
+  needs_code: 'warning',
+  frozen: 'danger',
+  invalid: 'danger',
+  dead: 'neutral',
+  disabled: 'neutral',
+};
+
+export const TASK_STATUS_TONE: Record<TaskStatus, Tone> = {
+  pending: 'info',
+  pending_confirmation: 'warning',
+  running: 'primary',
+  completed: 'success',
+  failed: 'danger',
+  cancelled: 'neutral',
+};
+
+export const MESSAGE_STATUS_TONE: Record<MessageStatus, Tone> = {
+  received: 'neutral',
+  pending: 'warning',
+  sent: 'success',
+  failed: 'danger',
+};
+
+export const NOTIFICATION_LEVEL_TONE: Record<NotificationLevel, Tone> = {
+  info: 'info',
+  success: 'success',
+  warning: 'warning',
+  error: 'danger',
+};
+
+/** 账号状态分组：用于「异常」筛选与看板口径（与后端 abnormal 一致） */
+export const ABNORMAL_STATUSES: AccountStatus[] = ['needs_code', 'frozen', 'invalid', 'dead', 'disabled'];
+
+/** 任务状态分组：失败/待处理，任务中心与看板共用 */
+export const FAILED_TASK_STATUSES: TaskStatus[] = ['failed'];
+export const ACTIVE_TASK_STATUSES: TaskStatus[] = ['pending', 'pending_confirmation', 'running'];

@@ -29,3 +29,6 @@ backups/
 .redisdata/
 run/
 *.pid
+
+# 素材库媒体文件（本地运行时上传产物）
+materials/

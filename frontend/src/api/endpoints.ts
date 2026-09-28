@@ -2,14 +2,19 @@
  * 接口封装。路径与 docs/API_CONTRACT.md（v1）逐条对应。
  * 所有函数只做「拼路径 + 传参 + 解析」，不做业务判断。
  */
-import { ApiError, api } from './client';
+import { ApiError, api, type QueryValue, type RequestOptions } from './client';
+import { buildQuery } from './client';
 import type {
   AccountCreate,
   AccountListQuery,
   AccountListResponse,
   AccountOut,
+  AccountOverviewOut,
   AccountSummary,
   AccountUpdate,
+  BulkAccountRequest,
+  BulkAction,
+  BulkResultOut,
   AssignmentOut,
   AuditListQuery,
   AuditListResponse,
@@ -27,7 +32,14 @@ import type {
   GroupOut,
   LoginStartRequest,
   LoginStepResponse,
+  MessageListQuery,
   MessageListResponse,
+  MessageSearchResponse,
+  MetricsTrendsOut,
+  MetricsWindow,
+  NotificationListQuery,
+  NotificationListResponse,
+  NotificationOut,
   OkResponse,
   Paged,
   ProxyCreate,
@@ -39,10 +51,15 @@ import type {
   RelayRouteUpdate,
   SendMessageResponse,
   TaskActionResponse,
+  TaskBulkRetryResponse,
   TaskListQuery,
   TaskListResponse,
   TaskOut,
   TokenResponse,
+  RelayTestRequest,
+  RelayTestResponse,
+  ExportResource,
+  ExportResult,
   UserCreate,
   UserOut,
   UserUpdate,
@@ -79,7 +96,8 @@ export const dashboardApi = {
 // ---------------------------------------------------------------- 账号
 
 export const accountApi = {
-  list: (query: AccountListQuery) => api.get<AccountListResponse>('/api/accounts', { ...query }),
+  list: (query: AccountListQuery, options?: RequestOptions) =>
+    api.get<AccountListResponse>('/api/accounts', { ...query }, options),
   summary: () => api.get<AccountSummary>('/api/accounts/summary'),
   create: (payload: AccountCreate) => api.post<AccountOut>('/api/accounts', payload),
   get: (id: UUID) => api.get<AccountOut>(`/api/accounts/${id}`),
@@ -101,6 +119,35 @@ export const accountApi = {
       photo_url?: string;
     },
   ) => api.post<OkResponse & { task_id?: UUID }>(`/api/accounts/${id}/profile`, payload),
+  /** 账号详情一次拿全（详情抽屉用）：账号 + 分组 + 代理 + 租约 + 统计 + 最近记录 */
+  overview: (id: UUID) => api.get<AccountOverviewOut>(`/api/accounts/${id}/overview`),
+};
+
+/**
+ * 批量账号操作（POST /api/accounts/bulk/{action}）。
+ * 只覆盖「对已有的号做一次已有操作」：检测、同步会话、分配、改分组、改代理、启停、清租约。
+ * 明确不做批量私信 / 群发 / 加群 / 改资料（见 规划.md「不做这些」）。
+ */
+export const accountBulkApi = {
+  /**
+   * 通用入口。除 bulk/assign 外都允许**不带 body**（等价 `{}` → 400「没有选中任何账号」），
+   * 所以这里 payload 是可选的；assign 必须带 user_id。
+   * 空选择 / scope 写法错 / mode 非法 → 400；越权 → 403；号不存在 → 404。
+   */
+  run: (action: BulkAction, payload?: BulkAccountRequest) =>
+    api.post<BulkResultOut>(`/api/accounts/bulk/${action}`, payload ?? {}),
+  check: (payload?: BulkAccountRequest) => accountBulkApi.run('check', payload),
+  syncDialogs: (payload?: BulkAccountRequest) => accountBulkApi.run('sync-dialogs', payload),
+  /** 仅 admin：批量分配 / 取消分配（mode='unassign'，响应 action 会是 unassign） */
+  assign: (payload: BulkAccountRequest) => accountBulkApi.run('assign', payload),
+  unassign: (payload: Omit<BulkAccountRequest, 'mode'>) =>
+    accountBulkApi.run('assign', { ...payload, mode: 'unassign' }),
+  group: (payload: BulkAccountRequest) => accountBulkApi.run('group', payload),
+  proxy: (payload: BulkAccountRequest) => accountBulkApi.run('proxy', payload),
+  status: (payload: BulkAccountRequest) => accountBulkApi.run('status', payload),
+  disable: (payload?: BulkAccountRequest) => accountBulkApi.run('disable', payload),
+  enable: (payload?: BulkAccountRequest) => accountBulkApi.run('enable', payload),
+  releaseLease: (payload?: BulkAccountRequest) => accountBulkApi.run('release-lease', payload),
 };
 
 export const accountLoginApi = {
@@ -160,15 +207,20 @@ export const assignmentApi = {
 // ---------------------------------------------------------------- 会话 / 消息
 
 export const dialogApi = {
-  list: (query: DialogListQuery) => api.get<DialogListResponse>('/api/dialogs', { ...query }),
+  list: (query: DialogListQuery, options?: RequestOptions) =>
+    api.get<DialogListResponse>('/api/dialogs', { ...query }, options),
   get: (id: UUID) => api.get<DialogOut>(`/api/dialogs/${id}`),
-  messages: (id: UUID, params?: { limit?: number; before?: string }) =>
-    api.get<MessageListResponse>(`/api/dialogs/${id}/messages`, { limit: params?.limit ?? 50, before: params?.before }),
+  messages: (id: UUID, params?: { limit?: number; before?: string; q?: string }) =>
+    api.get<MessageListResponse>(`/api/dialogs/${id}/messages`, {
+      limit: params?.limit ?? 50,
+      before: params?.before,
+      q: params?.q,
+    }),
   read: (id: UUID) => api.post<OkResponse>(`/api/dialogs/${id}/read`, {}),
   sync: (id: UUID, limit = 50) => api.post<OkResponse & { task_id?: UUID }>(`/api/dialogs/${id}/sync`, { limit }),
   drafts: (id: UUID) => api.get<DraftOut[] | Paged<DraftOut>>(`/api/dialogs/${id}/drafts`).then(asList<DraftOut>),
-  draft: (id: UUID, instruction: string) =>
-    api.post<DraftOut>(`/api/dialogs/${id}/draft`, { instruction }, { timeoutMs: 60_000 }),
+  draft: (id: UUID, instruction: string, options?: RequestOptions) =>
+    api.post<DraftOut>(`/api/dialogs/${id}/draft`, { instruction }, { timeoutMs: 60_000, ...options }),
   discardDraft: (draftId: UUID) => api.del<OkResponse>(`/api/drafts/${draftId}`),
 };
 
@@ -179,18 +231,27 @@ export const messageApi = {
       text,
       ...(draftId ? { draft_id: draftId } : {}),
     }),
+  /** 全局消息检索（GET /api/messages?q=…），支持 sort/order */
+  search: (query: MessageListQuery, options?: RequestOptions) =>
+    api.get<MessageSearchResponse>('/api/messages', { ...query }, options),
 };
 
 // ---------------------------------------------------------------- 任务
 
 export const taskApi = {
-  list: (query: TaskListQuery) => api.get<TaskListResponse>('/api/tasks', { ...query }),
+  list: (query: TaskListQuery, options?: RequestOptions) =>
+    api.get<TaskListResponse>('/api/tasks', { ...query }, options),
   get: (id: UUID) => api.get<TaskOut>(`/api/tasks/${id}`),
   retry: (id: UUID) => api.post<TaskActionResponse>(`/api/tasks/${id}/retry`),
   cancel: (id: UUID) => api.post<TaskActionResponse>(`/api/tasks/${id}/cancel`),
+  /**
+   * 批量重试（队列运维动作，不是批量发送）：最多 200 条，逐条给结果；
+   * 某条不可重试不会让整个请求失败（顶层 ok = failed == 0）。
+   * 空数组 → 400，超过 200 → 422。
+   */
+  bulkRetry: (taskIds: UUID[]) => api.post<TaskBulkRetryResponse>('/api/tasks/bulk/retry', { task_ids: taskIds }),
 };
 
-// ---------------------------------------------------------------- Bot
 
 export const botApi = {
   list: () => api.get<BotOut[] | Paged<BotOut>>('/api/bots').then(asList<BotOut>),
@@ -211,6 +272,9 @@ export const relayApi = {
   remove: (id: UUID) => api.del<OkResponse>(`/api/relays/${id}`),
   links: (params: { route_id?: UUID | null; page?: number; page_size?: number }) =>
     api.get<Paged<RelayLinkOut>>('/api/relays/links', { ...params }),
+  /** 仅 admin：保存规则前先试通（只发一条测试消息，不碰任何用户号） */
+  test: (payload: RelayTestRequest) =>
+    api.post<RelayTestResponse>('/api/relays/test', payload, { silent: true }),
 };
 
 // ---------------------------------------------------------------- 操作记录
@@ -251,3 +315,59 @@ export const auditApi = {
   /** 已确认可用的审计路径（用于页面提示） */
   resolvedPath: () => resolvedAuditPath,
 };
+
+// ---------------------------------------------------------------- 指标趋势
+
+/** GET /api/metrics/trends?window=24h|7d|30d（window / range 两个参数名后端都接受） */
+export const metricsApi = {
+  trends: (window: MetricsWindow = '24h') =>
+    api.get<MetricsTrendsOut>('/api/metrics/trends', { window }, { silent: true }),
+};
+
+// ---------------------------------------------------------------- 通知
+
+export const notificationApi = {
+  list: (query: NotificationListQuery = {}) =>
+    api.get<NotificationListResponse>('/api/notifications', { ...query }, { silent: true }),
+  markRead: (id: UUID) =>
+    api.post<OkResponse & { notification?: NotificationOut }>(`/api/notifications/${id}/read`, {}),
+  markAllRead: () => api.post<OkResponse & { marked?: number }>('/api/notifications/read-all', {}),
+};
+
+// ---------------------------------------------------------------- 导出（服务端 CSV）
+
+/**
+ * GET /api/export/{resource}.csv，接受与对应列表接口相同的 query（含 sort/order/q）。
+ * 注意：导出的是「当前筛选条件下的全部数据」，不受 page/page_size 影响；
+ * 后端上限 5 万行，超出会截断并回 X-Export-Truncated: true。
+ */
+export const exportApi = {
+  /** 拿到可直接 window.open 的地址（需要带 JWT 的场景请用 csv()） */
+  url: (resource: ExportResource, query?: object) =>
+    `/api/export/${resource}.csv${buildQuery(query as Record<string, QueryValue>)}`,
+  /** 通用导出：query 传对应列表接口的查询对象即可（筛选条件会原样带给后端） */
+  csv: (resource: ExportResource, query?: object): Promise<ExportResult> =>
+    api.download(`/api/export/${resource}.csv`, query as Record<string, QueryValue>),
+  accounts: (query?: AccountListQuery) => exportApi.csv('accounts', query),
+  dialogs: (query?: DialogListQuery) => exportApi.csv('dialogs', query),
+  messages: (query?: MessageListQuery) => exportApi.csv('messages', query),
+  tasks: (query?: TaskListQuery) => exportApi.csv('tasks', query),
+  audit: (query?: AuditListQuery) => exportApi.csv('audit', query),
+};
+
+// ---------------------------------------------------------------- 健康检查
+
+export const healthApi = {
+  live: () => api.get<{ status: string; service: string; version: string }>('/health', undefined, { silent: true, retries: 0 }),
+  ready: () =>
+    api.get<{ status: string; database: boolean; redis: boolean }>('/ready', undefined, { silent: true, retries: 0 }),
+};
+
+/** 列表接口统一的排序参数（页面把 DataTable 的排序变化直接透传） */
+export function sortParams(
+  field?: string | null,
+  order?: 'asc' | 'desc' | null,
+): { sort?: string; order?: 'asc' | 'desc' } {
+  if (!field || !order) return {};
+  return { sort: field, order };
+}

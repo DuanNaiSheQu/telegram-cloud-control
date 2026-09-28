@@ -141,6 +141,9 @@ services:
       start_period: 60s
     stop_grace_period: 30s
     logging: *default-logging
+    volumes:
+      # 素材库媒体文件：API 上传、Worker 读取，两个服务挂同一个卷
+      - materials-data:/app/materials
 
   worker:
     build:
@@ -168,6 +171,8 @@ services:
       - "${WORKER_METRICS_PORT_RANGE:-9101-9110}:9101"
     # SIGTERM 后先释放租约再退出（释放租约 + 断连），给足 60 秒
     stop_grace_period: 60s
+    volumes:
+      - materials-data:/app/materials
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9101/metrics >/dev/null || exit 1"]
       interval: 30s
@@ -276,6 +281,7 @@ volumes:
   prometheus_data:
   alertmanager_data:
   pushgateway_data:
+  materials-data:  # 素材库媒体文件（api 上传 / worker 读取共享）
 
 networks:
   default:

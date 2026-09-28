@@ -22,21 +22,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select
 
 from app import __version__, db, security
-from app.api import metrics
+from app.api import metrics, sampler
 from app.api.bots import bot_tasks, manager
 from app.api.bots import webhook as webhook_router
 from app.api.routers import (
     accounts,
+    accounts_bulk,
     assignments,
     audit,
     auth,
+    campaigns,
     dashboard,
     dialogs,
+    exports,
     groups,
     health,
+    materials,
     network,
+    notifications,
     relays,
     tasks,
+    trends,
     users,
     ws,
 )
@@ -131,6 +137,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     background: List[asyncio.Task] = [
         asyncio.create_task(bot_tasks.poll_loop(), name="bot-task-poll"),
         asyncio.create_task(metrics.refresh_loop(), name="metrics-refresh"),
+        asyncio.create_task(sampler.sample_loop(), name="metrics-sampler"),
         asyncio.create_task(register_bot_webhooks(), name="bot-webhook-register"),
     ]
     logger.info("API 已启动，后台协程 %s 个", len(background))
@@ -184,6 +191,9 @@ def create_app() -> FastAPI:
     for router in (
         auth.router,
         dashboard.router,
+        # ⚠️ /accounts/bulk/* 必须排在 /accounts/{account_id}/* 之前：
+        # 否则 "bulk" 会被当成 account_id 去解析 UUID，直接 422。
+        accounts_bulk.router,
         accounts.router,
         groups.router,
         network.router,
@@ -191,11 +201,16 @@ def create_app() -> FastAPI:
         dialogs.drafts_router,
         dialogs.messages_router,
         tasks.router,
+        campaigns.router,
+        materials.router,
         relays.bots_router,
         relays.router,
         assignments.router,
         users.router,
         audit.router,
+        exports.router,
+        notifications.router,
+        trends.router,
         ws.router,
         webhook_router.router,
     ):

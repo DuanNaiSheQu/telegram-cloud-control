@@ -27,6 +27,14 @@ from app.models.enums import (
     UserRole,
 )
 from app.models.message import Message
+from app.models.material import MATERIAL_KIND_LABELS, Material, MaterialKind
+from app.models.metrics_sample import MetricsSample
+from app.models.notification import (
+    NOTIFICATION_KIND_LABELS,
+    NOTIFICATION_KIND_LEVELS,
+    NOTIFICATION_LEVELS,
+    Notification,
+)
 from app.models.relay import RelayLink, RelayRoute, ReplyDraft
 from app.models.task import Lease, Task
 from app.models.user import User
@@ -64,4 +72,12 @@ __all__ = [
     "DraftStatus",
     "RelayTargetKind",
     "AuditLog",
+    "MetricsSample",
+    "Notification",
+    "NOTIFICATION_KIND_LABELS",
+    "NOTIFICATION_KIND_LEVELS",
+    "NOTIFICATION_LEVELS",
+    "Material",
+    "MaterialKind",
+    "MATERIAL_KIND_LABELS",
 ]
