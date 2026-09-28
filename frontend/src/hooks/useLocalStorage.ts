@@ -20,7 +20,7 @@ export function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: T 
     const onStorage = (event: StorageEvent) => {
       if (event.key !== key || event.newValue === null) return;
       try {
-        setValue(JSON.parse(event.newValue) as T);
+        setValue(readJson<T>(key, defaultValue));
       } catch {
         /* 脏数据忽略 */
       }

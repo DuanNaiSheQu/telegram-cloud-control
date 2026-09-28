@@ -1,8 +1,20 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // 开发环境把 /api 反代到本机后端（含 WebSocket 升级），生产用 nginx.conf 做同样的事。
+// 版本号真源在仓库根的 VERSION（与后端 /health 返回的同一个值）
+const appVersion = (() => {
+  try {
+    return readFileSync(resolve(__dirname, '..', 'VERSION'), 'utf8').trim() || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
+
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   plugins: [react()],
   server: {
     host: '127.0.0.1',

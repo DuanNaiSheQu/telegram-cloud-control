@@ -12,6 +12,8 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.0-2AABEE.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新记录-blue.svg" alt="Changelog"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/commits/main"><img src="https://img.shields.io/github/last-commit/cafinxnull/telegram-cloud-control?label=last%20commit" alt="Last commit"></a>
@@ -137,9 +139,29 @@
 - 登录只用这个号自己的验证码或自己创建的 Bot Token，不导入别人的会话文件。
 - Postgres / Redis 默认只绑定宿主 `127.0.0.1`，对外只暴露前端 80 端口（前面应再放一层 HTTPS 反代）。
 
+## 最新更新
+
+> 版本号唯一真源是仓库根的 [`VERSION`](VERSION)：后端 `/health` 返回它，前端构建时注入它（侧栏左下角可见）。
+> 完整历史见 [`CHANGELOG.md`](CHANGELOG.md)。
+
+### v0.3.0 — 账号矩阵成熟化（2026-09-29）
+
+- **多格式账号导入**：手机号清单 / StringSession 串 / `.session` 文件 / tdata 目录 zip，
+  先预览再落库，去重按确定性哈希（修掉了「重复号码识别不出来」的老问题），每号独立设备指纹。
+- **深度验活**：读权限 + 授权会话数 + 可选写探测，复算 0-100 健康分；批量节流旋钮（额度 / 间隔 / 解熔断）。
+- **防封四道闸门**：FloodWait 熔断、活跃时段、动作最小间隔、每日配额；养号阶梯 20 → 200 条/天随号龄放量。
+- **群情报（入群即采）**：入群/退群事件静默入库，群档案与成员名单按需只读采集；
+  支持**粘贴群链接自动采群员**（`t.me/+hash`、`@username` 都行，可选自动加入、采完退出），
+  进度逐条可见（解析 → 加入 → 采集中 N/M → 完成），采完可**一键打包**（zip：群总表 + 每群成员 + 事件 + 清单）。
+- **官方机制养号**：身份取自官方真实发布版本表；读服务端下发的 `help.GetAppConfig` 限制参数驱动节流
+  （只收紧不放松）；`warmup_activity` 按官方客户端节奏上线/翻会话/下线，不发消息、不加群。
+- **修复**：`localStorage` 残缺结构导致的整页白屏；失败原因红字撑破列宽遮挡其它列。
+- 文档：[账号矩阵与群情报](docs/ACCOUNT_MATRIX.md)
+
 ## 界面预览
 
 > 深色 / 浅色双主题；下图均为 1440×900 真实截图（2x 缩放），完整截图在 [`frontend/screenshots/`](frontend/screenshots/)。
+> 截图可随时重生成：`cd frontend && npm run screenshots`（深色）或 `npm run screenshots -- --theme light`（浅色）。
 
 <table>
   <tr>
@@ -163,14 +185,26 @@
   <tr>
     <td><b>账号检测</b>：勾选/全部/按分组检测，结果写回<br>
       <img src="frontend/screenshots/uicore-detection-results-dark-1440.png" alt="账号检测"></td>
-    <td><b>员工分配</b>：员工、角色、账号选择器与归属反查<br>
-      <img src="frontend/screenshots/uiops-assignments-dark.png" alt="员工分配"></td>
+    <td><b>成员分配</b>：成员、角色、账号选择器与归属反查<br>
+      <img src="frontend/screenshots/uiops-assignments-dark.png" alt="成员分配"></td>
+  </tr>
+  <tr>
+    <td><b>营销中心</b>：批量私信 / 群发 / 素材群发 / 加群退群 / 强拉 / 改资料 / 吵群 / 拟人<br>
+      <img src="frontend/screenshots/uicore-campaigns-dark-1440.png" alt="营销中心"></td>
+    <td><b>群情报</b>：入群即采、按链接采集群员、逐条进度与一键打包<br>
+      <img src="frontend/screenshots/uicore-group-intel-dark-1440.png" alt="群情报"></td>
   </tr>
   <tr>
     <td><b>操作记录</b>：谁在什么时间对哪个号做了什么<br>
       <img src="frontend/screenshots/uiinbox-audit-dark.png" alt="操作记录"></td>
     <td><b>浅色主题</b>：同一套 token 换皮<br>
       <img src="frontend/screenshots/02-shell-light-1440.png" alt="浅色主题"></td>
+  </tr>
+  <tr>
+    <td><b>登录页</b>：品牌叙事 + 环境标识 + 记住用户名<br>
+      <img src="frontend/screenshots/uiops-login-dark.png" alt="登录页"></td>
+    <td><b>账号管理（浅色）</b>：深浅双主题同一套组件<br>
+      <img src="frontend/screenshots/uicore-accounts-light-1440.png" alt="账号管理浅色"></td>
   </tr>
 </table>
 

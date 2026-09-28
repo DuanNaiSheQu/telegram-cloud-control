@@ -32,3 +32,6 @@ run/
 
 # 素材库媒体文件（本地运行时上传产物）
 materials/
+
+# 截图脚本的中间产物（manifest 会随主题变化，不入库）
+frontend/screenshots/manifest-*.json

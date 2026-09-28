@@ -1,7 +1,7 @@
 {
   "name": "tgcc-frontend",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Telegram 云控 前端控制台",
   "engines": {
@@ -12,7 +12,8 @@
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.2",
@@ -31,6 +32,7 @@
     "eslint": "^8.57.1",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
+    "playwright": "^1.63.0",
     "typescript": "~5.6.3",
     "vite": "^5.4.11"
   }

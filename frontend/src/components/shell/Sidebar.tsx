@@ -102,7 +102,7 @@ export function Sidebar({
         (group) => group.key,
       );
       const closedItems = prev.closedItems.filter((path) => !autoParents.includes(path));
-      const closedGroups = prev.closedGroups.filter((key) => !groupKeys.includes(key));
+      const closedGroups = (prev.closedGroups ?? []).filter((key) => !groupKeys.includes(key));
       if (closedItems.length === prev.closedItems.length && closedGroups.length === prev.closedGroups.length) {
         return prev;
       }
@@ -110,16 +110,19 @@ export function Sidebar({
     });
   }, [autoParents, setOpenState]);
 
-  const groupOpen = (group: NavGroup) => !openState.closedGroups.includes(group.key);
+  // 双保险：即便存储里是残缺结构，也不至于让整个侧栏崩掉
+  const closedGroups = openState?.closedGroups ?? [];
+  const closedItems = openState?.closedItems ?? [];
+  const groupOpen = (group: NavGroup) => !closedGroups.includes(group.key);
 
   const itemOpen = (item: NavItem) =>
-    justOpened.includes(item.path) || !openState.closedItems.includes(item.path);
+    justOpened.includes(item.path) || !closedItems.includes(item.path);
 
   const toggleGroup = (group: NavGroup) =>
     setOpenState((prev) => ({
       ...prev,
-      closedGroups: prev.closedGroups.includes(group.key)
-        ? prev.closedGroups.filter((key) => key !== group.key)
+      closedGroups: (prev.closedGroups ?? []).includes(group.key)
+        ? (prev.closedGroups ?? []).filter((key) => key !== group.key)
         : [...prev.closedGroups, group.key],
     }));
 
@@ -263,7 +266,7 @@ export function Sidebar({
           </button>
           {!collapsed ? (
             <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
-              v1.0.0
+              {`v${__APP_VERSION__}`}
             </span>
           ) : null}
         </div>
