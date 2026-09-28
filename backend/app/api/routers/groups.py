@@ -113,7 +113,8 @@ async def delete_group(
     """删分组不会删号：tg_accounts.group_id 外键是 ON DELETE SET NULL，号回到「未分组」。"""
     group = await _get_group(session, group_id)
     name = group.name
-    session.delete(group)
+    # AsyncSession.delete 是协程：忘了 await 会静默不删（照样回 200、照样写审计），必须 await
+    await session.delete(group)
     await write_audit(
         session,
         action="group.delete",

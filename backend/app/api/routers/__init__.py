@@ -12,6 +12,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Iterable, List, Optional, Sequence
 
+from fastapi import HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import inspect as sa_inspect
 
@@ -65,6 +66,13 @@ class AccountIdsRequest(BaseModel):
 def enum_value(value: Any) -> str:
     """枚举取字符串值；已经是 str 的原样返回。"""
     return value.value if hasattr(value, "value") else str(value)
+
+
+def ensure_utc(value: Optional[datetime]) -> Optional[datetime]:
+    """查询参数里的 ISO8601 可能不带时区：按 UTC 补齐，避免和 timestamptz 比较时报错。"""
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=timezone.utc)
 
 
 def utcnow() -> datetime:
@@ -200,6 +208,47 @@ def proxy_out(proxy: Proxy, account_count: int = 0) -> ProxyOut:
 
 # ---------------- 小工具 ----------------
 
+#: 允许的排序方向
+SORT_ORDERS = ("asc", "desc")
+
+
+def build_order_by(
+    *,
+    sort: Optional[str],
+    order: Optional[str],
+    mapping: "dict[str, Any]",
+    default_field: str,
+    default_order: str = "desc",
+    nulls_last: bool = False,
+    tiebreaker: Any = None,
+) -> List[Any]:
+    """把 `sort=&order=` 翻译成 order_by 子句。
+
+    只允许白名单里的字段（防止拿任意列排序拖库）；给不出中文提示就白名单兜底。
+    列表接口都走这里，字段名和报错文案才一致。
+    """
+    if order is not None and str(order).strip().lower() not in SORT_ORDERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="order 只能是 asc 或 desc"
+        )
+    field = (sort or default_field).strip()
+    if field not in mapping:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"不支持的排序字段：{field}；可用字段：{'、'.join(sorted(mapping))}",
+        )
+    direction = (order or default_order).strip().lower()
+    column = mapping[field]
+    clause = column.asc() if direction == "asc" else column.desc()
+    if nulls_last:
+        clause = clause.nulls_last()
+    clauses: List[Any] = [clause]
+    if tiebreaker is not None and tiebreaker is not column:
+        # 有并列值时保持分页稳定（否则翻页可能重复 / 漏行）
+        clauses.append(tiebreaker.desc())
+    return clauses
+
+
 def parse_uuid(value: Any) -> Optional[uuid.UUID]:
     if value is None or value == "":
         return None
@@ -253,3 +302,34 @@ async def publish_task_safely(payload: dict) -> None:
 
 def rows_to_accounts(rows: Sequence[Any]) -> List[TgAccount]:
     return [row for row in rows if isinstance(row, TgAccount)]
+
+
+__all__ = [
+    "AccountIdsRequest",
+    "DIALOG_CHANNEL_LABELS",
+    "DIALOG_KIND_LABELS",
+    "MESSAGE_DIRECTION_LABELS",
+    "MESSAGE_STATUS_LABELS",
+    "RELAY_TARGET_LABELS",
+    "SORT_ORDERS",
+    "account_label",
+    "account_out",
+    "bot_out",
+    "build_order_by",
+    "dedupe",
+    "ensure_utc",
+    "dialog_out",
+    "enum_value",
+    "group_out",
+    "message_out",
+    "parse_uuid",
+    "parse_uuid_csv",
+    "proxy_out",
+    "publish_safely",
+    "publish_task_safely",
+    "rows_to_accounts",
+    "task_out",
+    "unloaded_attr",
+    "user_label",
+    "utcnow",
+]

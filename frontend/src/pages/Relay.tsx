@@ -1,37 +1,46 @@
-import { useState } from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Popconfirm,
-  Select,
-  Space,
-  Switch,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
+/**
+ * Bot 转发页：转发规则列表 + 新建/编辑（带测试消息）+ 删除/停用 +
+ * 已转发记录表（原消息正文/发送人/会话/员工群那条 ID，来自 /api/relays/links 新字段）+
+ * 记录详情抽屉（跳原会话）。
+ * 全部颜色/间距走 var(--tg-*)，表格/筛选/空态用共享组件。
+ */
+import { useMemo, useState } from 'react';
+import { Button, Select, Space, Switch, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  ExperimentOutlined,
+  LinkOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons';
+import { Link } from 'react-router-dom';
+import {
+  ConfirmModal,
+  CopyableText,
+  DataTable,
+  FilterBar,
+  PageContainer,
+  RelativeTime,
+  SoftTag,
+  StatCard,
+  StatGrid,
+} from '../components';
 import { accountApi, botApi, dialogApi, relayApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
-import { RELAY_TARGET_KIND_OPTIONS } from '../constants';
-import { formatTime, shortId } from '../utils/format';
+import { buildActiveFilters, useTableQuery } from '../hooks/useTableQuery';
+import { formatNumber, shortId } from '../utils/format';
 import { notifySuccess } from '../utils/feedback';
-import type {
-  RelayLinkOut,
-  RelayRouteCreate,
-  RelayRouteOut,
-  RelayTargetKind,
-} from '../api/types';
+import { useAuth } from '../auth/AuthContext';
+import type { RelayRouteOut, RelayTargetKind } from '../api/types';
+import { LinkDetailDrawer } from '../features/relay/LinkDetailDrawer';
+import { RelayRouteFormModal } from '../features/relay/RelayRouteFormModal';
+import { TestMessageModal } from '../features/relay/TestMessageModal';
+import { botLabel, type RelayLinkItem } from '../features/relay/types';
 
 export default function Relay() {
+  const { isAdmin } = useAuth();
   const routes = useAsyncData(() => relayApi.list(), []);
   const bots = useAsyncData(() => botApi.list(), []);
   const accounts = useAsyncData(() => accountApi.list({ page: 1, page_size: 200 }), []);
@@ -39,306 +48,402 @@ export default function Relay() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<RelayRouteOut | null>(null);
-  const [linkRouteId, setLinkRouteId] = useState<string | null>(null);
-  const [linkPage, setLinkPage] = useState(1);
-  const [linkPageSize, setLinkPageSize] = useState(20);
+  const [testRoute, setTestRoute] = useState<RelayRouteOut | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RelayRouteOut | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
+  const [detailLink, setDetailLink] = useState<RelayLinkItem | null>(null);
 
+  const linksQuery = useTableQuery({ filters: { route_id: '' as string }, pageSize: 20 });
   const links = useAsyncData(
-    () => relayApi.links({ route_id: linkRouteId, page: linkPage, page_size: linkPageSize }),
-    [linkRouteId, linkPage, linkPageSize],
+    () =>
+      relayApi.links({
+        route_id: linksQuery.filters.route_id || null,
+        page: linksQuery.page,
+        page_size: linksQuery.pageSize,
+      }),
+    [linksQuery.paramsKey],
   );
+
+  const routeList = useMemo(() => routes.data ?? [], [routes.data]);
+  const botList = useMemo(() => bots.data ?? [], [bots.data]);
+
+  const totalRelayed = useMemo(
+    () => routeList.reduce((sum, item) => sum + (item.relayed_count || 0), 0),
+    [routeList],
+  );
+  const enabledCount = useMemo(() => routeList.filter((item) => item.enabled).length, [routeList]);
+
+  const handleToggle = async (record: RelayRouteOut, checked: boolean) => {
+    setToggleBusyId(record.id);
+    try {
+      await relayApi.update(record.id, { enabled: checked });
+      notifySuccess(checked ? '规则已启用' : '规则已停用');
+      void routes.reload();
+    } catch {
+      /* client 已统一中文提示 */
+    } finally {
+      setToggleBusyId(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await relayApi.remove(deleteTarget.id);
+      notifySuccess(res.message || '规则已删除');
+      setDeleteTarget(null);
+      void routes.reload();
+    } catch {
+      /* client 已统一中文提示 */
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const routeColumns: ColumnsType<RelayRouteOut> = [
     {
       title: '规则',
       dataIndex: 'name',
-      width: 150,
-      render: (value: string, record) => value || `规则 ${shortId(record.id, 6)}`,
+      width: 170,
+      render: (value: string, record) => (
+        <div className="tg-stack">
+          <span className="tg-nowrap">{value || `规则 ${shortId(record.id, 6)}`}</span>
+          {record.remark ? (
+            <Typography.Text type="secondary" className="ellipsis" title={record.remark}>
+              {record.remark}
+            </Typography.Text>
+          ) : null}
+        </div>
+      ),
     },
     {
       title: 'Bot',
       dataIndex: 'bot_name',
-      width: 180,
+      width: 170,
       render: (value: string | null, record) => (
-        <Space direction="vertical" size={0}>
+        <div className="tg-stack">
           <span>{value || '—'}</span>
           {record.bot_username ? (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              @{record.bot_username}
-            </Typography.Text>
+            <Typography.Text code>@{record.bot_username}</Typography.Text>
           ) : null}
-        </Space>
+        </div>
       ),
     },
     {
       title: '员工群 chat_id',
       dataIndex: 'staff_chat_id',
-      width: 170,
+      width: 200,
       render: (value: number, record) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text code>{value}</Typography.Text>
+        <div className="tg-stack">
+          <CopyableText value={value} mono />
           {record.staff_chat_title ? (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            <Typography.Text type="secondary" className="ellipsis" title={record.staff_chat_title}>
               {record.staff_chat_title}
             </Typography.Text>
           ) : null}
-        </Space>
+        </div>
       ),
     },
     {
       title: '目标类型',
       dataIndex: 'target_kind',
-      width: 100,
+      width: 90,
       render: (value: RelayTargetKind) => (
-        <Tag>{value === 'private' ? '私聊' : '群聊'}</Tag>
+        <SoftTag tone="info">{value === 'private' ? '私聊' : '群聊'}</SoftTag>
       ),
     },
     {
       title: '来源过滤',
       key: 'source',
-      width: 220,
+      width: 210,
       render: (_: unknown, record) => (
-        <Space direction="vertical" size={0}>
-          <span>{record.account_label ? `账号 ${record.account_label}` : '全部账号'}</span>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {record.dialog_title ? `会话 ${record.dialog_title}` : '全部会话'}
-          </Typography.Text>
-        </Space>
+        <div className="tg-stack">
+          <span>
+            <SoftTag tone={record.account_id ? 'primary' : 'neutral'}>
+              {record.account_label ? `账号 ${record.account_label}` : '全部账号'}
+            </SoftTag>
+          </span>
+          <span>
+            <SoftTag tone={record.dialog_id ? 'primary' : 'neutral'}>
+              {record.dialog_title ? `会话 ${record.dialog_title}` : '全部会话'}
+            </SoftTag>
+          </span>
+        </div>
       ),
     },
     {
       title: '已转发',
       dataIndex: 'relayed_count',
       width: 90,
+      align: 'right',
+      render: (value: number) => <span className="tg-num">{formatNumber(value)}</span>,
     },
     {
       title: '启用',
       dataIndex: 'enabled',
-      width: 90,
+      width: 80,
       render: (value: boolean, record) => (
-        <Switch
-          size="small"
-          checked={value}
-          onChange={async (checked) => {
-            try {
-              await relayApi.update(record.id, { enabled: checked });
-              notifySuccess(checked ? '规则已启用' : '规则已停用');
-              void routes.reload();
-            } catch {
-              /* client 已统一提示 */
-            }
-          }}
-        />
+        <Tooltip title={isAdmin ? undefined : '仅管理员可启用/停用规则'}>
+          <Switch
+            size="small"
+            checked={value}
+            disabled={!isAdmin}
+            loading={toggleBusyId === record.id}
+            onChange={(checked) => void handleToggle(record, checked)}
+          />
+        </Tooltip>
       ),
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
-      width: 170,
-      render: (value: string | null) => formatTime(value),
+      width: 140,
+      render: (value: string | null) => <RelativeTime value={value} />,
     },
     {
       title: '操作',
       key: 'actions',
-      width: 230,
+      width: 250,
+      fixed: 'right',
       render: (_: unknown, record) => (
-        <Space>
-          <Button size="small" onClick={() => setLinkRouteId(record.id)}>
-            看转发记录
-          </Button>
-          <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(record)}>
-            编辑
-          </Button>
-          <Popconfirm
-            title="删除这条转发规则？"
-            description="已转发的记录会保留，但不再继续转发。"
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-            onConfirm={async () => {
-              try {
-                const res = await relayApi.remove(record.id);
-                notifySuccess(res.message || '规则已删除');
-                void routes.reload();
-              } catch {
-                /* client 已统一提示 */
-              }
-            }}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />}>
+        <Space size="small" wrap>
+          <Tooltip title="查看这条规则已转发的记录">
+            <Button size="small" icon={<LinkOutlined />} onClick={() => linksQuery.setFilter('route_id', record.id)}>
+              记录
+            </Button>
+          </Tooltip>
+          <Tooltip title={isAdmin ? '用这条规则的 Bot 发一条测试消息' : '仅管理员可发送测试消息'}>
+            <Button
+              size="small"
+              icon={<ExperimentOutlined />}
+              disabled={!isAdmin}
+              onClick={() => setTestRoute(record)}
+            >
+              测试
+            </Button>
+          </Tooltip>
+          <Tooltip title={isAdmin ? undefined : '仅管理员可编辑规则'}>
+            <Button size="small" icon={<EditOutlined />} disabled={!isAdmin} onClick={() => setEditing(record)}>
+              编辑
+            </Button>
+          </Tooltip>
+          <Tooltip title={isAdmin ? undefined : '仅管理员可删除规则'}>
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              disabled={!isAdmin}
+              onClick={() => setDeleteTarget(record)}
+            >
               删除
             </Button>
-          </Popconfirm>
+          </Tooltip>
         </Space>
       ),
     },
   ];
 
-  const linkColumns: ColumnsType<RelayLinkOut> = [
+  const linkColumns: ColumnsType<RelayLinkItem> = [
     {
       title: '时间',
-      dataIndex: 'created_at',
-      width: 180,
-      render: (value: string | null) => formatTime(value),
-    },
-    {
-      title: '原消息',
-      dataIndex: 'message_id',
-      render: (value: string) => (
-        <Tooltip title={`原消息 ID：${value}`}>
-          <Typography.Text code>{shortId(value, 8)}</Typography.Text>
-        </Tooltip>
+      key: 'origin_created_at',
+      width: 140,
+      render: (_: unknown, record) => (
+        <RelativeTime value={record.origin_created_at ?? record.created_at} />
       ),
     },
     {
-      title: '员工群那条',
+      title: '原消息正文',
+      key: 'origin_body',
+      width: 240,
+      render: (_: unknown, record) =>
+        record.origin_body ? (
+          <Tooltip title={record.origin_body}>
+            <span className="tg-clamp-2" style={{ color: 'var(--tg-color-text-primary)' }}>
+              {record.origin_body}
+            </span>
+          </Tooltip>
+        ) : (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ),
+    },
+    {
+      title: '发送人',
+      key: 'origin_sender_name',
+      width: 130,
+      render: (_: unknown, record) => record.origin_sender_name || '—',
+    },
+    {
+      title: '会话',
+      key: 'origin_dialog_title',
+      width: 180,
+      render: (_: unknown, record) => (
+        <div className="tg-stack">
+          <span className="ellipsis" title={record.origin_dialog_title ?? undefined}>
+            {record.origin_dialog_title || '—'}
+          </span>
+          {record.account_label ? (
+            <Typography.Text type="secondary">{record.account_label}</Typography.Text>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      title: '员工群那条 ID',
       dataIndex: 'staff_message_id',
-      width: 160,
-      render: (value: number) => <Typography.Text code>{value}</Typography.Text>,
+      width: 150,
+      render: (value: number) => <CopyableText value={value} mono />,
     },
     {
       title: '员工群 chat_id',
       dataIndex: 'staff_chat_id',
-      width: 170,
-      render: (value: number) => <Typography.Text code>{value}</Typography.Text>,
+      width: 150,
+      render: (value: number) => <CopyableText value={value} mono />,
     },
     {
-      title: 'Bot',
-      dataIndex: 'bot_id',
-      width: 130,
-      render: (value: string) => <Typography.Text code>{shortId(value, 8)}</Typography.Text>,
-    },
-    {
-      title: '规则',
-      dataIndex: 'route_id',
-      width: 130,
-      render: (value: string | null) => (value ? <Typography.Text code>{shortId(value, 8)}</Typography.Text> : '—'),
+      title: '操作',
+      key: 'actions',
+      width: 80,
+      fixed: 'right',
+      render: (_: unknown, record) => (
+        <Button size="small" onClick={() => setDetailLink(record)}>
+          详情
+        </Button>
+      ),
     },
   ];
 
+  const routeOptions = routeList.map((item) => ({
+    value: item.id,
+    label: item.name || `规则 ${shortId(item.id, 6)}`,
+  }));
+
   return (
-    <div>
-      <Card
-        className="section-card"
-        title="Bot 转发规则"
-        extra={
-          <Space>
-            <Button
-              icon={<ReloadOutlined />}
-              loading={routes.loading}
-              onClick={() => {
-                void routes.reload();
-                void bots.reload();
-              }}
-            >
-              刷新
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              disabled={!(bots.data ?? []).length}
-              onClick={() => setCreateOpen(true)}
-            >
+    <PageContainer
+      title="Bot 转发"
+      description="把账号收到的消息按规则用 Bot 转发到员工群，并保留「原消息 ↔ 员工群那条」的对应关系。"
+      actions={
+        <Space>
+          <Button
+            icon={<ReloadOutlined />}
+            loading={routes.loading}
+            onClick={() => {
+              void routes.reload();
+              void bots.reload();
+              void links.reload();
+            }}
+          >
+            刷新
+          </Button>
+          <Tooltip title={isAdmin ? undefined : '仅管理员可新建规则'}>
+            <Button type="primary" icon={<PlusOutlined />} disabled={!isAdmin} onClick={() => setCreateOpen(true)}>
               新建规则
             </Button>
-          </Space>
-        }
-      >
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message="新消息入库后写一条 relay_to_staff 任务，用指定 Bot 发到员工群，并带上来源（哪个号、群还是私信、对方是谁）。"
-        />
-        {!(bots.data ?? []).length ? (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 12 }}
-            message="还没有 Bot，先去「Bot 管理」用 BotFather 给的 Token 建一个。"
-          />
-        ) : null}
-        <Table<RelayRouteOut>
-          size="small"
-          rowKey="id"
-          loading={routes.loading}
-          dataSource={routes.data ?? []}
-          columns={routeColumns}
-          pagination={false}
-          scroll={{ x: 1500 }}
-          locale={{ emptyText: <Empty description="还没有转发规则" /> }}
-        />
-      </Card>
+          </Tooltip>
+        </Space>
+      }
+    >
+      <StatGrid>
+        <StatCard title="规则总数" value={routeList.length} tone="neutral" />
+        <StatCard title="启用中" value={enabledCount} tone="primary" />
+        <StatCard title="累计转发" value={totalRelayed} tone="success" />
+      </StatGrid>
 
-      <Card
+      <DataTable<RelayRouteOut>
+        rowKey="id"
+        columns={routeColumns}
+        dataSource={routeList}
+        loading={routes.loading}
+        error={routes.error}
+        onRetry={() => void routes.reload()}
+        columnSettingsKey="relay-routes"
+        scrollX={1500}
+        empty={{
+          art: 'list',
+          title: '还没有转发规则',
+          description: '建一条规则，把账号收到的消息用 Bot 自动转发到员工群。',
+          action: isAdmin ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+              新建规则
+            </Button>
+          ) : undefined,
+          secondaryAction: botList.length ? undefined : (
+            <Link to="/bots">
+              <Button>先去 Bot 管理创建 Bot</Button>
+            </Link>
+          ),
+        }}
+      />
+
+      <DataTable<RelayLinkItem>
         title="已转发记录"
-        extra={
-          <Space>
+        rowKey="id"
+        columns={linkColumns}
+        dataSource={links.data?.items ?? []}
+        total={links.data?.total ?? 0}
+        page={linksQuery.page}
+        pageSize={linksQuery.pageSize}
+        onPageChange={linksQuery.setPage}
+        loading={links.loading}
+        error={links.error}
+        onRetry={() => void links.reload()}
+        columnSettingsKey="relay-links"
+        scrollX={1200}
+        toolbar={
+          <FilterBar
+            onReset={linksQuery.reset}
+            onSearch={() => void links.reload()}
+            loading={links.loading}
+            activeFilters={buildActiveFilters([
+              {
+                key: 'route_id',
+                label: '规则',
+                display: routeOptions.find((item) => item.value === linksQuery.filters.route_id)?.label,
+                clear: () => linksQuery.setFilter('route_id', ''),
+              },
+            ])}
+          >
             <Select
               allowClear
-              size="small"
+              showSearch
+              optionFilterProp="label"
               placeholder="全部规则"
-              style={{ width: 200 }}
-              value={linkRouteId ?? undefined}
-              onChange={(value) => {
-                setLinkRouteId(value ?? null);
-                setLinkPage(1);
-              }}
-              options={(routes.data ?? []).map((route) => ({
-                value: route.id,
-                label: route.name || `规则 ${shortId(route.id, 6)}`,
-              }))}
+              style={{ width: 240 }}
+              value={linksQuery.filters.route_id || undefined}
+              onChange={(value) => linksQuery.setFilter('route_id', value ?? '')}
+              options={routeOptions}
             />
-            <Button
-              size="small"
-              icon={<ReloadOutlined />}
-              loading={links.loading}
-              onClick={() => void links.reload()}
-            >
-              刷新
-            </Button>
-          </Space>
+          </FilterBar>
         }
-      >
-        <Table<RelayLinkOut>
-          size="small"
-          rowKey="id"
-          loading={links.loading}
-          dataSource={links.data?.items ?? []}
-          columns={linkColumns}
-          scroll={{ x: 1100 }}
-          locale={{ emptyText: <Empty description="还没有转发记录" /> }}
-          pagination={{
-            current: linkPage,
-            pageSize: linkPageSize,
-            total: links.data?.total ?? 0,
-            showSizeChanger: true,
-            pageSizeOptions: ['20', '50', '100'],
-            showTotal: (total) => `共 ${total} 条`,
-            onChange: (page, size) => {
-              setLinkPage(page);
-              setLinkPageSize(size);
-            },
-          }}
-        />
-      </Card>
+        empty={{
+          art: 'inbox',
+          title: '还没有转发记录',
+          description: '规则命中并成功转发后，原消息与员工群里那条的对应关系会记录在这里。',
+        }}
+      />
 
-      <RouteFormModal
+      <RelayRouteFormModal
         open={createOpen || Boolean(editing)}
         route={editing}
-        bots={(bots.data ?? []).map((bot) => ({
+        bots={botList.map((bot) => ({
           value: bot.id,
-          label: `${bot.name}${bot.bot_username ? ` (@${bot.bot_username})` : ''}`,
+          label: botLabel(bot.name, bot.bot_username),
+          name: bot.name,
+          username: bot.bot_username ?? undefined,
         }))}
         accounts={(accounts.data?.items ?? []).map((item) => ({
           value: item.id,
           label: `${item.phone_masked}${item.username ? ` / ${item.username}` : ''}`,
+          name: item.phone_masked,
         }))}
         dialogs={(dialogs.data?.items ?? []).map((item) => ({
           value: item.id,
           label: `${item.title || item.peer_display || item.tg_chat_id}（${
             item.channel === 'bot' ? 'Bot' : '用户号'
           }）`,
+          name: item.title,
         }))}
         onCancel={() => {
           setCreateOpen(false);
@@ -350,138 +455,27 @@ export default function Relay() {
           void routes.reload();
         }}
       />
-    </div>
-  );
-}
 
-interface RouteForm {
-  name?: string;
-  bot_id: string;
-  staff_chat_id: number;
-  staff_chat_title?: string;
-  target_kind: RelayTargetKind;
-  account_id?: string | null;
-  dialog_id?: string | null;
-  enabled: boolean;
-  remark?: string;
-}
+      <TestMessageModal
+        open={Boolean(testRoute)}
+        botId={testRoute?.bot_id ?? null}
+        chatId={testRoute?.staff_chat_id ?? null}
+        botLabel={testRoute ? botLabel(testRoute.bot_name, testRoute.bot_username) : undefined}
+        onClose={() => setTestRoute(null)}
+      />
 
-interface Option {
-  value: string;
-  label: string;
-}
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        danger
+        loading={deleting}
+        title={`删除转发规则「${deleteTarget?.name || shortId(deleteTarget?.id ?? '', 6)}」？`}
+        content="已转发的记录会保留，但这条规则不会再转发新消息。"
+        okText="删除"
+        onOk={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
-function RouteFormModal({
-  open,
-  route,
-  bots,
-  accounts,
-  dialogs,
-  onCancel,
-  onSuccess,
-}: {
-  open: boolean;
-  route: RelayRouteOut | null;
-  bots: Option[];
-  accounts: Option[];
-  dialogs: Option[];
-  onCancel: () => void;
-  onSuccess: () => void;
-}) {
-  const [form] = Form.useForm<RouteForm>();
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleFinish = async (values: RouteForm) => {
-    setSubmitting(true);
-    const payload: RelayRouteCreate = {
-      name: values.name ?? '',
-      bot_id: values.bot_id,
-      staff_chat_id: Number(values.staff_chat_id),
-      staff_chat_title: values.staff_chat_title ?? '',
-      target_kind: values.target_kind,
-      account_id: values.account_id || null,
-      dialog_id: values.dialog_id || null,
-      enabled: values.enabled,
-      remark: values.remark ?? '',
-    };
-    try {
-      if (route) {
-        await relayApi.update(route.id, payload);
-        notifySuccess('规则已更新');
-      } else {
-        await relayApi.create(payload);
-        notifySuccess('规则已创建');
-      }
-      onSuccess();
-    } catch {
-      /* client 已统一提示 */
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={route ? '编辑转发规则' : '新建转发规则'}
-      onCancel={onCancel}
-      onOk={() => form.submit()}
-      okText="保存"
-      cancelText="取消"
-      confirmLoading={submitting}
-      width={560}
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={handleFinish}
-        key={route?.id ?? 'new'}
-        initialValues={{
-          name: route?.name ?? '',
-          bot_id: route?.bot_id,
-          staff_chat_id: route?.staff_chat_id,
-          staff_chat_title: route?.staff_chat_title ?? '',
-          target_kind: route?.target_kind ?? 'group',
-          account_id: route?.account_id ?? null,
-          dialog_id: route?.dialog_id ?? null,
-          enabled: route?.enabled ?? true,
-          remark: route?.remark ?? '',
-        }}
-      >
-        <Form.Item label="规则名" name="name">
-          <Input placeholder="例如：客服群转发" allowClear />
-        </Form.Item>
-        <Form.Item label="用哪个 Bot" name="bot_id" rules={[{ required: true, message: '请选择 Bot' }]}>
-          <Select placeholder="选择 Bot" options={bots} showSearch optionFilterProp="label" />
-        </Form.Item>
-        <Space size="middle" style={{ display: 'flex' }} align="start">
-          <Form.Item
-            label="员工群 chat_id"
-            name="staff_chat_id"
-            rules={[{ required: true, message: '请填员工群 chat_id' }]}
-          >
-            <InputNumber style={{ width: 200 }} placeholder="-1001234567890" />
-          </Form.Item>
-          <Form.Item label="目标类型" name="target_kind">
-            <Select style={{ width: 140 }} options={RELAY_TARGET_KIND_OPTIONS} />
-          </Form.Item>
-        </Space>
-        <Form.Item label="员工群名称（备注用）" name="staff_chat_title">
-          <Input placeholder="例如：值班-客服群" allowClear />
-        </Form.Item>
-        <Form.Item label="来源过滤：只转发哪个账号的消息" name="account_id">
-          <Select allowClear showSearch optionFilterProp="label" placeholder="不选 = 全部账号" options={accounts} />
-        </Form.Item>
-        <Form.Item label="来源过滤：只转发哪个会话的消息" name="dialog_id">
-          <Select allowClear showSearch optionFilterProp="label" placeholder="不选 = 全部会话" options={dialogs} />
-        </Form.Item>
-        <Form.Item label="启用" name="enabled" valuePropName="checked">
-          <Switch />
-        </Form.Item>
-        <Form.Item label="备注" name="remark">
-          <Input.TextArea rows={2} />
-        </Form.Item>
-      </Form>
-    </Modal>
+      <LinkDetailDrawer link={detailLink} onClose={() => setDetailLink(null)} />
+    </PageContainer>
   );
 }

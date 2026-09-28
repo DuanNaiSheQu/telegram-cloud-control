@@ -4,7 +4,7 @@
  * - 订阅按 dialog_id 引用计数，重连后自动补订阅
  * - 25s 一次 {"op":"ping"} 保活（服务端回 {"op":"pong"}）
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getToken } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { WsRawEvent, WsServerEvent, WsStatus } from '../api/types';
@@ -254,3 +254,27 @@ export const WS_STATUS_TEXT: Record<WsStatus, string> = {
   connecting: '实时连接中…',
   closed: '实时连接已断开',
 };
+
+/**
+ * 只订阅某类推送事件的便捷 hook：
+ *   useWsEvent('message', (event) => { ... });   // event 自动收窄为 WsMessageEvent
+ * 回调用 ref 保存，页面不必为了稳定引用去 useCallback。
+ */
+export function useWsEvent<K extends WsServerEvent['kind']>(
+  kind: K,
+  handler: (event: Extract<WsServerEvent, { kind: K }>) => void,
+  enabled = true,
+): void {
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+
+  const { onEvent } = useWebSocket(enabled);
+  useEffect(() => {
+    if (!enabled) return;
+    return onEvent((event) => {
+      if (event.kind === kind) {
+        handlerRef.current(event as Extract<WsServerEvent, { kind: K }>);
+      }
+    });
+  }, [enabled, kind, onEvent]);
+}

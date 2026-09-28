@@ -88,19 +88,6 @@ class Settings(BaseSettings):
     # ---------- 转发 ----------
     relay_include_source_header: bool = True
 
-    # ---------- 批量运营 ----------
-    # 素材文件落盘目录（媒体素材）；文字素材只进库
-    materials_dir: str = "materials"
-    # 批量任务里相邻两个号的首发间隔秒数（错峰，避免一批号同时上线打同一目标）
-    campaign_stagger_seconds: float = 2.0
-    # 吵群 / 拟人发言的安全上限：轮数、单轮间隔、总时长（超出会被 API 拒绝）
-    campaign_max_rounds: int = 20
-    campaign_min_interval_seconds: float = 3.0
-    campaign_max_interval_seconds: float = 120.0
-    campaign_max_duration_seconds: int = 1500
-    # 拟人发言每次向 AI 要的近邻消息条数
-    campaign_persona_context_messages: int = 10
-
     # ---------- 属性 ----------
     @property
     def cors_origin_list(self) -> List[str]:

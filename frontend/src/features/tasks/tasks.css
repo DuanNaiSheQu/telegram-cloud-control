@@ -1,0 +1,108 @@
+/*
+ * 任务中心 / 审计页共用的小样式（状态汇总条、JSON 块）。
+ * 颜色 / 间距 / 圆角只允许 var(--tg-*) 变量。
+ */
+
+/* ---------- 任务状态汇总条 ---------- */
+
+.tg-task-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tg-space-sm);
+}
+
+.tg-task-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tg-space-sm);
+  height: 24px;
+  padding: 0 var(--tg-space-md);
+  border-radius: var(--tg-radius-pill);
+  border: 1px solid var(--tg-color-border);
+  background: var(--tg-color-bg-card);
+  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard),
+    background var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.tg-task-chip:hover {
+  border-color: var(--tg-color-border-strong);
+  background: var(--tg-color-bg-hover);
+}
+
+.tg-task-chip.is-active {
+  border-color: var(--tg-color-primary);
+  background: var(--tg-color-primary-bg);
+  color: var(--tg-color-primary);
+}
+
+.tg-task-chip.is-static {
+  cursor: default;
+}
+
+.tg-task-chip-count {
+  font-weight: var(--tg-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.tg-task-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tg-color-neutral);
+}
+
+.tg-task-chip.is-overdue .dot {
+  background: var(--tg-color-warning);
+}
+
+.tg-task-chip.is-stuck .dot {
+  background: var(--tg-color-danger);
+}
+
+.tg-task-summary-total {
+  margin-left: auto;
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+}
+
+/* ---------- JSON 块 ---------- */
+
+.tg-json-block {
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-md);
+  background: var(--tg-color-bg-sunken);
+  overflow: hidden;
+}
+
+.tg-json-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-md);
+  padding: var(--tg-space-xs) var(--tg-space-md);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
+  background: var(--tg-color-bg-card);
+}
+
+.tg-json-block-title {
+  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size-sm);
+  font-weight: var(--tg-font-weight-medium);
+}
+
+.tg-json-block-body {
+  margin: 0;
+  padding: var(--tg-space-lg) var(--tg-space-xl);
+  overflow: auto;
+  color: var(--tg-color-text-primary);
+  font-family: var(--tg-font-family-mono);
+  font-size: var(--tg-font-size-sm);
+  line-height: var(--tg-font-line-normal);
+  white-space: pre-wrap;
+  word-break: break-all;
+}

@@ -2,9 +2,13 @@
  * fetch 封装：
  * - 自动带 Authorization: Bearer <JWT>
  * - 统一中文错误提示（401 清 token 并跳登录，403/409/422/5xx 分类提示）
- * - 统一解析 {detail: "原因"}
+ * - 统一解析 {detail: "原因"}（422 的数组 detail 会拼成一句中文）
+ * - GET 网络抖动自动重试一次（后端重启时页面不至于立刻报错）
+ * - downloadFile：导出 CSV 的二进制通道（带文件名解析）
  */
 import { notifyError, notifyWarning } from '../utils/feedback';
+import { filenameFromDisposition } from '../utils/download';
+import type { ExportResult } from './types';
 
 export const TOKEN_KEY = 'tgcc_token';
 
@@ -44,6 +48,11 @@ export class ApiError extends Error {
   get isNetworkError(): boolean {
     return this.status === 0;
   }
+
+  /** 适合直接展示给值班同事的中文文案 */
+  get friendlyMessage(): string {
+    return this.message || messageForStatus(this.status, this.detail, this.path);
+  }
 }
 
 export type QueryValue =
@@ -65,6 +74,9 @@ export interface RequestOptions {
   signal?: AbortSignal;
   /** 401 时是否清 token 跳登录（登录接口自己关掉） */
   authRedirect?: boolean;
+  /** 网络层失败的重试次数（默认 GET 重试 1 次，其它方法 0 次） */
+  retries?: number;
+  retryDelayMs?: number;
 }
 
 export function buildQuery(query?: Record<string, QueryValue>): string {
@@ -111,6 +123,7 @@ function messageForStatus(status: number, detail: string, path: string): string 
   if (status === 404) return `接口不存在（404）：${path}`;
   if (status === 409) return '当前状态不允许该操作，请刷新后重试';
   if (status === 422) return '参数校验失败';
+  if (status === 429) return '操作太频繁，请稍后再试';
   if (status >= 500) return `服务端错误（${status}），请稍后重试`;
   return `请求失败（${status}）`;
 }
@@ -144,6 +157,44 @@ function emitUnauthorized(): void {
 
 const DEFAULT_TIMEOUT = 30_000;
 
+function buildHeaders(body: unknown, accept = 'application/json'): Record<string, string> {
+  const headers: Record<string, string> = { Accept: accept };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  return headers;
+}
+
+/** 带超时/外部 signal 的 fetch */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+  try {
+    return await fetch(url, { ...init, signal: controller.signal, credentials: 'same-origin' });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+async function parseBody(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const {
     method = 'GET',
@@ -155,49 +206,43 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     authRedirect = true,
   } = options;
 
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const retries = options.retries ?? (method === 'GET' ? 1 : 0);
+  const retryDelayMs = options.retryDelayMs ?? 400;
+  const url = `${path}${buildQuery(query)}`;
 
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-  if (signal) {
-    if (signal.aborted) controller.abort();
-    else signal.addEventListener('abort', () => controller.abort(), { once: true });
-  }
+  let response: Response | null = null;
+  let lastNetworkError: ApiError | null = null;
 
-  let response: Response;
-  try {
-    response = await fetch(`${path}${buildQuery(query)}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: controller.signal,
-      credentials: 'same-origin',
-    });
-  } catch (err) {
-    window.clearTimeout(timer);
-    if ((err as Error)?.name === 'AbortError') {
-      const timeoutError = new ApiError(0, '请求超时，请稍后重试', path);
-      if (!silent) notifyError(timeoutError.message);
-      throw timeoutError;
-    }
-    const networkError = new ApiError(0, '无法连接后端服务，请确认 API 已启动', path);
-    if (!silent) notifyError(networkError.message);
-    throw networkError;
-  }
-  window.clearTimeout(timer);
-
-  let payload: unknown = null;
-  const text = await response.text();
-  if (text) {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => window.setTimeout(resolve, retryDelayMs * attempt));
     try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = text;
+      response = await fetchWithTimeout(
+        url,
+        { method, headers: buildHeaders(body), body: body === undefined ? undefined : JSON.stringify(body) },
+        timeoutMs,
+        signal,
+      );
+      lastNetworkError = null;
+      break;
+    } catch (err) {
+      const aborted = (err as Error)?.name === 'AbortError';
+      // 调用方主动取消（切换筛选/离开页面）：不提示、不重试
+      if (aborted && signal?.aborted) throw new ApiError(0, '请求已取消', path);
+      lastNetworkError = new ApiError(0, aborted ? '请求超时，请稍后重试' : '无法连接后端服务，请确认 API 已启动', path);
+      if (attempt === retries) {
+        if (!silent) notifyError(lastNetworkError.message);
+        throw lastNetworkError;
+      }
     }
   }
+
+  if (!response) {
+    const error = lastNetworkError ?? new ApiError(0, '无法连接后端服务，请确认 API 已启动', path);
+    if (!silent) notifyError(error.message);
+    throw error;
+  }
+
+  const payload = await parseBody(response);
 
   if (!response.ok) {
     const detail = extractDetail(payload);
@@ -215,6 +260,50 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return payload as T;
 }
 
+/**
+ * 二进制下载（导出 CSV）：
+ * 后端回 text/csv + Content-Disposition，这里把 Blob 与文件名一起交给页面，
+ * 由页面决定是否直接触发下载（有的场景要先生成预览）。
+ */
+export async function downloadFile(
+  path: string,
+  query?: Record<string, QueryValue>,
+  options: RequestOptions = {},
+): Promise<ExportResult> {
+  const { timeoutMs = 120_000, silent, signal } = options;
+  const url = `${path}${buildQuery(query)}`;
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(url, { method: 'GET', headers: buildHeaders(undefined) }, timeoutMs, signal);
+  } catch (err) {
+    if ((err as Error)?.name === 'AbortError' && signal?.aborted) {
+      throw new ApiError(0, '导出已取消', path);
+    }
+    const error = new ApiError(0, '导出失败：无法连接后端服务', path);
+    if (!silent) notifyError(error.message);
+    throw error;
+  }
+
+  if (!response.ok) {
+    const payload = await parseBody(response);
+    const detail = extractDetail(payload);
+    const message = detail || `导出失败（${response.status}）`;
+    const error = new ApiError(response.status, message, path, detail, payload);
+    if (!silent) notifyError(message);
+    throw error;
+  }
+
+  const blob = await response.blob();
+  const totalHeader = response.headers.get('X-Export-Total');
+  return {
+    blob,
+    filename: filenameFromDisposition(response.headers.get('Content-Disposition'), 'export.csv'),
+    total: totalHeader ? Number(totalHeader) : null,
+    truncated: response.headers.get('X-Export-Truncated') === 'true',
+  };
+}
+
 export const api = {
   get: <T>(path: string, query?: Record<string, QueryValue>, options?: RequestOptions) =>
     request<T>(path, { ...options, method: 'GET', query }),
@@ -222,6 +311,9 @@ export const api = {
     request<T>(path, { ...options, method: 'POST', body }),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: 'PATCH', body }),
+  put: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>(path, { ...options, method: 'PUT', body }),
   del: <T>(path: string, query?: Record<string, QueryValue>, options?: RequestOptions) =>
     request<T>(path, { ...options, method: 'DELETE', query }),
+  download: downloadFile,
 };

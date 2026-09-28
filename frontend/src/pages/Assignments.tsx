@@ -1,97 +1,172 @@
+/**
+ * 员工分配页（admin 专属）：
+ * - 员工列表：用户名/角色/启用状态/已分配账号数/最后登录；
+ * - 新建 / 改口令 / 停用 / 启用 / 删除；
+ * - 选员工 → 账号选择器（搜索/分组筛选/多选/「未分配」视图，行内显示归属人）批量分配/取消；
+ * - 分配矩阵：每个员工名下的账号一览；
+ * - operator 访问：不请求任何接口，直接给中文 403 提示。
+ */
 import { useMemo, useState } from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd';
+import { Button, Space, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { DeleteOutlined, KeyOutlined, PlusOutlined, ReloadOutlined, TeamOutlined } from '@ant-design/icons';
-import { assignmentApi, userApi } from '../api/endpoints';
+import {
+  DeleteOutlined,
+  KeyOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
+import {
+  ConfirmModal,
+  DataTable,
+  ErrorState,
+  PageContainer,
+  RelativeTime,
+  SectionCard,
+  SoftTag,
+  StatCard,
+  StatGrid,
+} from '../components';
+import { accountApi, assignmentApi, userApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
-import { USER_ROLE_LABELS, USER_ROLE_OPTIONS } from '../constants';
-import { formatTime } from '../utils/format';
+import { formatNumber, shortId } from '../utils/format';
 import { notifySuccess } from '../utils/feedback';
 import { useAuth } from '../auth/AuthContext';
-import AccountPickerModal from '../components/AccountPickerModal';
+import { USER_ROLE_LABELS } from '../constants';
 import type { UserOut, UserRole } from '../api/types';
+import { AccountAssignModal } from '../features/assignments/AccountAssignModal';
+import { PasswordModal, UserFormModal } from '../features/assignments/UserFormModal';
 
 export default function Assignments() {
-  const { isAdmin } = useAuth();
-  const users = useAsyncData(() => userApi.list(), []);
-  const assignments = useAsyncData(() => assignmentApi.list(), []);
+  const { isAdmin, user: currentUser } = useAuth();
+  const users = useAsyncData(() => userApi.list(), [], { immediate: isAdmin });
+  const assignments = useAsyncData(() => assignmentApi.list(), [], { immediate: isAdmin });
+  const accounts = useAsyncData(() => accountApi.list({ page: 1, page_size: 200 }), [], {
+    immediate: isAdmin,
+  });
 
   const [createOpen, setCreateOpen] = useState(false);
   const [pwdUser, setPwdUser] = useState<UserOut | null>(null);
   const [assignUser, setAssignUser] = useState<UserOut | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserOut | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const assignedIds = useMemo(() => {
-    if (!assignUser) return [];
-    return assignments.data?.find((item) => item.user_id === assignUser.id)?.account_ids ?? [];
-  }, [assignments.data, assignUser]);
+  const userList = useMemo(() => users.data ?? [], [users.data]);
+  const assignmentList = useMemo(() => assignments.data ?? [], [assignments.data]);
+  const accountList = useMemo(() => accounts.data?.items ?? [], [accounts.data]);
 
-  const handleAssign = async (selectedIds: string[]) => {
-    if (!assignUser) return;
-    const current = new Set(assignedIds);
-    const next = new Set(selectedIds);
-    const added = selectedIds.filter((id) => !current.has(id));
-    const removed = assignedIds.filter((id) => !next.has(id));
-    setSaving(true);
+  const assignedAccountCount = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of assignmentList) for (const id of item.account_ids) set.add(id);
+    return set.size;
+  }, [assignmentList]);
+  const unassignedCount = Math.max(0, accountList.length - assignedAccountCount);
+  const operatorCount = userList.filter((item) => item.role === 'operator').length;
+
+  // 分配矩阵：每个员工名下的账号标签（管理员行说明「看全部」）
+  const accountLabelOf = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of accountList) map.set(item.id, item.phone_masked);
+    return map;
+  }, [accountList]);
+
+  const matrixRows = useMemo(
+    () =>
+      assignmentList.map((item) => ({
+        ...item,
+        labels: item.account_ids.map((id) => accountLabelOf.get(id) ?? shortId(id)),
+      })),
+    [assignmentList, accountLabelOf],
+  );
+
+  // operator 访问：管理端专属页，直接给中文 403 提示（接口同样拒绝，这里不再发起请求）
+  if (!isAdmin) {
+    return (
+      <PageContainer title="员工分配" description="员工账号、口令与账号分配关系的管理入口。">
+        <SectionCard>
+          <ErrorState
+            title="403 需要管理员权限"
+            description="员工分配是管理员专属页面：员工账号、口令与分配关系都属于管理动作。当前登录账号是操作员，后端接口同样会拒绝（403）。如有需要，请联系管理员。"
+            error="需要管理员权限"
+            compact
+          />
+        </SectionCard>
+      </PageContainer>
+    );
+  }
+
+  const handleToggleActive = async (record: UserOut) => {
+    setBusyId(record.id);
     try {
-      if (added.length) {
-        await assignmentApi.create(assignUser.id, added);
-        notifySuccess(`已给 ${assignUser.username} 分配 ${added.length} 个账号`);
-      }
-      if (removed.length) {
-        await assignmentApi.remove(assignUser.id, removed);
-        notifySuccess(`已取消 ${removed.length} 个账号的分配`);
-      }
-      if (!added.length && !removed.length) notifySuccess('分配关系没有变化');
-      setAssignUser(null);
+      await userApi.update(record.id, { is_active: !record.is_active });
+      notifySuccess(record.is_active ? '员工已停用' : '员工已启用');
+      void users.reload();
+    } catch {
+      /* 最后一个管理员的保护等后端 400/409 中文原因已由 client 统一提示 */
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await userApi.remove(deleteTarget.id);
+      notifySuccess(res.message || '员工已删除');
+      setDeleteTarget(null);
       void users.reload();
       void assignments.reload();
     } catch {
-      /* client 已统一提示 */
+      /* client 已统一中文提示 */
     } finally {
-      setSaving(false);
+      setDeleting(false);
     }
   };
 
   const columns: ColumnsType<UserOut> = [
-    { title: '用户名', dataIndex: 'username', width: 160 },
     {
-      title: '显示名',
-      dataIndex: 'display_name',
-      width: 160,
-      render: (value: string) => value || '—',
+      title: '用户名',
+      dataIndex: 'username',
+      width: 170,
+      render: (value: string, record) => (
+        <div className="tg-stack">
+          <span>{value}</span>
+          {record.display_name && record.display_name !== value ? (
+            <Typography.Text type="secondary">{record.display_name}</Typography.Text>
+          ) : null}
+        </div>
+      ),
     },
     {
       title: '角色',
       dataIndex: 'role',
-      width: 110,
+      width: 100,
       render: (value: UserRole) => (
-        <Tag color={value === 'admin' ? 'gold' : 'blue'}>{USER_ROLE_LABELS[value] ?? value}</Tag>
+        <SoftTag tone={value === 'admin' ? 'primary' : 'neutral'}>
+          {USER_ROLE_LABELS[value] ?? value}
+        </SoftTag>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'is_active',
+      width: 90,
+      render: (value: boolean) => (
+        <SoftTag tone={value ? 'success' : 'neutral'}>{value ? '启用' : '停用'}</SoftTag>
       ),
     },
     {
       title: '已分配账号数',
       dataIndex: 'account_count',
       width: 130,
+      align: 'right',
       render: (value: number, record) => (
-        <Space>
-          <Tag color={value > 0 ? 'blue' : 'default'}>{value}</Tag>
+        <Space size={6}>
+          <span className="tg-num">{formatNumber(value)}</span>
           {record.role === 'admin' ? (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            <Typography.Text type="secondary" style={{ fontSize: 'var(--tg-font-size-sm)' }}>
               管理员看全部
             </Typography.Text>
           ) : null}
@@ -99,129 +174,169 @@ export default function Assignments() {
       ),
     },
     {
-      title: '状态',
-      dataIndex: 'is_active',
-      width: 100,
-      render: (value: boolean) => (value ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>),
-    },
-    {
       title: '最后登录',
       dataIndex: 'last_login_at',
-      width: 170,
-      render: (value: string | null) => formatTime(value),
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      width: 170,
-      render: (value: string | null) => formatTime(value),
+      width: 150,
+      render: (value: string | null) => <RelativeTime value={value} />,
     },
     {
       title: '操作',
       key: 'actions',
-      width: 300,
-      render: (_: unknown, record) => (
-        <Space wrap>
-          <Button
-            size="small"
-            icon={<TeamOutlined />}
-            disabled={!isAdmin}
-            onClick={() => setAssignUser(record)}
-          >
-            分配账号
-          </Button>
-          <Button size="small" icon={<KeyOutlined />} disabled={!isAdmin} onClick={() => setPwdUser(record)}>
-            改口令
-          </Button>
-          <Button
-            size="small"
-            disabled={!isAdmin}
-            onClick={async () => {
-              try {
-                await userApi.update(record.id, { is_active: !record.is_active });
-                notifySuccess(record.is_active ? '员工已停用' : '员工已启用');
-                void users.reload();
-              } catch {
-                /* client 已统一提示 */
-              }
-            }}
-          >
-            {record.is_active ? '停用' : '启用'}
-          </Button>
-          <Popconfirm
-            title="删除这个员工？"
-            description="删除后他用这个账号登录不了控制台。"
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-            disabled={!isAdmin}
-            onConfirm={async () => {
-              try {
-                const res = await userApi.remove(record.id);
-                notifySuccess(res.message || '员工已删除');
-                void users.reload();
-                void assignments.reload();
-              } catch {
-                /* client 已统一提示 */
-              }
-            }}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />} disabled={!isAdmin}>
-              删除
+      width: 340,
+      fixed: 'right',
+      render: (_: unknown, record) => {
+        const isSelf = record.id === currentUser?.id;
+        return (
+          <Space size="small" wrap>
+            <Tooltip title={record.role === 'admin' ? '管理员可见全部账号，无需分配' : undefined}>
+              <Button
+                size="small"
+                icon={<TeamOutlined />}
+                disabled={record.role === 'admin'}
+                onClick={() => setAssignUser(record)}
+              >
+                分配账号
+              </Button>
+            </Tooltip>
+            <Button size="small" icon={<KeyOutlined />} onClick={() => setPwdUser(record)}>
+              改口令
             </Button>
-          </Popconfirm>
-        </Space>
+            <Button
+              size="small"
+              loading={busyId === record.id}
+              disabled={isSelf}
+              onClick={() => void handleToggleActive(record)}
+            >
+              {record.is_active ? '停用' : '启用'}
+            </Button>
+            <Tooltip title={isSelf ? '不能删除自己' : undefined}>
+              <Button
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                disabled={isSelf}
+                onClick={() => setDeleteTarget(record)}
+              >
+                删除
+              </Button>
+            </Tooltip>
+          </Space>
+        );
+      },
+    },
+  ];
+
+  const matrixColumns: ColumnsType<(typeof matrixRows)[number]> = [
+    {
+      title: '员工',
+      dataIndex: 'username',
+      width: 200,
+      render: (value: string, record) => (
+        <div className="tg-stack">
+          <span>{value}</span>
+          {record.display_name && record.display_name !== value ? (
+            <Typography.Text type="secondary">{record.display_name}</Typography.Text>
+          ) : null}
+        </div>
       ),
+    },
+    {
+      title: '账号数',
+      dataIndex: 'account_count',
+      width: 90,
+      align: 'right',
+      render: (value: number) => <span className="tg-num">{formatNumber(value)}</span>,
+    },
+    {
+      title: '名下账号',
+      key: 'labels',
+      render: (_: unknown, record) =>
+        record.labels.length ? (
+          <Space size={6} wrap>
+            {record.labels.map((label: string) => (
+              <SoftTag key={label} tone="info">
+                {label}
+              </SoftTag>
+            ))}
+          </Space>
+        ) : (
+          <Typography.Text type="secondary">还没有分配账号</Typography.Text>
+        ),
     },
   ];
 
   return (
-    <div>
-      <Card
-        title="员工分配"
-        extra={
-          <Space>
-            <Button
-              icon={<ReloadOutlined />}
-              loading={users.loading}
-              onClick={() => {
-                void users.reload();
-                void assignments.reload();
-              }}
-            >
-              刷新
-            </Button>
-            <Button type="primary" icon={<PlusOutlined />} disabled={!isAdmin} onClick={() => setCreateOpen(true)}>
+    <PageContainer
+      title="员工分配"
+      description="分组是标签，分配才是权限：操作员只能看到并操作自己被分配到的账号；管理员可见全部。"
+      actions={
+        <Space>
+          <Button
+            icon={<ReloadOutlined />}
+            loading={users.loading}
+            onClick={() => {
+              void users.reload();
+              void assignments.reload();
+              void accounts.reload();
+            }}
+          >
+            刷新
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+            新建员工
+          </Button>
+        </Space>
+      }
+    >
+      <StatGrid>
+        <StatCard title="员工总数" value={userList.length} tone="neutral" />
+        <StatCard title="操作员" value={operatorCount} tone="primary" />
+        <StatCard title="已分配账号" value={assignedAccountCount} tone="success" />
+        <StatCard title="未分配账号" value={unassignedCount} tone="warning" />
+      </StatGrid>
+
+      <DataTable<UserOut>
+        rowKey="id"
+        columns={columns}
+        dataSource={userList}
+        loading={users.loading}
+        error={users.error}
+        onRetry={() => void users.reload()}
+        columnSettingsKey="assignments-users"
+        scrollX={1100}
+        empty={{
+          art: 'accounts',
+          title: '还没有员工账号',
+          description: '新建员工并分配账号后，对方就可以用自己的账号登录控制台值班了。',
+          action: (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
               新建员工
             </Button>
-          </Space>
-        }
+          ),
+        }}
+      />
+
+      <SectionCard
+        title="分配矩阵"
+        subtitle="每个员工名下的账号一览；在员工行点「分配账号」可批量调整，账号选择器里也能按归属人反查。"
+        bodyPadding="none"
       >
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message="操作员只能看/操作被分配到的账号；管理员看全部账号。分组是标签，分配才是权限。"
+        <DataTable<(typeof matrixRows)[number]>
+          rowKey="user_id"
+          columns={matrixColumns}
+          dataSource={matrixRows}
+          loading={assignments.loading}
+          error={assignments.error}
+          onRetry={() => void assignments.reload()}
+          showDensity={false}
+          scrollX={760}
+          empty={{
+            art: 'list',
+            title: '还没有分配记录',
+            description: '在员工列表里点「分配账号」，把账号批量交给操作员。',
+          }}
         />
-        {!isAdmin ? (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 12 }}
-            message="当前登录的不是管理员，员工管理和分配按钮不可用（后端会回 403）。"
-          />
-        ) : null}
-        <Table<UserOut>
-          size="small"
-          rowKey="id"
-          loading={users.loading}
-          dataSource={users.data ?? []}
-          columns={columns}
-          pagination={false}
-          scroll={{ x: 1300 }}
-          locale={{ emptyText: <Empty description="还没有员工账号" /> }}
-        />
-      </Card>
+      </SectionCard>
 
       <UserFormModal
         open={createOpen}
@@ -232,145 +347,31 @@ export default function Assignments() {
         }}
       />
 
-      <PasswordModal
-        user={pwdUser}
-        onCancel={() => setPwdUser(null)}
-        onSuccess={() => setPwdUser(null)}
-      />
+      <PasswordModal user={pwdUser} onCancel={() => setPwdUser(null)} onSuccess={() => setPwdUser(null)} />
 
-      <AccountPickerModal
+      <AccountAssignModal
         open={Boolean(assignUser)}
-        title={`分配账号给：${assignUser?.display_name || assignUser?.username || ''}`}
-        hint="勾选 = 分配，取消勾选 = 收回；保存时只提交变化的部分。"
-        value={assignedIds}
-        confirmLoading={saving}
+        user={assignUser}
+        assignments={assignmentList}
+        accounts={accountList}
         onCancel={() => setAssignUser(null)}
-        onSubmit={handleAssign}
+        onSaved={() => {
+          setAssignUser(null);
+          void users.reload();
+          void assignments.reload();
+        }}
       />
-    </div>
-  );
-}
 
-interface UserForm {
-  username: string;
-  password: string;
-  display_name?: string;
-  role: UserRole;
-}
-
-function UserFormModal({
-  open,
-  onCancel,
-  onSuccess,
-}: {
-  open: boolean;
-  onCancel: () => void;
-  onSuccess: () => void;
-}) {
-  const [form] = Form.useForm<UserForm>();
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleFinish = async (values: UserForm) => {
-    setSubmitting(true);
-    try {
-      await userApi.create({
-        username: values.username.trim(),
-        password: values.password,
-        display_name: values.display_name ?? '',
-        role: values.role,
-      });
-      notifySuccess('员工已创建');
-      form.resetFields();
-      onSuccess();
-    } catch {
-      /* client 已统一提示 */
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title="新建员工"
-      onCancel={onCancel}
-      onOk={() => form.submit()}
-      okText="创建"
-      cancelText="取消"
-      confirmLoading={submitting}
-    >
-      <Form form={form} layout="vertical" onFinish={handleFinish} initialValues={{ role: 'operator' }}>
-        <Form.Item
-          label="用户名"
-          name="username"
-          rules={[{ required: true, message: '请输入用户名' }, { min: 2, message: '至少 2 个字符' }]}
-        >
-          <Input placeholder="登录用户名" allowClear autoComplete="off" />
-        </Form.Item>
-        <Form.Item
-          label="口令"
-          name="password"
-          rules={[{ required: true, message: '请输入口令' }, { min: 6, message: '至少 6 位' }]}
-        >
-          <Input.Password placeholder="至少 6 位" autoComplete="new-password" />
-        </Form.Item>
-        <Form.Item label="显示名" name="display_name">
-          <Input placeholder="例如：值班-小王" allowClear />
-        </Form.Item>
-        <Form.Item label="角色" name="role" rules={[{ required: true, message: '请选择角色' }]}>
-          <Select options={USER_ROLE_OPTIONS} />
-        </Form.Item>
-      </Form>
-    </Modal>
-  );
-}
-
-function PasswordModal({
-  user,
-  onCancel,
-  onSuccess,
-}: {
-  user: UserOut | null;
-  onCancel: () => void;
-  onSuccess: () => void;
-}) {
-  const [form] = Form.useForm<{ password: string }>();
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleFinish = async (values: { password: string }) => {
-    if (!user) return;
-    setSubmitting(true);
-    try {
-      await userApi.update(user.id, { password: values.password });
-      notifySuccess('口令已更新');
-      form.resetFields();
-      onSuccess();
-    } catch {
-      /* client 已统一提示 */
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={Boolean(user)}
-      title={`修改口令：${user?.username ?? ''}`}
-      onCancel={onCancel}
-      onOk={() => form.submit()}
-      okText="保存"
-      cancelText="取消"
-      confirmLoading={submitting}
-    >
-      <Form form={form} layout="vertical" onFinish={handleFinish}>
-        <Form.Item
-          label="新口令"
-          name="password"
-          rules={[{ required: true, message: '请输入新口令' }, { min: 6, message: '至少 6 位' }]}
-        >
-          <Input.Password placeholder="至少 6 位" autoComplete="new-password" />
-        </Form.Item>
-      </Form>
-    </Modal>
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        danger
+        loading={deleting}
+        title={`删除员工「${deleteTarget?.username ?? ''}」？`}
+        content="删除后该员工无法再登录控制台；他名下的账号会变成未分配，不影响账号本身。"
+        okText="删除"
+        onOk={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </PageContainer>
   );
 }

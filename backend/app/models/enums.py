@@ -95,15 +95,6 @@ class TaskType(str, enum.Enum):
     login_start = "login_start"          # 发送验证码
     login_code = "login_code"            # 提交验证码
     login_password = "login_password"    # 提交两步验证密码
-    # 批量运营（Worker 执行，每号一条任务，payload.batch_id 聚合）
-    bulk_pm = "bulk_pm"                  # 批量私信：向目标逐个发消息
-    group_broadcast = "group_broadcast"  # 群发：向指定群发消息
-    material_send = "material_send"      # 素材群发：按素材库内容发送
-    join_group = "join_group"            # 加群：邀请链接 / 公开群
-    leave_group = "leave_group"          # 退群
-    force_add_member = "force_add_member"  # 强拉进群：把成员拉进群（需管理员）
-    storm_chat = "storm_chat"            # 吵群：按文本池和随机间隔连续发言
-    persona_chat = "persona_chat"        # 拟人发言：按人设生成话术连续发言
     # Bot（API 执行）
     relay_to_staff = "relay_to_staff"    # 转发到员工群
     bot_reply = "bot_reply"              # 官方 Bot 自动回复
@@ -128,14 +119,6 @@ TASK_TYPE_LABELS = {
     "login_start": "登录-发送验证码",
     "login_code": "登录-提交验证码",
     "login_password": "登录-提交两步密码",
-    "bulk_pm": "批量私信",
-    "group_broadcast": "群发",
-    "material_send": "素材群发",
-    "join_group": "加群",
-    "leave_group": "退群",
-    "force_add_member": "强拉进群",
-    "storm_chat": "吵群",
-    "persona_chat": "拟人发言",
     "relay_to_staff": "转发到员工群",
     "bot_reply": "Bot 自动回复",
     "reply_to_origin": "回复送回原会话",

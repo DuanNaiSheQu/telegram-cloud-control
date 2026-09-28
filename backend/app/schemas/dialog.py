@@ -65,6 +65,15 @@ class MessageListResponse(BaseModel):
     has_more: bool = False
 
 
+class MessagePageResponse(BaseModel):
+    """跨会话的消息搜索分页（GET /api/messages），不带单个 dialog 上下文。"""
+
+    items: List[MessageOut]
+    total: int
+    page: int = 1
+    page_size: int = 20
+
+
 class SendMessageRequest(BaseModel):
     dialog_id: uuid.UUID
     text: str = Field(min_length=1, max_length=4096)

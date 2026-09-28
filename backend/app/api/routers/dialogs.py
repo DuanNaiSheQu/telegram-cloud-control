@@ -27,6 +27,7 @@ from app.api.deps import (
     visible_account_ids,
 )
 from app.api.routers import (
+    build_order_by,
     dialog_out,
     enum_value,
     message_out,
@@ -57,6 +58,7 @@ from app.schemas import (
     DialogOut,
     DraftOut,
     MessageListResponse,
+    MessagePageResponse,
     SendMessageRequest,
     SendMessageResponse,
 )
@@ -69,6 +71,26 @@ router = APIRouter(prefix="/dialogs", tags=["dialogs"])
 #: /api/messages/send、/api/drafts/{id} 不挂在 /dialogs 下，单独两个小路由
 messages_router = APIRouter(tags=["messages"])
 drafts_router = APIRouter(tags=["drafts"])
+
+#: 会话列表允许的排序字段（白名单）
+DIALOG_SORT_FIELDS = {
+    "last_message_at": Dialog.last_message_at,
+    "created_at": Dialog.created_at,
+    "updated_at": Dialog.updated_at,
+    "title": Dialog.title,
+    "unread_count": Dialog.unread_count,
+    "member_count": Dialog.member_count,
+}
+
+#: 消息列表允许的排序字段（白名单）
+MESSAGE_SORT_FIELDS = {
+    "created_at": Message.created_at,
+    "updated_at": Message.updated_at,
+    "sender_name": Message.sender_name,
+    "status": Message.status,
+    "direction": Message.direction,
+    "tg_message_id": Message.tg_message_id,
+}
 
 
 class SyncMessagesBody(BaseModel):
@@ -92,11 +114,62 @@ async def _load_dialog(session: AsyncSession, dialog_id: uuid.UUID) -> Dialog:
     return dialog
 
 
-def _dialog_conditions(ids: Optional[List[uuid.UUID]]):
+def dialog_conditions(ids: Optional[List[uuid.UUID]]):
     """会话可见范围：Bot 会话是全局的，用户号会话跟着账号分配走。"""
     if ids is None:
         return []
     return [(Dialog.channel == DialogChannel.bot) | (Dialog.account_id.in_(ids))]
+
+
+def _keyword_condition(raw: Optional[str]):
+    """标题 / 对方 / 用户名 / 最近预览 / 消息正文 的模糊匹配（列表与导出共用）。"""
+    if not raw or not raw.strip():
+        return None
+    pattern = f"%{raw.strip()}%"
+    return or_(
+        Dialog.title.ilike(pattern),
+        Dialog.peer_display.ilike(pattern),
+        Dialog.username.ilike(pattern),
+        Dialog.last_message_preview.ilike(pattern),
+        # 也按消息正文找：值班的人常记得「那句话在哪个会话里」。
+        # 用 in_(子查询) 并加 limit，避免消息表很大时把整表扫穿。
+        Dialog.id.in_(select(Message.dialog_id).where(Message.body.ilike(pattern)).limit(500)),
+    )
+
+
+def message_conditions(
+    ids: Optional[List[uuid.UUID]],
+    *,
+    q: Optional[str] = None,
+    channel: Optional[DialogChannel] = None,
+    kind: Optional[DialogKind] = None,
+    account_id: Optional[uuid.UUID] = None,
+    dialog_id: Optional[uuid.UUID] = None,
+    direction: Optional[MessageDirection] = None,
+    status_filter: Optional[MessageStatus] = None,
+) -> list:
+    """消息筛选条件（跨会话搜索与导出共用）。
+
+    可见范围要 join `dialogs` 判定：用户号会话跟着账号分配走，Bot 会话全局可见。
+    """
+    conditions = []
+    if ids is not None:
+        conditions.append((Dialog.channel == DialogChannel.bot) | (Dialog.account_id.in_(ids)))
+    if dialog_id is not None:
+        conditions.append(Message.dialog_id == dialog_id)
+    if account_id is not None:
+        conditions.append(Dialog.account_id == account_id)
+    if channel is not None:
+        conditions.append(Message.channel == channel)
+    if kind is not None:
+        conditions.append(Dialog.kind == kind)
+    if direction is not None:
+        conditions.append(Message.direction == direction)
+    if status_filter is not None:
+        conditions.append(Message.status == status_filter)
+    if q and q.strip():
+        conditions.append(Message.body.ilike(f"%{q.strip()}%"))
+    return conditions
 
 
 async def _history(session: AsyncSession, dialog_id: uuid.UUID, limit: int) -> List[Message]:
@@ -137,15 +210,21 @@ async def list_dialogs(
     account_id: Optional[uuid.UUID] = Query(default=None),
     bot_id: Optional[uuid.UUID] = Query(default=None),
     keyword: Optional[str] = Query(default=None),
+    q: Optional[str] = Query(default=None, description="keyword 的别名：标题 / 对方 / 正文"),
     only_unread: bool = Query(default=False),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    sort: Optional[str] = Query(default=None, description="排序字段，见 DIALOG_SORT_FIELDS"),
+    order: Optional[str] = Query(default=None, description="asc | desc，默认 desc"),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> DialogListResponse:
-    """按最近消息时间倒序；operator 只能看到自己分配账号下的会话（Bot 会话人人可见）。"""
+    """按最近消息时间倒序；operator 只能看到自己分配账号下的会话（Bot 会话人人可见）。
+
+    `q` 与 `keyword` 等价，都在标题、对方、用户名、最近预览和**消息正文**里找。
+    """
     ids = await visible_account_ids(session, user)
-    conditions = _dialog_conditions(ids)
+    conditions = dialog_conditions(ids)
     if channel is not None:
         conditions.append(Dialog.channel == channel)
     if kind is not None:
@@ -157,29 +236,27 @@ async def list_dialogs(
         conditions.append(Dialog.bot_id == bot_id)
     if only_unread:
         conditions.append(Dialog.unread_count > 0)
-    if keyword and keyword.strip():
-        pattern = f"%{keyword.strip()}%"
-        conditions.append(
-            or_(
-                Dialog.title.ilike(pattern),
-                Dialog.peer_display.ilike(pattern),
-                Dialog.username.ilike(pattern),
-                Dialog.last_message_preview.ilike(pattern),
-                # 也按消息正文找：值班的人常记得「那句话在哪个会话里」。
-                # 用 in_(子查询) 并加 limit，避免消息表很大时把整表扫穿。
-                Dialog.id.in_(
-                    select(Message.dialog_id).where(Message.body.ilike(pattern)).limit(500)
-                ),
-            )
-        )
+    for raw in (q, keyword):
+        condition = _keyword_condition(raw)
+        if condition is not None:
+            conditions.append(condition)
 
     total = await session.scalar(select(func.count()).select_from(Dialog).where(*conditions))
+    order_by = build_order_by(
+        sort=sort,
+        order=order,
+        mapping=DIALOG_SORT_FIELDS,
+        default_field="last_message_at",
+        default_order="desc",
+        nulls_last=True,
+        tiebreaker=Dialog.id,
+    )
     dialogs = list(
         (
             await session.scalars(
                 select(Dialog)
                 .where(*conditions)
-                .order_by(Dialog.last_message_at.desc().nullslast(), Dialog.created_at.desc())
+                .order_by(*order_by)
                 .offset((page - 1) * page_size)
                 .limit(page_size)
             )
@@ -210,22 +287,31 @@ async def list_messages(
     dialog_id: uuid.UUID,
     limit: int = Query(50, ge=1, le=500),
     before: Optional[datetime] = Query(default=None, description="ISO8601，取这个时间之前的消息"),
+    q: Optional[str] = Query(default=None, description="正文关键词（会话内搜索）"),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> MessageListResponse:
-    """返回按时间正序的 items；has_more 表示还有更早的消息，可继续用 before 翻。"""
+    """返回按时间正序的 items；has_more 表示还有更早的消息，可继续用 before 翻。
+
+    聊天视图固定正序（由 `before` 往前翻）；要按字段排序请用 `GET /api/messages`。
+    """
     dialog = await _load_dialog(session, dialog_id)
     await assert_dialog_access(session, user, dialog)
 
     conditions = [Message.dialog_id == dialog.id]
+    if q and q.strip():
+        conditions.append(Message.body.ilike(f"%{q.strip()}%"))
+    total = await session.scalar(
+        select(func.count()).select_from(Message).where(*conditions)
+    )
+    page_conditions = list(conditions)
     if before is not None:
-        conditions.append(Message.created_at < before)
-    total = await session.scalar(select(func.count()).select_from(Message).where(Message.dialog_id == dialog.id))
+        page_conditions.append(Message.created_at < before)
     rows = list(
         (
             await session.scalars(
                 select(Message)
-                .where(*conditions)
+                .where(*page_conditions)
                 .order_by(Message.created_at.desc(), Message.id.desc())
                 .limit(limit + 1)
             )
@@ -238,6 +324,73 @@ async def list_messages(
         total=int(total or 0),
         dialog=dialog_out(dialog),
         has_more=has_more,
+    )
+
+
+@messages_router.get("/messages", response_model=MessagePageResponse, summary="跨会话消息搜索（分页 + 排序）")
+async def search_messages(
+    q: Optional[str] = Query(default=None, description="正文关键词"),
+    channel: Optional[DialogChannel] = Query(default=None),
+    kind: Optional[DialogKind] = Query(default=None),
+    account_id: Optional[uuid.UUID] = Query(default=None),
+    dialog_id: Optional[uuid.UUID] = Query(default=None),
+    direction: Optional[MessageDirection] = Query(default=None),
+    status_filter: Optional[MessageStatus] = Query(default=None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    sort: Optional[str] = Query(default=None, description="排序字段，见 MESSAGE_SORT_FIELDS"),
+    order: Optional[str] = Query(default=None, description="asc | desc，默认 desc"),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> MessagePageResponse:
+    """跨会话搜消息：只按正文（`q`）与通道 / 方向 / 状态筛选，operator 受账号分配范围约束。
+
+    这是「搜索」页用的接口；单个会话内的聊天记录请用 `/api/dialogs/{id}/messages`。
+    """
+    if dialog_id is not None:
+        dialog = await _load_dialog(session, dialog_id)
+        await assert_dialog_access(session, user, dialog)
+    if account_id is not None:
+        await assert_account_access(session, user, account_id)
+
+    ids = await visible_account_ids(session, user)
+    conditions = message_conditions(
+        ids,
+        q=q,
+        channel=channel,
+        kind=kind,
+        account_id=account_id,
+        dialog_id=dialog_id,
+        direction=direction,
+        status_filter=status_filter,
+    )
+    joined = select(Message).join(Dialog, Dialog.id == Message.dialog_id).where(*conditions)
+    total = await session.scalar(
+        select(func.count())
+        .select_from(Message)
+        .join(Dialog, Dialog.id == Message.dialog_id)
+        .where(*conditions)
+    )
+    order_by = build_order_by(
+        sort=sort,
+        order=order,
+        mapping=MESSAGE_SORT_FIELDS,
+        default_field="created_at",
+        default_order="desc",
+        tiebreaker=Message.id,
+    )
+    rows = list(
+        (
+            await session.scalars(
+                joined.order_by(*order_by).offset((page - 1) * page_size).limit(page_size)
+            )
+        ).all()
+    )
+    return MessagePageResponse(
+        items=[message_out(item) for item in rows],
+        total=int(total or 0),
+        page=page,
+        page_size=page_size,
     )
 
 

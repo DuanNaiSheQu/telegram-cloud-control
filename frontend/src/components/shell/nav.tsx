@@ -12,6 +12,7 @@ import {
   RobotOutlined,
   SafetyCertificateOutlined,
   ScheduleOutlined,
+  SendOutlined,
   ShareAltOutlined,
   TeamOutlined,
   UserOutlined,

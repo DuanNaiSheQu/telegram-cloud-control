@@ -101,6 +101,32 @@ tgcc_backup_last_run_timestamp_seconds $(date +%s)"
   push_metrics "$kind" "$body" || warn "上报失败状态到 pushgateway 也没成功：pushgateway 是否在跑（make monitoring）？"
 }
 
+# ---------------------------------------------------------------- 上报备份结果到 Redis（控制台通知流）
+# API 侧（backend/app/core/notifications.py）只读这个键：ok=false 时产生 backup_failed 通知。
+# 写失败只警告不致命：备份本身与 pushgateway 告警都不受影响。
+REDIS_RESULT_KEY="tgcc:backup:last-result"
+
+report_redis_result() {
+  local kind="$1" state="$2" message="${3:-}"
+  local ts json
+  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  message="${message//\"/\'}"   # 防 JSON 破形：内部消息不含双引号
+  json="{\"ok\":${state},\"kind\":\"${kind}\",\"ts\":\"${ts}\",\"message\":\"${message}\"}"
+  if [ "$BACKUP_MODE" = "docker" ]; then
+    if "${COMPOSE[@]}" exec -T redis redis-cli SET "$REDIS_RESULT_KEY" "$json" EX 1209600 >/dev/null 2>&1; then
+      log "已把备份结果写入 Redis（${kind} ok=${state}）"
+      return 0
+    fi
+  elif command -v redis-cli >/dev/null 2>&1 \
+      && redis-cli -u "${BACKUP_REDIS_URL:-redis://127.0.0.1:6379/0}" \
+           SET "$REDIS_RESULT_KEY" "$json" EX 1209600 >/dev/null 2>&1; then
+    log "已把备份结果写入 Redis（${kind} ok=${state}）"
+    return 0
+  fi
+  warn "把备份结果写入 Redis 失败：控制台将看不到备份状态通知（不影响备份本身与 pushgateway 告警）"
+  return 1
+}
+
 # ---------------------------------------------------------------- 备份执行
 
 pg_dump_to() {
@@ -204,6 +230,7 @@ do_daily() {
   now="$(date +%s)"
   log "每日备份耗时 $((now - start)) 秒"
   FAILED_KIND=""
+  report_redis_result daily true "每日备份成功" || true
   if report_success daily tgcc_last_successful_backup_timestamp_seconds "$now" "$((now - start))"; then
     return 0
   fi
@@ -219,6 +246,7 @@ do_base() {
   now="$(date +%s)"
   log "基础备份耗时 $((now - start)) 秒"
   FAILED_KIND=""
+  report_redis_result base true "基础备份成功" || true
   if report_success base tgcc_last_successful_basebackup_timestamp_seconds "$now" "$((now - start))"; then
     return 0
   fi
@@ -265,6 +293,7 @@ on_error() {
       daily) report_failure daily tgcc_last_successful_backup_timestamp_seconds ;;
       base) report_failure base tgcc_last_successful_basebackup_timestamp_seconds ;;
     esac
+    report_redis_result "$FAILED_KIND" false "备份脚本异常中断（第 $line 行）" || true
   fi
   exit 1
 }
@@ -284,6 +313,7 @@ usage() {
   BACKUP_KEEP_DAILY=7         保留几个日备
   BACKUP_KEEP_WEEKLY=4        保留几个周备
   BACKUP_PUSHGATEWAY_URL=...  上报地址；留空按「服务名 -> 宿主端口」顺序自动尝试
+  BACKUP_REDIS_URL=...       direct 模式的 Redis 地址（把备份结果写给控制台通知流，默认 redis://127.0.0.1:6379/0）
   PGHOST/PGPORT/PGUSER/PGPASSWORD   direct 模式直连参数
 USAGE
 }
@@ -302,17 +332,17 @@ main() {
   case "$BACKUP_KIND" in
     daily)
       FAILED_KIND=daily
-      do_daily || { report_failure daily tgcc_last_successful_backup_timestamp_seconds; err "每日备份失败，已上报 0"; exit 1; }
+      do_daily || { report_failure daily tgcc_last_successful_backup_timestamp_seconds; report_redis_result daily false "每日备份失败" || true; err "每日备份失败，已上报 0"; exit 1; }
       ;;
     base)
       FAILED_KIND=base
-      do_base || { report_failure base tgcc_last_successful_basebackup_timestamp_seconds; err "基础备份失败，已上报 0"; exit 1; }
+      do_base || { report_failure base tgcc_last_successful_basebackup_timestamp_seconds; report_redis_result base false "基础备份失败" || true; err "基础备份失败，已上报 0"; exit 1; }
       ;;
     all)
       FAILED_KIND=daily
-      do_daily || { report_failure daily tgcc_last_successful_backup_timestamp_seconds; err "每日备份失败，已上报 0"; exit 1; }
+      do_daily || { report_failure daily tgcc_last_successful_backup_timestamp_seconds; report_redis_result daily false "每日备份失败" || true; err "每日备份失败，已上报 0"; exit 1; }
       FAILED_KIND=base
-      do_base || { report_failure base tgcc_last_successful_basebackup_timestamp_seconds; err "基础备份失败，已上报 0"; exit 1; }
+      do_base || { report_failure base tgcc_last_successful_basebackup_timestamp_seconds; report_redis_result base false "基础备份失败" || true; err "基础备份失败，已上报 0"; exit 1; }
       ;;
   esac
   FAILED_KIND=""

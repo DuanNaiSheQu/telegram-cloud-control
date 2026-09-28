@@ -8,14 +8,15 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session, visible_account_ids
-from app.api.routers import account_label, user_label
+from app.api.routers import account_label, build_order_by, ensure_utc, user_label
 from app.core.audit import ACTION_LABELS
 from app.models import AuditLog, TgAccount, User
 from app.schemas import AuditListResponse, AuditOut
@@ -23,6 +24,14 @@ from app.schemas import AuditListResponse, AuditOut
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/audit", tags=["audit"])
+
+#: 审计列表允许的排序字段（白名单）
+AUDIT_SORT_FIELDS = {
+    "created_at": AuditLog.created_at,
+    "updated_at": AuditLog.updated_at,
+    "action": AuditLog.action,
+    "target_type": AuditLog.target_type,
+}
 
 
 @router.get("", response_model=AuditListResponse, summary="审计列表")
@@ -33,6 +42,12 @@ async def list_audit(
     user_id: Optional[uuid.UUID] = Query(default=None),
     account_id: Optional[uuid.UUID] = Query(default=None),
     bot_id: Optional[uuid.UUID] = Query(default=None),
+    from_: Optional[datetime] = Query(
+        default=None, alias="from", description="ISO8601，created_at >= from（含）"
+    ),
+    to: Optional[datetime] = Query(default=None, description="ISO8601，created_at <= to（含）"),
+    sort: Optional[str] = Query(default=None, description="排序字段，见 AUDIT_SORT_FIELDS"),
+    order: Optional[str] = Query(default=None, description="asc | desc，默认 desc"),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AuditListResponse:
@@ -49,14 +64,32 @@ async def list_audit(
         conditions.append(AuditLog.account_id == account_id)
     if bot_id is not None:
         conditions.append(AuditLog.bot_id == bot_id)
+    if from_ is not None or to is not None:
+        start, end = ensure_utc(from_), ensure_utc(to)
+        if start is not None and end is not None and start > end:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="时间范围不合法：from 不能晚于 to"
+            )
+        if start is not None:
+            conditions.append(AuditLog.created_at >= start)
+        if end is not None:
+            conditions.append(AuditLog.created_at <= end)
 
     total = await session.scalar(select(func.count()).select_from(AuditLog).where(*conditions))
+    order_by = build_order_by(
+        sort=sort,
+        order=order,
+        mapping=AUDIT_SORT_FIELDS,
+        default_field="created_at",
+        default_order="desc",
+        tiebreaker=AuditLog.id,
+    )
     logs = list(
         (
             await session.scalars(
                 select(AuditLog)
                 .where(*conditions)
-                .order_by(AuditLog.created_at.desc())
+                .order_by(*order_by)
                 .offset((page - 1) * page_size)
                 .limit(page_size)
             )

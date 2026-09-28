@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app import security
 from app.api.deps import (
@@ -24,16 +25,33 @@ from app.api.deps import (
     scope_clause,
     visible_account_ids,
 )
-from app.api.routers import account_out, enum_value, publish_task_safely, utcnow
+from app.api.routers import (
+    account_out,
+    build_order_by,
+    dialog_out,
+    enum_value,
+    group_out,
+    message_out,
+    proxy_out,
+    publish_task_safely,
+    task_out,
+    unloaded_attr,
+    user_label,
+    utcnow,
+)
 from app.core import events, leases
-from app.core.audit import write_audit
+from app.core.audit import ACTION_LABELS, write_audit
 from app.core.tasks import enqueue_task
 from app.models import (
     ACCOUNT_STATUS_LABELS,
     AccountGroup,
     AccountStatus,
+    AuditLog,
     CurrentTask,
+    Dialog,
+    DialogKind,
     Lease,
+    Message,
     Proxy,
     Task,
     TaskStatus,
@@ -46,14 +64,19 @@ from app.schemas import (
     AccountCreate,
     AccountListResponse,
     AccountOut,
+    AccountOverviewOut,
     AccountSummary,
     AccountUpdate,
+    AuditOut,
     CheckRequest,
     CheckResultOut,
+    DialogStats,
+    LeaseDetail,
     LoginCodeRequest,
     LoginPasswordRequest,
     LoginStartRequest,
     LoginStepResponse,
+    TaskStats,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +85,27 @@ router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 #: 一次「全部检测」最多排队多少个号，防止误点把任务表灌爆
 MAX_CHECK_BATCH = 1000
+
+#: 账号列表允许的排序字段（白名单，避免拿任意列排序）
+ACCOUNT_SORT_FIELDS = {
+    "created_at": TgAccount.created_at,
+    "updated_at": TgAccount.updated_at,
+    "phone_masked": TgAccount.phone_masked,
+    "username": TgAccount.username,
+    "display_name": TgAccount.display_name,
+    "status": TgAccount.status,
+    "current_task": TgAccount.current_task,
+    "age_days": TgAccount.age_days,
+    "group_count": TgAccount.group_count,
+    "last_heartbeat": TgAccount.last_heartbeat,
+    "last_checked_at": TgAccount.last_checked_at,
+}
+
+#: 详情聚合抽屉每块的条数
+OVERVIEW_DIALOG_LIMIT = 20
+OVERVIEW_MESSAGE_LIMIT = 50
+OVERVIEW_TASK_LIMIT = 20
+OVERVIEW_AUDIT_LIMIT = 20
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -88,8 +132,22 @@ async def _load_account(session: AsyncSession, account_id: uuid.UUID) -> TgAccou
 
 
 async def _reload_account(session: AsyncSession, account_id: uuid.UUID) -> TgAccount:
-    """重新查一次，让 lazy="joined" 的 group / proxy 关系一起加载（否则出参里 group_name 会是空）。"""
-    return await _load_account(session, account_id)
+    """改完后重新查一次，返回最新值。
+
+    注意：group / proxy 关系在首次查询后就缓存进 identity map，改完再查不会刷新，
+    PATCH 响应会「滞后一拍」返回改前的关系数据（DB 其实已生效）。这里用
+    populate_existing + joinedload 强制用库里最新值覆盖。
+    """
+    await _load_account(session, account_id)
+    account = await session.scalar(
+        select(TgAccount)
+        .where(TgAccount.id == account_id)
+        .options(joinedload(TgAccount.group), joinedload(TgAccount.proxy))
+        .execution_options(populate_existing=True)
+    )
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在")
+    return account
 
 
 async def _find_by_phone(session: AsyncSession, phone: str) -> Optional[TgAccount]:
@@ -194,6 +252,8 @@ async def list_accounts(
     current_task: Optional[CurrentTask] = Query(default=None),
     phone: Optional[str] = Query(default=None, description="按脱敏手机号模糊匹配"),
     keyword: Optional[str] = Query(default=None, description="手机号 / 用户名 / 显示名模糊匹配"),
+    sort: Optional[str] = Query(default=None, description="排序字段，见 ACCOUNT_SORT_FIELDS"),
+    order: Optional[str] = Query(default=None, description="asc | desc，默认 desc"),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> AccountListResponse:
@@ -226,10 +286,18 @@ async def list_accounts(
     total = await session.scalar(
         select(func.count()).select_from(TgAccount).where(*conditions)
     )
+    order_by = build_order_by(
+        sort=sort,
+        order=order,
+        mapping=ACCOUNT_SORT_FIELDS,
+        default_field="created_at",
+        default_order="desc",
+        tiebreaker=TgAccount.id,
+    )
     rows = await session.scalars(
         select(TgAccount)
         .where(*conditions)
-        .order_by(TgAccount.created_at.desc())
+        .order_by(*order_by)
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
@@ -308,6 +376,154 @@ async def get_account(
     account = await _load_account(session, account_id)
     lease_map = await leases.lease_holders(session, [account.id])
     return account_out(account, lease_map.get(account.id))
+
+
+@router.get("/{account_id}/overview", response_model=AccountOverviewOut, summary="账号详情聚合（右侧抽屉）")
+async def account_overview(
+    account_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> AccountOverviewOut:
+    """一次给出抽屉需要的全部数据：账号 + 分组 / 代理 + 租约 + 统计 + 最近若干行明细。
+
+    越权访问未分配的号一律 403，账号不存在 404。明细只给「最近 N 条」
+    （`OVERVIEW_*_LIMIT`），翻更早的历史请用各自的列表接口，避免抽屉变成全表扫描。
+    """
+    await assert_account_access(session, user, account_id)
+    account = await _load_account(session, account_id)
+    now = utcnow()
+
+    # ---- 租约 ----
+    lease_row = await session.scalar(select(Lease).where(Lease.account_id == account.id))
+    lease_out: Optional[LeaseDetail] = None
+    if lease_row is not None:
+        lease_out = LeaseDetail(
+            worker_id=lease_row.worker_id,
+            lease_until=lease_row.lease_until,
+            last_heartbeat=lease_row.last_heartbeat,
+            active=bool(lease_row.lease_until and lease_row.lease_until > now),
+        )
+
+    # ---- 分组 / 代理（AccountOut 里只有名字和 endpoint，抽屉要完整对象）----
+    group = unloaded_attr(account, "group")
+    proxy = unloaded_attr(account, "proxy")
+    group_item = None
+    if isinstance(group, AccountGroup):
+        group_count = await session.scalar(
+            select(func.count()).select_from(TgAccount).where(TgAccount.group_id == group.id)
+        )
+        group_item = group_out(group, int(group_count or 0))
+    proxy_item = None
+    if isinstance(proxy, Proxy):
+        proxy_count = await session.scalar(
+            select(func.count()).select_from(TgAccount).where(TgAccount.proxy_id == proxy.id)
+        )
+        proxy_item = proxy_out(proxy, int(proxy_count or 0))
+
+    # ---- 会话统计 ----
+    dialog_stats = DialogStats()
+    dialog_rows = await session.execute(
+        select(Dialog.kind, func.count()).where(Dialog.account_id == account.id).group_by(Dialog.kind)
+    )
+    for kind_value, count in dialog_rows.all():
+        amount = int(count or 0)
+        dialog_stats.total += amount
+        label = enum_value(kind_value)
+        if label == DialogKind.group.value:
+            dialog_stats.group = amount
+        elif label == DialogKind.private.value:
+            dialog_stats.private = amount
+    dialog_stats.unread = int(
+        await session.scalar(
+            select(func.count())
+            .select_from(Dialog)
+            .where(Dialog.account_id == account.id, Dialog.unread_count > 0)
+        )
+        or 0
+    )
+
+    # ---- 任务统计（按状态分桶，缺的保持 0）----
+    task_stats = TaskStats()
+    task_rows = await session.execute(
+        select(Task.status, func.count()).where(Task.account_id == account.id).group_by(Task.status)
+    )
+    for status_value, count in task_rows.all():
+        label = enum_value(status_value)
+        if hasattr(task_stats, label):
+            setattr(task_stats, label, int(count or 0))
+
+    # ---- 最近明细 ----
+    dialogs = list(
+        (
+            await session.scalars(
+                select(Dialog)
+                .where(Dialog.account_id == account.id)
+                .order_by(Dialog.last_message_at.desc().nullslast(), Dialog.created_at.desc())
+                .limit(OVERVIEW_DIALOG_LIMIT)
+            )
+        ).all()
+    )
+    dialog_ids = select(Dialog.id).where(Dialog.account_id == account.id)
+    messages = list(
+        (
+            await session.scalars(
+                select(Message)
+                .where(Message.dialog_id.in_(dialog_ids))
+                .order_by(Message.created_at.desc(), Message.id.desc())
+                .limit(OVERVIEW_MESSAGE_LIMIT)
+            )
+        ).all()
+    )
+    tasks = list(
+        (
+            await session.scalars(
+                select(Task)
+                .where(Task.account_id == account.id)
+                .order_by(Task.created_at.desc())
+                .limit(OVERVIEW_TASK_LIMIT)
+            )
+        ).all()
+    )
+    audit_rows = list(
+        (
+            await session.scalars(
+                select(AuditLog)
+                .where(AuditLog.account_id == account.id)
+                .order_by(AuditLog.created_at.desc())
+                .limit(OVERVIEW_AUDIT_LIMIT)
+            )
+        ).all()
+    )
+    audit_user_ids = {item.user_id for item in audit_rows if item.user_id}
+    auditors = {
+        row.id: row
+        for row in (await session.scalars(select(User).where(User.id.in_(audit_user_ids)))).all()
+    } if audit_user_ids else {}
+
+    audit_items: List[AuditOut] = []
+    for log in audit_rows:
+        item = AuditOut.model_validate(log)
+        item.action_label = ACTION_LABELS.get(log.action, log.action)
+        item.user_name = user_label(auditors.get(log.user_id)) if log.user_id else None
+        item.account_label = account.phone_masked
+        audit_items.append(item)
+
+    lease_hint = (
+        {"worker_id": lease_row.worker_id, "lease_until": lease_row.lease_until} if lease_row else None
+    )
+    return AccountOverviewOut(
+        account=account_out(account, lease_hint),
+        group=group_item,
+        proxy=proxy_item,
+        lease=lease_out,
+        dialog_stats=dialog_stats,
+        task_stats=task_stats,
+        recent_dialogs=[dialog_out(item) for item in dialogs],
+        recent_messages=[message_out(item) for item in messages],
+        recent_tasks=[task_out(item, account) for item in tasks],
+        recent_audit=audit_items,
+        generated_at=now,
+    )
 
 
 @router.patch("/{account_id}", response_model=AccountOut, summary="修改账号（分组 / 代理 / 备注 / 显示名 / 状态）")

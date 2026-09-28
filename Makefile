@@ -130,9 +130,16 @@ smoke:
 e2e:
 	$(PY) scripts/e2e_check.py
 
+## 控制台新接口验收：批量/导出/详情聚合/趋势/通知/排序搜索（需先 make stack-up）
+console-check:
+	cd backend && .venv/bin/python -m tests.console_api
+	cd backend && .venv/bin/python -m tests.console_extra
+	cd backend && .venv/bin/python -m tests.console_delete
+	cd backend && .venv/bin/python -m tests.console_filter
+
 ## 静态校验部署产物（compose / 告警规则 / .env.example / nginx）
 config-check:
 	$(PY) scripts/check_stack_config.py
 
 .PHONY: help up down logs ps migrate revision admin monitoring backup restore dev-api dev-worker dev-web psql check \
-	stack-up stack-down stack-status smoke e2e config-check
+	stack-up stack-down stack-status smoke e2e console-check config-check

@@ -46,6 +46,18 @@ class WebhookToggleRequest(BaseModel):
     enable: bool = True
 
 
+class RelayTestRequest(BaseModel):
+    """用某个 Bot 往指定员工聊天发一条测试消息（保存规则之前也能先试）。"""
+
+    bot_id: uuid.UUID
+    chat_id: int
+    text: Optional[str] = None
+
+
+#: 测试消息默认文案
+RELAY_TEST_TEXT = "这是一条测试消息（Telegram 云控）"
+
+
 class RelayLinkListResponse(BaseModel):
     """转发记录分页；单独定义是为了让 OpenAPI 里有完整 schema（前端直接生成类型）。"""
 
@@ -453,7 +465,8 @@ async def delete_relay(
     if route is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="转发规则不存在")
     name = route.name or str(route.id)[:8]
-    session.delete(route)
+    # AsyncSession.delete 是协程：忘了 await 会静默不删（照样回 200、照样写审计），必须 await
+    await session.delete(route)
     await write_audit(
         session,
         action="relay.delete",
@@ -464,6 +477,63 @@ async def delete_relay(
     )
     await session.commit()
     return {"ok": True, "message": f"已删除转发规则「{name}」"}
+
+
+@router.post("/test", summary="用指定 Bot 发一条测试消息到员工聊天")
+async def test_relay(
+    payload: RelayTestRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin),
+) -> dict:
+    """转发规则「测试」按钮：不依赖已保存的规则，保存前也能先试通。
+
+    只发**一条**测试消息到指定的员工聊天（不会碰任何用户号、也不会群发），
+    失败一律给人能看懂的中文：Bot 不存在 / Token 解不开 → 400，Telegram 拒绝（不在群里、
+    没和 Bot 说过话、被拉黑等）→ 409。
+    """
+    bot_row = await session.scalar(select(Bot).where(Bot.id == payload.bot_id))
+    if bot_row is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bot 不存在，请刷新 Bot 列表后重试")
+
+    text = (payload.text or "").strip() or RELAY_TEST_TEXT
+    if len(text) > 4096:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="测试消息太长了：最多 4096 个字符")
+
+    runtime = await manager.ensure_runtime(bot_row)
+    if runtime is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bot 运行时不可用：Token 无法解密，请到 Bot 管理里重新保存 Token",
+        )
+    try:
+        sent = await manager.send_text(runtime, payload.chat_id, text)
+    except manager.BotSendError as exc:
+        # Telegram 侧的「当前状态不允许」：用 409 更贴切（员工看到中文原因知道怎么办）
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001 - 网络/上游异常也要给中文，不抛 500
+        logger.warning("测试消息发送失败 bot_id=%s chat_id=%s: %s", bot_row.id, payload.chat_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"测试消息发送失败：{type(exc).__name__}: {exc}",
+        ) from exc
+
+    await write_audit(
+        session,
+        action="relay.test",
+        user_id=admin.id,
+        bot_id=bot_row.id,
+        target_type="relay_test",
+        target_id=str(payload.chat_id),
+        detail={"chat_id": payload.chat_id, "staff_message_id": sent.message_id, "preview": text[:80]},
+    )
+    await session.commit()
+    logger.info("测试消息已发出 bot_id=%s chat_id=%s message_id=%s", bot_row.id, payload.chat_id, sent.message_id)
+    return {
+        "ok": True,
+        "message": f"测试消息已发到 {payload.chat_id}",
+        "detail": "如果员工群没收到，确认 Bot 在群里、且群里发过 /start 或已被设为管理员",
+        "staff_message_id": sent.message_id,
+    }
 
 
 @router.get("/links", response_model=RelayLinkListResponse, summary="转发记录（原消息 ↔ 员工群那条）")
@@ -503,6 +573,7 @@ async def list_relay_links(
         item.origin_body = (message.body or "")[:500] or None
         item.origin_sender_name = message.sender_name or None
         item.origin_dialog_title = dialog.title or None
+        item.origin_dialog_id = dialog.id
         item.account_label = account_label(account) if account is not None else None
         item.origin_created_at = message.created_at
         items.append(item)

@@ -1,22 +1,12 @@
+/**
+ * Bot 管理页：Bot 列表（名称/@username/Token 掩码/Webhook 状态与注册时间/自动回复开关/转发目标）
+ * + 新建/编辑/删除 + 重新校验（getMe）+ 注册/删除 Webhook + persona 资料编辑（字数与示例模板）。
+ * - 新建/换 Token 失败（假 Token → 后端 400 中文原因）在表单内展示，页面不崩；
+ * - getMe 校验失败的无效 Token 行显式标黄（useBotHealth 页内体检）；
+ * - Token 安全提示（加密保存、只在服务端解密）。
+ */
 import { useState } from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Popconfirm,
-  Select,
-  Space,
-  Switch,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
+import { Button, Space, Switch, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   CheckCircleOutlined,
@@ -25,33 +15,47 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SyncOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
+import {
+  ConfirmModal,
+  CopyableText,
+  DataTable,
+  PageContainer,
+  RelativeTime,
+  SoftTag,
+} from '../components';
 import { botApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
-import { RELAY_TARGET_KIND_OPTIONS } from '../constants';
-import { formatTime } from '../utils/format';
-import { notifySuccess } from '../utils/feedback';
-import type { BotCreate, BotOut, RelayTargetKind } from '../api/types';
+import { formatNumber } from '../utils/format';
+import { notifySuccess, toast } from '../utils/feedback';
+import { useAuth } from '../auth/AuthContext';
+import type { BotOut } from '../api/types';
+import { BotFormModal } from '../features/bots/BotFormModal';
+import { PersonaModal } from '../features/bots/PersonaModal';
+import { setBotHealthCache, useBotHealth } from '../features/bots/useBotHealth';
 
-/**
- * Bot 管理独立成页（不在 Bot 转发页做 Tab）：Token 掩码、Webhook 状态、
- * 自动回复开关和 persona 都在这里维护，转发规则在「Bot 转发」页。
- */
 export default function Bots() {
+  const { isAdmin } = useAuth();
   const bots = useAsyncData(() => botApi.list(), []);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<BotOut | null>(null);
   const [personaBot, setPersonaBot] = useState<BotOut | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BotOut | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [healthVersion, setHealthVersion] = useState(0);
+
+  const health = useBotHealth(bots.data ?? [], isAdmin, healthVersion);
 
   const handleWebhook = async (bot: BotOut, enable: boolean) => {
     setBusyId(bot.id);
     try {
       const res = await botApi.webhook(bot.id, enable);
-      notifySuccess(res.message || res.detail || (enable ? 'Webhook 已注册' : 'Webhook 已删除'));
+      notifySuccess(res.message || (enable ? 'Webhook 已注册' : 'Webhook 已删除'));
       void bots.reload();
     } catch {
-      /* client 已统一提示 */
+      /* client 已统一中文提示（后端 detail 带 Telegram 原始原因） */
     } finally {
       setBusyId(null);
     }
@@ -61,12 +65,31 @@ export default function Bots() {
     setBusyId(bot.id);
     try {
       const res = await botApi.check(bot.id);
+      setBotHealthCache(bot.id, 'ok');
+      setHealthVersion((v) => v + 1);
       notifySuccess(`校验通过：${res.bot_username ? `@${res.bot_username}` : res.name}`);
       void bots.reload();
     } catch {
-      /* client 已统一提示 */
+      setBotHealthCache(bot.id, 'invalid');
+      setHealthVersion((v) => v + 1);
+      toast.warning('校验失败：该 Token 可能已失效，详见行内标黄提示');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await botApi.remove(deleteTarget.id);
+      notifySuccess(res.message || 'Bot 已删除');
+      setDeleteTarget(null);
+      void bots.reload();
+    } catch {
+      /* client 已统一中文提示 */
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -74,199 +97,232 @@ export default function Bots() {
     {
       title: '名称',
       dataIndex: 'name',
-      width: 150,
-      render: (value: string, record) => (
-        <Space direction="vertical" size={0}>
-          <span>{value}</span>
-          {record.bot_tg_id ? (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              ID {record.bot_tg_id}
-            </Typography.Text>
-          ) : null}
-        </Space>
-      ),
+      width: 190,
+      render: (value: string, record) => {
+        const invalid = health[record.id] === 'invalid';
+        return (
+          <div className="tg-stack">
+            <Space size={6} wrap>
+              <span>{value}</span>
+              {invalid ? (
+                <Tooltip title="getMe 校验失败：Token 无效或已被撤销，请重新保存 Token 或到 BotFather 重新签发">
+                  <SoftTag tone="warning">Token 失效</SoftTag>
+                </Tooltip>
+              ) : health[record.id] === 'checking' ? (
+                <SoftTag tone="neutral">校验中…</SoftTag>
+              ) : null}
+            </Space>
+            {record.bot_tg_id ? (
+              <Typography.Text type="secondary" className="ellipsis">
+                ID {record.bot_tg_id}
+              </Typography.Text>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       title: '@username',
       dataIndex: 'bot_username',
-      width: 160,
+      width: 150,
       render: (value: string | null) =>
         value ? (
           <Typography.Text code>@{value}</Typography.Text>
         ) : (
           <Tooltip title="Token 校验成功后由 getMe 回填">
-            <Tag>未校验</Tag>
+            <SoftTag tone="neutral">未校验</SoftTag>
           </Tooltip>
         ),
     },
     {
-      title: 'Token',
+      title: 'Token 掩码',
       dataIndex: 'token_masked',
-      width: 170,
-      render: (value: string) => <Typography.Text code>{value || '—'}</Typography.Text>,
+      width: 180,
+      render: (value: string) =>
+        value ? (
+          <CopyableText value={value} mono tooltip="加密保存，接口只回掩码；明文只在服务端解密" />
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Webhook',
       key: 'webhook',
-      width: 220,
+      width: 230,
       render: (_: unknown, record) => (
-        <Space direction="vertical" size={2}>
-          <Tag color={record.webhook_enabled ? 'green' : 'default'}>
+        <div className="tg-stack">
+          <SoftTag tone={record.webhook_enabled ? 'success' : 'neutral'}>
             {record.webhook_enabled ? '已注册' : '未注册'}
-          </Tag>
+          </SoftTag>
           {record.webhook_url ? (
             <Tooltip title={record.webhook_url}>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }} className="ellipsis">
+              <Typography.Text type="secondary" className="ellipsis" style={{ maxWidth: 200 }}>
                 {record.webhook_url}
               </Typography.Text>
             </Tooltip>
           ) : null}
           {record.webhook_set_at ? (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              设置于 {formatTime(record.webhook_set_at)}
+            <Typography.Text type="secondary">
+              注册于 <RelativeTime value={record.webhook_set_at} />
             </Typography.Text>
           ) : null}
-        </Space>
+        </div>
       ),
     },
     {
       title: '自动回复',
       dataIndex: 'auto_reply_enabled',
-      width: 110,
+      width: 100,
       render: (value: boolean, record) => (
-        <Switch
-          size="small"
-          checked={value}
-          onChange={async (checked) => {
-            try {
-              await botApi.update(record.id, { auto_reply_enabled: checked });
-              notifySuccess(checked ? '自动回复已开启' : '自动回复已关闭');
-              void bots.reload();
-            } catch {
-              /* client 已统一提示 */
-            }
-          }}
-        />
+        <Tooltip title={isAdmin ? undefined : '仅管理员可操作'}>
+          <Switch
+            size="small"
+            checked={value}
+            disabled={!isAdmin}
+            onChange={async (checked) => {
+              try {
+                await botApi.update(record.id, { auto_reply_enabled: checked });
+                notifySuccess(checked ? '自动回复已开启' : '自动回复已关闭');
+                void bots.reload();
+              } catch {
+                /* client 已统一中文提示 */
+              }
+            }}
+          />
+        </Tooltip>
       ),
     },
     {
-      title: '转发到员工群',
-      dataIndex: 'relay_enabled',
-      width: 130,
-      render: (value: boolean, record) =>
-        value ? (
-          <Tooltip title={`chat_id ${record.relay_target_chat_id ?? '未设置'}`}>
-            <Tag color="blue">已开启</Tag>
-          </Tooltip>
+      title: '转发目标',
+      key: 'relay',
+      width: 170,
+      render: (_: unknown, record) =>
+        record.relay_enabled ? (
+          <div className="tg-stack">
+            <SoftTag tone="primary">
+              转发到 {record.relay_target_kind === 'private' ? '私聊' : '群聊'}
+            </SoftTag>
+            {record.relay_target_chat_id ? (
+              <CopyableText value={record.relay_target_chat_id} mono />
+            ) : (
+              <Typography.Text type="secondary">chat_id 未设置</Typography.Text>
+            )}
+          </div>
         ) : (
-          <Tag>未开启</Tag>
+          <SoftTag tone="neutral">未开启</SoftTag>
         ),
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
-      width: 170,
-      render: (value: string | null) => formatTime(value),
+      width: 140,
+      render: (value: string | null) => <RelativeTime value={value} />,
     },
     {
       title: '操作',
       key: 'actions',
-      width: 340,
+      width: 330,
+      fixed: 'right',
       render: (_: unknown, record) => (
-        <Space wrap>
-          <Button
-            size="small"
-            icon={<SyncOutlined />}
-            loading={busyId === record.id}
-            onClick={() => void handleCheck(record)}
-          >
-            重新校验
-          </Button>
-          {record.webhook_enabled ? (
+        <Space size="small" wrap>
+          <Tooltip title={isAdmin ? '重新 getMe 校验 Token' : '仅管理员可操作'}>
+            <Button
+              size="small"
+              icon={<SyncOutlined />}
+              disabled={!isAdmin}
+              loading={busyId === record.id}
+              onClick={() => void handleCheck(record)}
+            >
+              重新校验
+            </Button>
+          </Tooltip>
+          <Tooltip title={isAdmin ? undefined : '仅管理员可操作'}>
             <Button
               size="small"
               icon={<CheckCircleOutlined />}
+              disabled={!isAdmin}
               loading={busyId === record.id}
-              onClick={() => void handleWebhook(record, false)}
+              onClick={() => void handleWebhook(record, !record.webhook_enabled)}
             >
-              删除 Webhook
+              {record.webhook_enabled ? '删除 Webhook' : '注册 Webhook'}
             </Button>
-          ) : (
+          </Tooltip>
+          <Button size="small" icon={<UserOutlined />} onClick={() => setPersonaBot(record)}>
+            资料
+          </Button>
+          <Tooltip title={isAdmin ? undefined : '仅管理员可操作'}>
+            <Button size="small" icon={<EditOutlined />} disabled={!isAdmin} onClick={() => setEditing(record)}>
+              编辑
+            </Button>
+          </Tooltip>
+          <Tooltip title={isAdmin ? undefined : '仅管理员可操作'}>
             <Button
               size="small"
-              icon={<CheckCircleOutlined />}
-              loading={busyId === record.id}
-              onClick={() => void handleWebhook(record, true)}
+              danger
+              icon={<DeleteOutlined />}
+              disabled={!isAdmin}
+              onClick={() => setDeleteTarget(record)}
             >
-              注册 Webhook
-            </Button>
-          )}
-          <Button size="small" onClick={() => setPersonaBot(record)}>
-            自动回复资料
-          </Button>
-          <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(record)}>
-            编辑
-          </Button>
-          <Popconfirm
-            title="删除这个 Bot？"
-            description="删除后它的转发规则和自动回复都会失效。"
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-            onConfirm={async () => {
-              try {
-                const res = await botApi.remove(record.id);
-                notifySuccess(res.message || 'Bot 已删除');
-                void bots.reload();
-              } catch {
-                /* client 已统一提示 */
-              }
-            }}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />}>
               删除
             </Button>
-          </Popconfirm>
+          </Tooltip>
         </Space>
       ),
     },
   ];
 
+  const invalidCount = (bots.data ?? []).filter((item) => health[item.id] === 'invalid').length;
+
   return (
-    <div>
-      <Card
-        title="Bot 管理"
-        extra={
-          <Space>
-            <Button icon={<ReloadOutlined />} loading={bots.loading} onClick={() => void bots.reload()}>
-              刷新
+    <PageContainer
+      title="Bot 管理"
+      description="Bot Token 加密保存（只回掩码）；Webhook 注册与自动回复资料在这里维护，转发规则在「Bot 转发」页。"
+      actions={
+        <Space>
+          <Button icon={<ReloadOutlined />} loading={bots.loading} onClick={() => void bots.reload()}>
+            刷新
+          </Button>
+          <Tooltip title={isAdmin ? undefined : '仅管理员可新建 Bot'}>
+            <Button type="primary" icon={<PlusOutlined />} disabled={!isAdmin} onClick={() => setCreateOpen(true)}>
+              新建 Bot
             </Button>
+          </Tooltip>
+        </Space>
+      }
+    >
+      <DataTable<BotOut>
+        rowKey="id"
+        columns={columns}
+        dataSource={bots.data ?? []}
+        loading={bots.loading}
+        error={bots.error}
+        onRetry={() => void bots.reload()}
+        columnSettingsKey="bots"
+        scrollX={1560}
+        onRow={(record) => ({
+          style:
+            health[record.id] === 'invalid'
+              ? { background: 'var(--tg-color-warning-bg)' }
+              : undefined,
+        })}
+        title={
+          invalidCount > 0 ? (
+            <span style={{ color: 'var(--tg-color-warning)' }}>
+              有 {formatNumber(invalidCount)} 个 Bot 的 Token 校验失败（已标黄），请重新保存 Token
+            </span>
+          ) : undefined
+        }
+        empty={{
+          art: 'list',
+          title: '还没有 Bot',
+          description: '用 BotFather 给的 Token 新建一个 Bot，就可以做转发与自动回复了。',
+          action: isAdmin ? (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
               新建 Bot
             </Button>
-          </Space>
-        }
-      >
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message="Token 用 BotFather 给的那串，加密保存后只回掩码（123456...abcd）；新建时会调 getMe 校验并注册 Webhook。"
-        />
-        {bots.error ? (
-          <Alert type="error" showIcon message={`Bot 列表加载失败：${bots.error}`} style={{ marginBottom: 12 }} />
-        ) : null}
-        <Table<BotOut>
-          size="small"
-          rowKey="id"
-          loading={bots.loading}
-          dataSource={bots.data ?? []}
-          columns={columns}
-          pagination={false}
-          scroll={{ x: 1700 }}
-          locale={{ emptyText: <Empty description="还没有 Bot，先用 Token 建一个" /> }}
-        />
-      </Card>
+          ) : undefined,
+        }}
+      />
 
       <BotFormModal
         open={createOpen || Boolean(editing)}
@@ -290,198 +346,17 @@ export default function Bots() {
           void bots.reload();
         }}
       />
-    </div>
-  );
-}
 
-interface BotForm {
-  name: string;
-  token?: string;
-  relay_enabled: boolean;
-  relay_target_chat_id?: number | null;
-  relay_target_kind: RelayTargetKind;
-  auto_reply_enabled: boolean;
-  persona_text?: string;
-  remark?: string;
-}
-
-function BotFormModal({
-  open,
-  bot,
-  onCancel,
-  onSuccess,
-}: {
-  open: boolean;
-  bot: BotOut | null;
-  onCancel: () => void;
-  onSuccess: () => void;
-}) {
-  const [form] = Form.useForm<BotForm>();
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleFinish = async (values: BotForm) => {
-    setSubmitting(true);
-    try {
-      if (bot) {
-        await botApi.update(bot.id, {
-          name: values.name.trim(),
-          // Token 留空 = 不改
-          ...(values.token ? { token: values.token.trim() } : {}),
-          relay_enabled: values.relay_enabled,
-          relay_target_chat_id: values.relay_target_chat_id ?? null,
-          relay_target_kind: values.relay_target_kind,
-          auto_reply_enabled: values.auto_reply_enabled,
-          persona_text: values.persona_text ?? '',
-          remark: values.remark ?? '',
-        });
-        notifySuccess('Bot 已更新');
-      } else {
-        const payload: BotCreate = {
-          name: values.name.trim(),
-          token: (values.token ?? '').trim(),
-          relay_enabled: values.relay_enabled,
-          relay_target_chat_id: values.relay_target_chat_id ?? null,
-          relay_target_kind: values.relay_target_kind,
-          auto_reply_enabled: values.auto_reply_enabled,
-          persona_text: values.persona_text ?? '',
-          remark: values.remark ?? '',
-        };
-        await botApi.create(payload);
-        notifySuccess('Bot 已创建，Webhook 已尝试注册');
-      }
-      onSuccess();
-    } catch {
-      /* client 已统一提示 */
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={bot ? `编辑 Bot：${bot.name}` : '新建 Bot'}
-      onCancel={onCancel}
-      onOk={() => form.submit()}
-      okText="保存"
-      cancelText="取消"
-      confirmLoading={submitting}
-      width={560}
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={handleFinish}
-        key={bot?.id ?? 'new'}
-        initialValues={{
-          name: bot?.name ?? '',
-          relay_enabled: bot?.relay_enabled ?? false,
-          relay_target_chat_id: bot?.relay_target_chat_id ?? null,
-          relay_target_kind: bot?.relay_target_kind ?? 'group',
-          auto_reply_enabled: bot?.auto_reply_enabled ?? false,
-          persona_text: bot?.persona_text ?? '',
-          remark: bot?.remark ?? '',
-        }}
-      >
-        <Form.Item label="名称" name="name" rules={[{ required: true, message: '请输入名称' }]}>
-          <Input placeholder="例如：客服Bot" allowClear />
-        </Form.Item>
-        <Form.Item
-          label={bot ? 'Token（留空表示不修改）' : 'Token'}
-          name="token"
-          rules={bot ? [] : [{ required: true, message: '请输入 BotFather 给的 Token' }]}
-          extra="形如 123456789:AA...；不会回显明文，只显示掩码。"
-        >
-          <Input.Password placeholder="123456789:AA..." autoComplete="new-password" />
-        </Form.Item>
-        <Space size="middle" style={{ display: 'flex' }} align="start">
-          <Form.Item label="转发到员工群" name="relay_enabled" valuePropName="checked">
-            <Switch />
-          </Form.Item>
-          <Form.Item label="目标类型" name="relay_target_kind">
-            <Select style={{ width: 140 }} options={RELAY_TARGET_KIND_OPTIONS} />
-          </Form.Item>
-          <Form.Item label="员工群 chat_id" name="relay_target_chat_id">
-            <InputNumber style={{ width: 200 }} placeholder="-1001234567890" />
-          </Form.Item>
-        </Space>
-        <Form.Item label="自动回复" name="auto_reply_enabled" valuePropName="checked">
-          <Switch />
-        </Form.Item>
-        <Form.Item label="自动回复资料 persona_text" name="persona_text">
-          <Input.TextArea rows={4} placeholder="这个 Bot 的身份和说话方式，自动回复时喂给模型。" />
-        </Form.Item>
-        <Form.Item label="备注" name="remark">
-          <Input.TextArea rows={2} />
-        </Form.Item>
-      </Form>
-    </Modal>
-  );
-}
-
-function PersonaModal({
-  bot,
-  onCancel,
-  onSuccess,
-}: {
-  bot: BotOut | null;
-  onCancel: () => void;
-  onSuccess: () => void;
-}) {
-  const [form] = Form.useForm<{ persona_text: string; auto_reply_enabled: boolean }>();
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleFinish = async (values: { persona_text: string; auto_reply_enabled: boolean }) => {
-    if (!bot) return;
-    setSubmitting(true);
-    try {
-      await botApi.update(bot.id, {
-        persona_text: values.persona_text,
-        auto_reply_enabled: values.auto_reply_enabled,
-      });
-      notifySuccess('自动回复资料已保存');
-      onSuccess();
-    } catch {
-      /* client 已统一提示 */
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={Boolean(bot)}
-      title={`自动回复资料：${bot?.name ?? ''}`}
-      onCancel={onCancel}
-      onOk={() => form.submit()}
-      okText="保存"
-      cancelText="取消"
-      confirmLoading={submitting}
-      width={560}
-    >
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={handleFinish}
-        key={bot?.id}
-        initialValues={{
-          persona_text: bot?.persona_text ?? '',
-          auto_reply_enabled: bot?.auto_reply_enabled ?? false,
-        }}
-      >
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message="官方 Bot 按这份资料自动回复，对方看到的是 Bot 身份；资料和调用记录分开存放。"
-        />
-        <Form.Item label="开启自动回复" name="auto_reply_enabled" valuePropName="checked">
-          <Switch />
-        </Form.Item>
-        <Form.Item label="资料 persona_text" name="persona_text">
-          <Input.TextArea rows={8} placeholder="例如：你是某某公司的客服 Bot，只回答营业时间和地址，其它问题请对方留言。" />
-        </Form.Item>
-      </Form>
-    </Modal>
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        danger
+        loading={deleting}
+        title={`删除 Bot「${deleteTarget?.name ?? ''}」？`}
+        content="删除后它的 Webhook 会一并注销，关联的转发规则和自动回复都会失效。"
+        okText="删除"
+        onOk={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </PageContainer>
   );
 }

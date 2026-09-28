@@ -45,7 +45,6 @@ from app.models import (
 from app.services.inbound import preview_of, publish_message, upsert_dialog
 from app.worker import login as login_flow
 from app.worker import metrics
-from app.worker.campaign_tasks import CampaignTasksMixin
 from app.worker.handlers import MessageData, message_data_from_telethon, persist_message
 from app.worker.telethon_account import (
     AccountConnection,
@@ -101,11 +100,8 @@ class ClaimedTask:
         )
 
 
-class TaskRunner(CampaignTasksMixin):
-    """任务分派器：Worker 领到任务后交给它执行。
-
-    批量运营的 8 类 handler 在 `app.worker.campaign_tasks.CampaignTasksMixin` 里。
-    """
+class TaskRunner:
+    """任务分派器：Worker 领到任务后交给它执行。"""
 
     def __init__(self, worker: Any) -> None:
         self.worker = worker
@@ -119,14 +115,6 @@ class TaskRunner(CampaignTasksMixin):
             TaskType.login_start.value: self._login_start,
             TaskType.login_code.value: self._login_code,
             TaskType.login_password.value: self._login_password,
-            TaskType.bulk_pm.value: self._bulk_pm,
-            TaskType.group_broadcast.value: self._group_broadcast,
-            TaskType.material_send.value: self._material_send,
-            TaskType.join_group.value: self._join_group,
-            TaskType.leave_group.value: self._leave_group,
-            TaskType.force_add_member.value: self._force_add_member,
-            TaskType.storm_chat.value: self._storm_chat,
-            TaskType.persona_chat.value: self._persona_chat,
         }
 
     # ---------------- 执行入口 ----------------

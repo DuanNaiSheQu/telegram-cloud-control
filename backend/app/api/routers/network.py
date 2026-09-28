@@ -127,7 +127,8 @@ async def delete_proxy(
     """删代理不会删号：tg_accounts.proxy_id 外键是 ON DELETE SET NULL，号变成直连。"""
     proxy = await _get_proxy(session, proxy_id)
     name = proxy.name
-    session.delete(proxy)
+    # AsyncSession.delete 是协程：忘了 await 会静默不删（照样回 200、照样写审计），必须 await
+    await session.delete(proxy)
     await write_audit(
         session,
         action="proxy.delete",

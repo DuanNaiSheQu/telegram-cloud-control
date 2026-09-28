@@ -1,4 +1,426 @@
-/* 全局样式：控制台外壳 + 会话气泡 */
+/* =============================================================================
+ * Telegram 云控 控制台样式
+ *
+ * 换皮规则：所有颜色/间距/圆角/阴影/字体都走 CSS 变量 --tg-*。
+ * 变量真源是 src/theme/tokens.ts（运行时以 <html> 内联样式注入，优先级最高）。
+ * 下面的 :root / [data-theme='dark'] 只是 JS 执行前的首屏兜底副本，
+ * 由 tokens.ts 生成（重新生成的方法见 src/theme/README.md），不要手改数值。
+ * ========================================================================== */
+
+/* @tg-vars:light:start */
+/* 由 tokens.ts 生成，勿手改；重新生成见 src/theme/README.md */
+:root {
+  --tg-color-primary: #2aabee;
+  --tg-color-primary-hover: #4bb8f0;
+  --tg-color-primary-active: #1e97d6;
+  --tg-color-primary-bg: #eaf6fe;
+  --tg-color-primary-bg-hover: #dceffc;
+  --tg-color-primary-border: #a8dcf8;
+  --tg-color-on-primary: #ffffff;
+  --tg-color-gradient-from: #2aabee;
+  --tg-color-gradient-to: #229ed9;
+  --tg-color-bg-app: #f6f7f9;
+  --tg-color-bg-sider: #ffffff;
+  --tg-color-bg-sider-hover: #f2f5f9;
+  --tg-color-bg-sider-active: #e8f4fd;
+  --tg-color-bg-topbar: #ffffff;
+  --tg-color-bg-card: #ffffff;
+  --tg-color-bg-card-hover: #fafbfc;
+  --tg-color-bg-elevated: #ffffff;
+  --tg-color-bg-sunken: #f7f8fa;
+  --tg-color-bg-input: #ffffff;
+  --tg-color-bg-hover: rgba(16, 24, 40, 0.04);
+  --tg-color-bg-active: rgba(16, 24, 40, 0.07);
+  --tg-color-bg-selected: #e8f4fd;
+  --tg-color-bg-mask: rgba(16, 24, 40, 0.45);
+  --tg-color-bg-skeleton: rgba(16, 24, 40, 0.06);
+  --tg-color-scroll-thumb: rgba(16, 24, 40, 0.18);
+  --tg-color-scroll-thumb-hover: rgba(16, 24, 40, 0.3);
+  --tg-color-tooltip-bg: #101828;
+  --tg-color-tooltip-text: #ffffff;
+  --tg-color-skeleton-highlight: rgba(16, 24, 40, 0.1);
+  --tg-color-text-primary: #101828;
+  --tg-color-text-secondary: #475467;
+  --tg-color-text-tertiary: #667085;
+  --tg-color-text-disabled: #98a2b3;
+  --tg-color-text-inverse: #ffffff;
+  --tg-color-text-link: #1e97d6;
+  --tg-color-text-link-hover: #2aabee;
+  --tg-color-border: #e4e7ec;
+  --tg-color-border-strong: #d0d5dd;
+  --tg-color-border-subtle: #eef0f4;
+  --tg-color-border-focus: #2aabee;
+  --tg-color-divider: #eceff3;
+  --tg-color-success: #12a06a;
+  --tg-color-success-hover: #0f8b5c;
+  --tg-color-success-bg: #e6f7ef;
+  --tg-color-success-border: #b7e6d0;
+  --tg-color-warning: #d99a00;
+  --tg-color-warning-hover: #bf8800;
+  --tg-color-warning-bg: #fff7e6;
+  --tg-color-warning-border: #ffe0a3;
+  --tg-color-danger: #e5484d;
+  --tg-color-danger-hover: #cf3b40;
+  --tg-color-danger-bg: #fef3f2;
+  --tg-color-danger-border: #fecdca;
+  --tg-color-info: #2aabee;
+  --tg-color-info-bg: #eaf6fe;
+  --tg-color-info-border: #a8dcf8;
+  --tg-color-neutral: #667085;
+  --tg-color-neutral-bg: #f4f5f7;
+  --tg-color-neutral-border: #e4e7ec;
+  --tg-color-account-healthy-fg: #0f7b52;
+  --tg-color-account-healthy-bg: #e6f7ef;
+  --tg-color-account-healthy-border: #b7e6d0;
+  --tg-color-account-healthy-dot: #12a06a;
+  --tg-color-account-pending-fg: #9a6700;
+  --tg-color-account-pending-bg: #fff7e6;
+  --tg-color-account-pending-border: #ffe0a3;
+  --tg-color-account-pending-dot: #d99a00;
+  --tg-color-account-needs_code-fg: #b45309;
+  --tg-color-account-needs_code-bg: #fff2e8;
+  --tg-color-account-needs_code-border: #ffd8bf;
+  --tg-color-account-needs_code-dot: #f97316;
+  --tg-color-account-frozen-fg: #b42318;
+  --tg-color-account-frozen-bg: #fef3f2;
+  --tg-color-account-frozen-border: #fecdca;
+  --tg-color-account-frozen-dot: #e5484d;
+  --tg-color-account-invalid-fg: #93370d;
+  --tg-color-account-invalid-bg: #fdf1ec;
+  --tg-color-account-invalid-border: #f5cfc0;
+  --tg-color-account-invalid-dot: #d2603a;
+  --tg-color-account-dead-fg: #52606d;
+  --tg-color-account-dead-bg: #f1f3f5;
+  --tg-color-account-dead-border: #dfe3e8;
+  --tg-color-account-dead-dot: #8b95a1;
+  --tg-color-account-disabled-fg: #667085;
+  --tg-color-account-disabled-bg: #f4f5f7;
+  --tg-color-account-disabled-border: #e4e7ec;
+  --tg-color-account-disabled-dot: #98a2b3;
+  --tg-color-task-pending-fg: #0958d9;
+  --tg-color-task-pending-bg: #eaf2ff;
+  --tg-color-task-pending-border: #c7dcff;
+  --tg-color-task-pending-dot: #2f6fed;
+  --tg-color-task-pending_confirmation-fg: #9a6700;
+  --tg-color-task-pending_confirmation-bg: #fff7e6;
+  --tg-color-task-pending_confirmation-border: #ffe0a3;
+  --tg-color-task-pending_confirmation-dot: #d99a00;
+  --tg-color-task-running-fg: #0958d9;
+  --tg-color-task-running-bg: #eaf2ff;
+  --tg-color-task-running-border: #c7dcff;
+  --tg-color-task-running-dot: #2f6fed;
+  --tg-color-task-completed-fg: #0f7b52;
+  --tg-color-task-completed-bg: #e6f7ef;
+  --tg-color-task-completed-border: #b7e6d0;
+  --tg-color-task-completed-dot: #12a06a;
+  --tg-color-task-failed-fg: #b42318;
+  --tg-color-task-failed-bg: #fef3f2;
+  --tg-color-task-failed-border: #fecdca;
+  --tg-color-task-failed-dot: #e5484d;
+  --tg-color-task-cancelled-fg: #667085;
+  --tg-color-task-cancelled-bg: #f4f5f7;
+  --tg-color-task-cancelled-border: #e4e7ec;
+  --tg-color-task-cancelled-dot: #98a2b3;
+  --tg-color-chart1: #2aabee;
+  --tg-color-chart2: #12a06a;
+  --tg-color-chart3: #f79009;
+  --tg-color-chart4: #7a5af8;
+  --tg-color-chart5: #e5484d;
+  --tg-color-chart6: #0ba5ec;
+  --tg-color-chart-grid: #eceff3;
+  --tg-color-chart-axis: #98a2b3;
+  --tg-color-shadow-color: rgba(16, 24, 40, 0.08);
+  --tg-space-none: 0px;
+  --tg-space-xxs: 2px;
+  --tg-space-xs: 4px;
+  --tg-space-sm: 6px;
+  --tg-space-md: 8px;
+  --tg-space-lg: 12px;
+  --tg-space-xl: 16px;
+  --tg-space-xxl: 20px;
+  --tg-space-xxxl: 24px;
+  --tg-space-huge: 32px;
+  --tg-space-giant: 40px;
+  --tg-space-colossal: 48px;
+  --tg-space-mega: 64px;
+  --tg-radius-none: 0px;
+  --tg-radius-xs: 4px;
+  --tg-radius-sm: 6px;
+  --tg-radius-md: 8px;
+  --tg-radius-lg: 10px;
+  --tg-radius-card: 14px;
+  --tg-radius-card-lg: 16px;
+  --tg-radius-control: 8px;
+  --tg-radius-pill: 999px;
+  --tg-font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --tg-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+  --tg-font-size-xs: 11px;
+  --tg-font-size-sm: 12px;
+  --tg-font-size-md: 13px;
+  --tg-font-size: 14px;
+  --tg-font-size-lg: 16px;
+  --tg-font-size-xl: 18px;
+  --tg-font-size-title: 20px;
+  --tg-font-size-display: 28px;
+  --tg-font-weight-regular: 400;
+  --tg-font-weight-medium: 500;
+  --tg-font-weight-semibold: 600;
+  --tg-font-weight-bold: 700;
+  --tg-font-line-tight: 1.25;
+  --tg-font-line-normal: 1.55;
+  --tg-font-line-loose: 1.75;
+  --tg-font-letter-tight: -0.01em;
+  --tg-shadow-none: none;
+  --tg-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --tg-shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --tg-shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 1px 3px rgba(16, 24, 40, 0.05);
+  --tg-shadow-lg: 0 12px 28px rgba(16, 24, 40, 0.12), 0 2px 6px rgba(16, 24, 40, 0.05);
+  --tg-shadow-xl: 0 24px 48px rgba(16, 24, 40, 0.16), 0 4px 12px rgba(16, 24, 40, 0.06);
+  --tg-shadow-focus: 0 0 0 3px rgba(42, 171, 238, 0.22);
+  --tg-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --tg-motion-duration-fast: 120ms;
+  --tg-motion-duration-base: 180ms;
+  --tg-motion-duration-slow: 260ms;
+  --tg-motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --tg-motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --tg-motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --tg-layout-sider-width: 232px;
+  --tg-layout-sider-collapsed-width: 64px;
+  --tg-layout-topbar-height: 56px;
+  --tg-layout-content-max-width: 1680px;
+  --tg-layout-content-padding-x: 24px;
+  --tg-layout-content-padding-y: 20px;
+  --tg-layout-page-gap: 16px;
+  --tg-layout-card-padding: 20px;
+  --tg-layout-control-height: 34px;
+  --tg-layout-control-height-sm: 28px;
+  --tg-layout-control-height-lg: 40px;
+  --tg-z-base: 0;
+  --tg-z-sticky: 10;
+  --tg-z-topbar: 100;
+  --tg-z-sider: 90;
+  --tg-z-drawer: 1000;
+  --tg-z-modal: 1100;
+  --tg-z-toast: 1200;
+  --tg-z-tooltip: 1300;
+  --tg-theme: light;
+  --tg-color-scheme: light;
+}
+/* @tg-vars:light:end */
+
+/* @tg-vars:dark:start */
+/* 由 tokens.ts 生成，勿手改；重新生成见 src/theme/README.md */
+[data-theme='dark'] {
+  --tg-color-primary: #2aabee;
+  --tg-color-primary-hover: #4cbcff;
+  --tg-color-primary-active: #1e97d6;
+  --tg-color-primary-bg: rgba(42, 171, 238, 0.16);
+  --tg-color-primary-bg-hover: rgba(42, 171, 238, 0.24);
+  --tg-color-primary-border: rgba(42, 171, 238, 0.42);
+  --tg-color-on-primary: #04141f;
+  --tg-color-gradient-from: #2aabee;
+  --tg-color-gradient-to: #1e97d6;
+  --tg-color-bg-app: #0d1117;
+  --tg-color-bg-sider: #111721;
+  --tg-color-bg-sider-hover: rgba(255, 255, 255, 0.05);
+  --tg-color-bg-sider-active: rgba(42, 171, 238, 0.16);
+  --tg-color-bg-topbar: #111721;
+  --tg-color-bg-card: #151c26;
+  --tg-color-bg-card-hover: #1a2230;
+  --tg-color-bg-elevated: #1b2331;
+  --tg-color-bg-sunken: #10161f;
+  --tg-color-bg-input: #0f151d;
+  --tg-color-bg-hover: rgba(255, 255, 255, 0.05);
+  --tg-color-bg-active: rgba(255, 255, 255, 0.09);
+  --tg-color-bg-selected: rgba(42, 171, 238, 0.16);
+  --tg-color-bg-mask: rgba(3, 6, 10, 0.65);
+  --tg-color-bg-skeleton: rgba(255, 255, 255, 0.07);
+  --tg-color-scroll-thumb: rgba(255, 255, 255, 0.16);
+  --tg-color-scroll-thumb-hover: rgba(255, 255, 255, 0.28);
+  --tg-color-tooltip-bg: #1f2937;
+  --tg-color-tooltip-text: #f1f5f9;
+  --tg-color-skeleton-highlight: rgba(255, 255, 255, 0.12);
+  --tg-color-text-primary: #e8edf4;
+  --tg-color-text-secondary: #a9b4c4;
+  --tg-color-text-tertiary: #7d8899;
+  --tg-color-text-disabled: #5a6577;
+  --tg-color-text-inverse: #0d1117;
+  --tg-color-text-link: #5cc0f5;
+  --tg-color-text-link-hover: #8ad3ff;
+  --tg-color-border: #25303f;
+  --tg-color-border-strong: #334155;
+  --tg-color-border-subtle: #1c2532;
+  --tg-color-border-focus: #2aabee;
+  --tg-color-divider: #1f2937;
+  --tg-color-success: #34d399;
+  --tg-color-success-hover: #4ade9f;
+  --tg-color-success-bg: rgba(18, 160, 106, 0.16);
+  --tg-color-success-border: rgba(74, 222, 159, 0.32);
+  --tg-color-warning: #fbbf24;
+  --tg-color-warning-hover: #fcd34d;
+  --tg-color-warning-bg: rgba(217, 154, 0, 0.16);
+  --tg-color-warning-border: rgba(251, 191, 77, 0.32);
+  --tg-color-danger: #f87171;
+  --tg-color-danger-hover: #ff9a95;
+  --tg-color-danger-bg: rgba(229, 72, 77, 0.16);
+  --tg-color-danger-border: rgba(255, 139, 133, 0.32);
+  --tg-color-info: #2aabee;
+  --tg-color-info-bg: rgba(42, 171, 238, 0.16);
+  --tg-color-info-border: rgba(42, 171, 238, 0.42);
+  --tg-color-neutral: #8b93a1;
+  --tg-color-neutral-bg: rgba(152, 162, 179, 0.14);
+  --tg-color-neutral-border: rgba(139, 147, 161, 0.26);
+  --tg-color-account-healthy-fg: #4ade9f;
+  --tg-color-account-healthy-bg: rgba(18, 160, 106, 0.16);
+  --tg-color-account-healthy-border: rgba(74, 222, 159, 0.32);
+  --tg-color-account-healthy-dot: #34d399;
+  --tg-color-account-pending-fg: #fbbf4d;
+  --tg-color-account-pending-bg: rgba(217, 154, 0, 0.16);
+  --tg-color-account-pending-border: rgba(251, 191, 77, 0.32);
+  --tg-color-account-pending-dot: #fbbf24;
+  --tg-color-account-needs_code-fg: #fdab6b;
+  --tg-color-account-needs_code-bg: rgba(249, 115, 22, 0.16);
+  --tg-color-account-needs_code-border: rgba(253, 171, 107, 0.32);
+  --tg-color-account-needs_code-dot: #fb923c;
+  --tg-color-account-frozen-fg: #ff8b85;
+  --tg-color-account-frozen-bg: rgba(229, 72, 77, 0.16);
+  --tg-color-account-frozen-border: rgba(255, 139, 133, 0.32);
+  --tg-color-account-frozen-dot: #f87171;
+  --tg-color-account-invalid-fg: #f0a58a;
+  --tg-color-account-invalid-bg: rgba(210, 96, 58, 0.16);
+  --tg-color-account-invalid-border: rgba(240, 165, 138, 0.32);
+  --tg-color-account-invalid-dot: #e07a56;
+  --tg-color-account-dead-fg: #a3aab4;
+  --tg-color-account-dead-bg: rgba(139, 149, 161, 0.16);
+  --tg-color-account-dead-border: rgba(163, 170, 180, 0.28);
+  --tg-color-account-dead-dot: #8b95a1;
+  --tg-color-account-disabled-fg: #8b93a1;
+  --tg-color-account-disabled-bg: rgba(152, 162, 179, 0.14);
+  --tg-color-account-disabled-border: rgba(139, 147, 161, 0.26);
+  --tg-color-account-disabled-dot: #7b8494;
+  --tg-color-task-pending-fg: #8ab8ff;
+  --tg-color-task-pending-bg: rgba(47, 111, 237, 0.16);
+  --tg-color-task-pending-border: rgba(138, 184, 255, 0.3);
+  --tg-color-task-pending-dot: #5b93f5;
+  --tg-color-task-pending_confirmation-fg: #fbbf4d;
+  --tg-color-task-pending_confirmation-bg: rgba(217, 154, 0, 0.16);
+  --tg-color-task-pending_confirmation-border: rgba(251, 191, 77, 0.32);
+  --tg-color-task-pending_confirmation-dot: #fbbf24;
+  --tg-color-task-running-fg: #7cc4ff;
+  --tg-color-task-running-bg: rgba(42, 171, 238, 0.18);
+  --tg-color-task-running-border: rgba(124, 196, 255, 0.32);
+  --tg-color-task-running-dot: #38bdf8;
+  --tg-color-task-completed-fg: #4ade9f;
+  --tg-color-task-completed-bg: rgba(18, 160, 106, 0.16);
+  --tg-color-task-completed-border: rgba(74, 222, 159, 0.32);
+  --tg-color-task-completed-dot: #34d399;
+  --tg-color-task-failed-fg: #ff8b85;
+  --tg-color-task-failed-bg: rgba(229, 72, 77, 0.16);
+  --tg-color-task-failed-border: rgba(255, 139, 133, 0.32);
+  --tg-color-task-failed-dot: #f87171;
+  --tg-color-task-cancelled-fg: #8b93a1;
+  --tg-color-task-cancelled-bg: rgba(152, 162, 179, 0.14);
+  --tg-color-task-cancelled-border: rgba(139, 147, 161, 0.26);
+  --tg-color-task-cancelled-dot: #7b8494;
+  --tg-color-chart1: #38bdf8;
+  --tg-color-chart2: #34d399;
+  --tg-color-chart3: #fbbf24;
+  --tg-color-chart4: #a78bfa;
+  --tg-color-chart5: #f87171;
+  --tg-color-chart6: #22d3ee;
+  --tg-color-chart-grid: rgba(255, 255, 255, 0.08);
+  --tg-color-chart-axis: #6b7688;
+  --tg-color-shadow-color: rgba(0, 0, 0, 0.45);
+  --tg-space-none: 0px;
+  --tg-space-xxs: 2px;
+  --tg-space-xs: 4px;
+  --tg-space-sm: 6px;
+  --tg-space-md: 8px;
+  --tg-space-lg: 12px;
+  --tg-space-xl: 16px;
+  --tg-space-xxl: 20px;
+  --tg-space-xxxl: 24px;
+  --tg-space-huge: 32px;
+  --tg-space-giant: 40px;
+  --tg-space-colossal: 48px;
+  --tg-space-mega: 64px;
+  --tg-radius-none: 0px;
+  --tg-radius-xs: 4px;
+  --tg-radius-sm: 6px;
+  --tg-radius-md: 8px;
+  --tg-radius-lg: 10px;
+  --tg-radius-card: 14px;
+  --tg-radius-card-lg: 16px;
+  --tg-radius-control: 8px;
+  --tg-radius-pill: 999px;
+  --tg-font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --tg-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+  --tg-font-size-xs: 11px;
+  --tg-font-size-sm: 12px;
+  --tg-font-size-md: 13px;
+  --tg-font-size: 14px;
+  --tg-font-size-lg: 16px;
+  --tg-font-size-xl: 18px;
+  --tg-font-size-title: 20px;
+  --tg-font-size-display: 28px;
+  --tg-font-weight-regular: 400;
+  --tg-font-weight-medium: 500;
+  --tg-font-weight-semibold: 600;
+  --tg-font-weight-bold: 700;
+  --tg-font-line-tight: 1.25;
+  --tg-font-line-normal: 1.55;
+  --tg-font-line-loose: 1.75;
+  --tg-font-letter-tight: -0.01em;
+  --tg-shadow-none: none;
+  --tg-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --tg-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --tg-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --tg-shadow-lg: 0 14px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --tg-shadow-xl: 0 26px 52px rgba(0, 0, 0, 0.62), 0 6px 16px rgba(0, 0, 0, 0.4);
+  --tg-shadow-focus: 0 0 0 3px rgba(42, 171, 238, 0.32);
+  --tg-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --tg-motion-duration-fast: 120ms;
+  --tg-motion-duration-base: 180ms;
+  --tg-motion-duration-slow: 260ms;
+  --tg-motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --tg-motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --tg-motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --tg-layout-sider-width: 232px;
+  --tg-layout-sider-collapsed-width: 64px;
+  --tg-layout-topbar-height: 56px;
+  --tg-layout-content-max-width: 1680px;
+  --tg-layout-content-padding-x: 24px;
+  --tg-layout-content-padding-y: 20px;
+  --tg-layout-page-gap: 16px;
+  --tg-layout-card-padding: 20px;
+  --tg-layout-control-height: 34px;
+  --tg-layout-control-height-sm: 28px;
+  --tg-layout-control-height-lg: 40px;
+  --tg-z-base: 0;
+  --tg-z-sticky: 10;
+  --tg-z-topbar: 100;
+  --tg-z-sider: 90;
+  --tg-z-drawer: 1000;
+  --tg-z-modal: 1100;
+  --tg-z-toast: 1200;
+  --tg-z-tooltip: 1300;
+  --tg-theme: dark;
+  --tg-color-scheme: dark;
+}
+/* @tg-vars:dark:end */
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- 基础重置 */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body,
 #root {
@@ -7,21 +429,245 @@ body,
   padding: 0;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-    'Helvetica Neue', Arial, sans-serif;
-  background: #f5f6f8;
+  font-family: var(--tg-font-family);
+  font-size: var(--tg-font-size);
+  line-height: var(--tg-font-line-normal);
+  color: var(--tg-color-text-primary);
+  background: var(--tg-color-bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--tg-motion-duration-base) var(--tg-motion-ease-standard),
+    color var(--tg-motion-duration-base) var(--tg-motion-ease-standard);
+}
+
+::selection {
+  background: var(--tg-color-primary-bg-hover);
+  color: var(--tg-color-text-primary);
+}
+
+a {
+  color: var(--tg-color-text-link);
+  text-decoration: none;
+  transition: color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+a:hover {
+  color: var(--tg-color-text-link-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--tg-color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--tg-radius-xs);
+}
+
+/* 滚动条：细、低对比，深色下不发白 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tg-color-scroll-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--tg-color-scroll-thumb);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--tg-radius-pill);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--tg-color-scroll-thumb-hover);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------- 工具类 */
+
+.ellipsis,
+.tg-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.tg-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.tg-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.tg-mono {
+  font-family: var(--tg-font-family-mono);
+  font-size: var(--tg-font-size-sm);
+  letter-spacing: 0;
+}
+
+.tg-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+.tg-muted {
+  color: var(--tg-color-text-tertiary);
+}
+
+.tg-secondary {
+  color: var(--tg-color-text-secondary);
+}
+
+.tg-nowrap {
+  white-space: nowrap;
+}
+
+.tg-flex {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+}
+
+.tg-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-md);
+}
+
+.tg-flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.tg-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-md);
+}
+
+.tg-vstack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-layout-page-gap);
+}
+
+.tg-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 1px solid var(--tg-color-border);
+  border-bottom-width: 2px;
+  border-radius: var(--tg-radius-xs);
+  background: var(--tg-color-bg-sunken);
+  color: var(--tg-color-text-tertiary);
+  font-family: var(--tg-font-family-mono);
+  font-size: var(--tg-font-size-xs);
+  line-height: 1;
+}
+
+.app-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tg-space-lg);
+  min-height: 60vh;
+  padding: var(--tg-space-xxxl);
+  text-align: center;
+}
+
+.code-block {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: var(--tg-space-lg);
+  background: var(--tg-color-bg-sunken);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-md);
+  color: var(--tg-color-text-secondary);
+  font-family: var(--tg-font-family-mono);
+  font-size: var(--tg-font-size-sm);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ---------------------------------------------------------------- 外壳骨架 */
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--tg-color-bg-app);
+}
+
+/* --- 侧栏 --- */
+
+.app-sider {
+  position: relative;
+  z-index: var(--tg-z-sider);
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: var(--tg-layout-sider-width);
+  background: var(--tg-color-bg-sider);
+  border-right: 1px solid var(--tg-color-border-subtle);
+  transition: width var(--tg-motion-duration-base) var(--tg-motion-ease-standard);
+}
+
+.app-sider.is-collapsed {
+  width: var(--tg-layout-sider-collapsed-width);
 }
 
 .app-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 56px;
-  padding: 0 16px;
-  color: rgba(255, 255, 255, 0.92);
+  gap: var(--tg-space-lg);
+  height: var(--tg-layout-topbar-height);
+  flex: 0 0 var(--tg-layout-topbar-height);
+  padding: 0 var(--tg-space-xl);
+  color: var(--tg-color-text-primary);
   overflow: hidden;
   white-space: nowrap;
+  border-bottom: 1px solid var(--tg-color-border-subtle);
+}
+
+.app-sider.is-collapsed .app-logo {
+  padding: 0;
+  justify-content: center;
 }
 
 .app-logo-mark {
@@ -31,46 +677,478 @@ body {
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #2aabee, #229ed9);
-  color: #fff;
-  font-weight: 700;
-  font-size: 12px;
+  border-radius: var(--tg-radius-md);
+  background: linear-gradient(135deg, var(--tg-color-gradient-from), var(--tg-color-gradient-to));
+  color: var(--tg-color-on-primary);
+  font-weight: var(--tg-font-weight-bold);
+  font-size: var(--tg-font-size-sm);
+  letter-spacing: 0.02em;
+  box-shadow: var(--tg-shadow-sm);
 }
 
 .app-logo-text {
-  font-size: 15px;
-  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--tg-font-size-lg);
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: var(--tg-font-letter-tight);
 }
 
-.app-header {
+.app-logo-sub {
+  font-size: var(--tg-font-size-xs);
+  font-weight: var(--tg-font-weight-regular);
+  color: var(--tg-color-text-tertiary);
+}
+
+.app-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--tg-space-md) var(--tg-space-sm);
+}
+
+.app-nav-group + .app-nav-group {
+  margin-top: var(--tg-space-lg);
+}
+
+.app-nav-group-title {
+  padding: 0 var(--tg-space-md) var(--tg-space-xs);
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-xs);
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.app-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 56px;
-  padding: 0 16px;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  gap: var(--tg-space-lg);
+  height: 38px;
+  margin: 2px var(--tg-space-xs);
+  padding: 0 var(--tg-space-md);
+  border-radius: var(--tg-radius-control);
+  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard),
+    color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
 }
 
-.app-content {
-  padding: 16px;
-  overflow: auto;
+.app-nav-item:hover {
+  background: var(--tg-color-bg-sider-hover);
+  color: var(--tg-color-text-primary);
 }
 
-.app-center {
-  display: flex;
+.app-nav-item.is-active {
+  background: var(--tg-color-bg-sider-active);
+  color: var(--tg-color-primary);
+  font-weight: var(--tg-font-weight-medium);
+}
+
+.app-nav-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: var(--tg-radius-pill);
+  background: var(--tg-color-primary);
+}
+
+.app-sider.is-collapsed .app-nav-item {
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+}
+
+.app-sider.is-collapsed .app-nav-item.is-active::before {
+  left: -4px;
+}
+
+.app-nav-icon {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  width: 16px;
+  font-size: 16px;
+  line-height: 1;
+  flex: 0 0 16px;
+}
+
+.app-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-nav-badge {
+  flex: 0 0 auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--tg-radius-pill);
+  font-size: var(--tg-font-size-xs);
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-nav-badge.is-danger {
+  background: var(--tg-color-danger-bg);
+  color: var(--tg-color-danger);
+}
+
+.app-nav-badge.is-warning {
+  background: var(--tg-color-warning-bg);
+  color: var(--tg-color-warning);
+}
+
+.app-nav-badge.is-info {
+  background: var(--tg-color-primary-bg);
+  color: var(--tg-color-primary);
+}
+
+.app-sider-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-sm);
+  padding: var(--tg-space-md);
+  border-top: 1px solid var(--tg-color-border-subtle);
+}
+
+.app-sider.is-collapsed .app-sider-footer {
+  justify-content: center;
+}
+
+/* --- 主区 / 顶栏 --- */
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--tg-z-topbar);
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-lg);
+  height: var(--tg-layout-topbar-height);
+  flex: 0 0 var(--tg-layout-topbar-height);
+  padding: 0 var(--tg-layout-content-padding-x);
+  background: var(--tg-color-bg-topbar);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
+}
+
+.app-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  flex: 1;
+  min-width: 0;
+}
+
+.app-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-xs);
+  flex: 0 0 auto;
+}
+
+.app-topbar-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--tg-space-xs);
+  background: var(--tg-color-border-subtle);
+}
+
+/* 顶栏里的图标按钮：统一 32×32 */
+.app-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--tg-radius-control);
+  background: transparent;
+  color: var(--tg-color-text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard),
+    color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard),
+    border-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.app-icon-button:hover {
+  background: var(--tg-color-bg-hover);
+  color: var(--tg-color-text-primary);
+}
+
+.app-icon-button:active {
+  background: var(--tg-color-bg-active);
+}
+
+.app-icon-button.is-active {
+  background: var(--tg-color-primary-bg);
+  color: var(--tg-color-primary);
+}
+
+/* 全局搜索：看起来像输入框的按钮 */
+.app-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  width: 100%;
+  max-width: 340px;
+  height: 32px;
+  padding: 0 var(--tg-space-md);
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-control);
+  background: var(--tg-color-bg-input);
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size);
+  cursor: pointer;
+  transition: border-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard),
+    box-shadow var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.app-search-trigger:hover {
+  border-color: var(--tg-color-primary-border);
+  box-shadow: var(--tg-shadow-xs);
+}
+
+.app-search-trigger .app-search-text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 实时连接状态 */
+.app-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tg-space-sm);
+  height: 28px;
+  padding: 0 var(--tg-space-md);
+  border-radius: var(--tg-radius-pill);
+  background: var(--tg-color-bg-sunken);
+  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size-sm);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.app-conn-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-conn.is-open {
+  background: var(--tg-color-success-bg);
+  color: var(--tg-color-success);
+}
+
+.app-conn.is-connecting {
+  background: var(--tg-color-warning-bg);
+  color: var(--tg-color-warning);
+}
+
+.app-conn.is-closed {
+  background: var(--tg-color-neutral-bg);
+  color: var(--tg-color-neutral);
+}
+
+.app-user-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  height: 36px;
+  padding: 0 var(--tg-space-md) 0 var(--tg-space-xs);
+  border-radius: var(--tg-radius-control);
+  color: var(--tg-color-text-primary);
+  cursor: pointer;
+  transition: background-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.app-user-trigger:hover {
+  background: var(--tg-color-bg-hover);
+}
+
+.app-user-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.app-user-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tg-font-size);
+  font-weight: var(--tg-font-weight-medium);
+}
+
+.app-user-role {
+  font-size: var(--tg-font-size-xs);
+  color: var(--tg-color-text-tertiary);
+}
+
+/* 面包屑 */
+.app-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-sm);
+  min-width: 0;
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.app-breadcrumb-sep {
+  color: var(--tg-color-text-disabled);
+}
+
+.app-breadcrumb-current {
+  color: var(--tg-color-text-primary);
+  font-weight: var(--tg-font-weight-medium);
+}
+
+/* 内容区 */
+.app-content {
+  /* 元素级派生变量：让窄屏媒体查询能生效（token 变量在 html 内联样式上，覆盖不动） */
+  --tg-content-pad-x: var(--tg-layout-content-padding-x);
+  --tg-content-pad-y: var(--tg-layout-content-padding-y);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--tg-content-pad-y) var(--tg-content-pad-x) var(--tg-space-colossal);
+}
+
+.app-content-inner {
+  width: 100%;
+  max-width: var(--tg-layout-content-max-width);
+  margin: 0 auto;
+}
+
+/* 窄屏适配：
+   注意 —— token 变量是写在 <html> 内联样式上的（优先级最高），
+   所以这里不能用 :root 覆盖 --tg-layout-*，只能在元素级定义派生变量。 */
+@media (max-width: 1279px) {
+  .app-content {
+    --tg-content-pad-x: 16px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-content {
+    --tg-content-pad-x: 12px;
+    --tg-content-pad-y: 12px;
+  }
+
+  .app-search-trigger .app-search-text,
+  .app-user-meta {
+    display: none;
+  }
+
+  .app-search-trigger {
+    max-width: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .app-topbar {
+    gap: var(--tg-space-md);
+  }
+}
+
+/* ---------------------------------------------------------------- 页面骨架 */
+
+.tg-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-layout-page-gap);
+}
+
+.tg-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tg-space-xl);
+  flex-wrap: wrap;
+}
+
+.tg-page-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-xxs);
+  min-width: 0;
+}
+
+.tg-page-title {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  margin: 0;
+  color: var(--tg-color-text-primary);
+  font-size: var(--tg-font-size-title);
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: var(--tg-font-letter-tight);
+  line-height: 1.3;
+}
+
+.tg-page-desc {
+  margin: 0;
+  max-width: 860px;
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size);
+}
+
+.tg-page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  flex-wrap: wrap;
+}
+
+.tg-page-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  flex-wrap: wrap;
 }
 
 .page-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--tg-space-md);
+  margin-bottom: var(--tg-space-lg);
 }
 
 .page-toolbar-right {
@@ -78,36 +1156,820 @@ body {
 }
 
 .stat-row {
-  margin-bottom: 16px;
+  margin-bottom: var(--tg-layout-page-gap);
 }
 
 .section-card {
-  margin-bottom: 16px;
+  margin-bottom: var(--tg-layout-page-gap);
+}
+
+/* ---------------------------------------------------------------- 卡片 */
+
+.tg-card {
+  position: relative;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-card);
+  box-shadow: var(--tg-shadow-xs);
+  transition: border-color var(--tg-motion-duration-base) var(--tg-motion-ease-standard),
+    box-shadow var(--tg-motion-duration-base) var(--tg-motion-ease-standard),
+    background-color var(--tg-motion-duration-base) var(--tg-motion-ease-standard);
+}
+
+.tg-card.is-hoverable:hover {
+  border-color: var(--tg-color-border);
+  box-shadow: var(--tg-shadow-md);
+}
+
+.tg-section-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-lg);
+  min-height: 52px;
+  padding: var(--tg-space-lg) var(--tg-layout-card-padding);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
+}
+
+.tg-section-card-header.is-plain {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.tg-section-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tg-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  color: var(--tg-color-text-primary);
+  font-size: var(--tg-font-size-lg);
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: var(--tg-font-letter-tight);
+}
+
+.tg-section-subtitle {
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+}
+
+.tg-section-extra {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.tg-section-body {
+  padding: var(--tg-layout-card-padding);
+}
+
+.tg-section-body.is-flush {
+  padding: 0;
+}
+
+.tg-section-body.is-tight {
+  padding: var(--tg-space-lg);
+}
+
+/* ---------------------------------------------------------------- 统计卡 */
+
+.tg-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-lg);
+  height: 100%;
+  padding: var(--tg-layout-card-padding);
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-card);
+  box-shadow: var(--tg-shadow-xs);
+  overflow: hidden;
+}
+
+.tg-stat-card.is-clickable {
+  cursor: pointer;
+}
+
+.tg-stat-card.is-clickable:hover {
+  border-color: var(--tg-color-border);
+  box-shadow: var(--tg-shadow-md);
+  transform: translateY(-1px);
+}
+
+.tg-stat-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tg-space-md);
+}
+
+.tg-stat-title {
+  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size-sm);
+  font-weight: var(--tg-font-weight-medium);
+}
+
+.tg-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: var(--tg-radius-md);
+  background: var(--tg-color-neutral-bg);
+  color: var(--tg-color-neutral);
+  font-size: 16px;
+}
+
+.tg-stat-icon.is-primary {
+  background: var(--tg-color-primary-bg);
+  color: var(--tg-color-primary);
+}
+
+.tg-stat-icon.is-success {
+  background: var(--tg-color-success-bg);
+  color: var(--tg-color-success);
+}
+
+.tg-stat-icon.is-warning {
+  background: var(--tg-color-warning-bg);
+  color: var(--tg-color-warning);
+}
+
+.tg-stat-icon.is-danger {
+  background: var(--tg-color-danger-bg);
+  color: var(--tg-color-danger);
+}
+
+.tg-stat-icon.is-info {
+  background: var(--tg-color-info-bg);
+  color: var(--tg-color-info);
+}
+
+.tg-stat-icon.is-neutral {
+  background: var(--tg-color-neutral-bg);
+  color: var(--tg-color-neutral);
+}
+
+.tg-stat-value-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tg-space-md);
+  flex-wrap: wrap;
+}
+
+.tg-stat-value {
+  color: var(--tg-color-text-primary);
+  font-size: var(--tg-font-size-display);
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: var(--tg-font-letter-tight);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tg-stat-unit {
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size);
+  padding-bottom: 3px;
+}
+
+.tg-stat-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--tg-radius-pill);
+  background: var(--tg-color-neutral-bg);
+  color: var(--tg-color-neutral);
+  font-size: var(--tg-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tg-stat-delta.is-good {
+  background: var(--tg-color-success-bg);
+  color: var(--tg-color-success);
+}
+
+.tg-stat-delta.is-bad {
+  background: var(--tg-color-danger-bg);
+  color: var(--tg-color-danger);
+}
+
+.tg-stat-delta.is-flat {
+  background: var(--tg-color-neutral-bg);
+  color: var(--tg-color-neutral);
+}
+
+.tg-stat-spark {
+  margin-top: auto;
+}
+
+.tg-stat-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-md);
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+}
+
+.tg-stat-hint {
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+}
+
+/* ---------------------------------------------------------------- 筛选栏 */
+
+.tg-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-lg);
+  padding: var(--tg-space-lg) var(--tg-layout-card-padding);
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-card);
+  box-shadow: var(--tg-shadow-xs);
+}
+
+.tg-filter-main {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  flex-wrap: wrap;
+}
+
+.tg-filter-fields {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.tg-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  margin-left: auto;
+}
+
+.tg-filter-active {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-sm);
+  flex-wrap: wrap;
+  padding-top: var(--tg-space-lg);
+  border-top: 1px dashed var(--tg-color-border-subtle);
+}
+
+.tg-filter-active-label {
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+}
+
+.tg-filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--tg-radius-sm);
+  background: var(--tg-color-primary-bg);
+  border: 1px solid var(--tg-color-primary-border);
+  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size-sm);
+}
+
+.tg-filter-tag-key {
+  color: var(--tg-color-text-tertiary);
+}
+
+.tg-filter-tag-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: var(--tg-radius-pill);
+  background: transparent;
+  color: var(--tg-color-text-tertiary);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.tg-filter-tag-close:hover {
+  background: var(--tg-color-bg-active);
+  color: var(--tg-color-text-primary);
+}
+
+/* ---------------------------------------------------------------- 表格 */
+
+.tg-table-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-card);
+  box-shadow: var(--tg-shadow-xs);
+  overflow: hidden;
+}
+
+.tg-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  flex-wrap: wrap;
+  padding: var(--tg-space-lg) var(--tg-layout-card-padding);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
+}
+
+.tg-table-toolbar-title {
+  color: var(--tg-color-text-primary);
+  font-size: var(--tg-font-size-lg);
+  font-weight: var(--tg-font-weight-semibold);
+}
+
+.tg-table-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.tg-table-meta {
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tg-table-body {
+  min-height: 120px;
+}
+
+/* ---------------------------------------------------------------- 空态 / 错误态 */
+
+.tg-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tg-space-md);
+  padding: var(--tg-space-colossal) var(--tg-space-xl);
+  text-align: center;
+}
+
+.tg-empty.is-compact {
+  padding: var(--tg-space-xxl) var(--tg-space-xl);
+}
+
+.tg-empty-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  margin-bottom: var(--tg-space-xs);
+  border-radius: var(--tg-radius-card-lg);
+  background: var(--tg-color-bg-sunken);
+  color: var(--tg-color-text-disabled);
+}
+
+.tg-empty.is-compact .tg-empty-art {
+  width: 64px;
+  height: 64px;
+}
+
+.tg-empty-title {
+  color: var(--tg-color-text-primary);
+  font-size: var(--tg-font-size-lg);
+  font-weight: var(--tg-font-weight-medium);
+}
+
+.tg-empty-desc {
+  max-width: 460px;
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size);
+}
+
+.tg-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  margin-top: var(--tg-space-xs);
+}
+
+.tg-error-state .tg-empty-art {
+  background: var(--tg-color-danger-bg);
+  color: var(--tg-color-danger);
+}
+
+/* ---------------------------------------------------------------- 骨架屏 */
+
+.tg-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tg-space-lg);
+}
+
+.tg-skeleton-row {
+  display: flex;
+  gap: var(--tg-space-lg);
+}
+
+.tg-skeleton-block {
+  position: relative;
+  overflow: hidden;
+  background: var(--tg-color-bg-skeleton);
+  border-radius: var(--tg-radius-md);
+}
+
+.tg-skeleton-block::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--tg-color-skeleton-highlight), transparent);
+  animation: tg-shimmer 1.4s infinite;
+}
+
+@keyframes tg-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tg-skeleton-block::after {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- 状态点 / 徽标 */
+
+.tg-status-dot {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  border-radius: var(--tg-radius-pill);
+}
+
+.tg-status-dot.is-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--tg-radius-pill);
+  border: 2px solid currentColor;
+  opacity: 0.4;
+  animation: tg-pulse 1.6s var(--tg-motion-ease-in-out) infinite;
+}
+
+@keyframes tg-pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  70% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tg-status-dot.is-pulse::after {
+    animation: none;
+  }
+}
+
+.tg-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: var(--tg-radius-sm);
+  border: 1px solid transparent;
+  font-size: var(--tg-font-size-sm);
+  line-height: 1;
+  white-space: nowrap;
+  font-weight: var(--tg-font-weight-medium);
+}
+
+.tg-copyable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.tg-copyable-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-copyable-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border: none;
+  border-radius: var(--tg-radius-xs);
+  background: transparent;
+  color: var(--tg-color-text-disabled);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--tg-motion-duration-fast) var(--tg-motion-ease-standard),
+    color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard),
+    background-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.tg-copyable:hover .tg-copyable-button,
+.tg-copyable-button:focus-visible {
+  opacity: 1;
+}
+
+.tg-copyable-button:hover {
+  background: var(--tg-color-bg-hover);
+  color: var(--tg-color-primary);
+}
+
+.tg-copyable-button.is-copied {
+  opacity: 1;
+  color: var(--tg-color-success);
+}
+
+/* ---------------------------------------------------------------- 趋势迷你图 */
+
+.tg-sparkline {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.tg-sparkline-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tg-color-text-disabled);
+  font-size: var(--tg-font-size-sm);
+}
+
+/* ---------------------------------------------------------------- 详情抽屉 */
+
+.tg-detail-section + .tg-detail-section {
+  margin-top: var(--tg-space-xxl);
+}
+
+.tg-detail-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-md);
+  margin-bottom: var(--tg-space-lg);
+  color: var(--tg-color-text-primary);
+  font-size: var(--tg-font-size);
+  font-weight: var(--tg-font-weight-semibold);
+}
+
+.tg-detail-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--tg-color-border-subtle);
+}
+
+.tg-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--tg-space-lg) var(--tg-space-xl);
+}
+
+.tg-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tg-detail-item.is-wide {
+  grid-column: 1 / -1;
+}
+
+.tg-detail-label {
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+}
+
+.tg-detail-value {
+  color: var(--tg-color-text-primary);
+  font-size: var(--tg-font-size);
+  overflow-wrap: anywhere;
+}
+
+.tg-detail-value.is-empty {
+  color: var(--tg-color-text-disabled);
+}
+
+/* ---------------------------------------------------------------- 通知面板 */
+
+.tg-notif-panel {
+  width: 360px;
+  max-width: 92vw;
+}
+
+.tg-notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-md);
+  padding-bottom: var(--tg-space-md);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
+}
+
+.tg-notif-list {
+  max-height: 380px;
+  overflow-y: auto;
+  margin: 0 calc(-1 * var(--tg-space-md));
+}
+
+.tg-notif-item {
+  display: flex;
+  gap: var(--tg-space-md);
+  padding: var(--tg-space-lg) var(--tg-space-md);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
+  cursor: pointer;
+  transition: background-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+
+.tg-notif-item:last-child {
+  border-bottom: none;
+}
+
+.tg-notif-item:hover {
+  background: var(--tg-color-bg-hover);
+}
+
+.tg-notif-item.is-unread {
+  background: var(--tg-color-primary-bg);
+}
+
+.tg-notif-item.is-unread:hover {
+  background: var(--tg-color-primary-bg-hover);
+}
+
+.tg-notif-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tg-notif-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tg-color-text-primary);
+  font-size: var(--tg-font-size);
+  font-weight: var(--tg-font-weight-medium);
+}
+
+.tg-notif-body {
+  margin-top: 2px;
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.tg-notif-time {
+  color: var(--tg-color-text-disabled);
+  font-size: var(--tg-font-size-xs);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- 全局搜索弹窗 */
+
+.tg-search-modal .ant-modal-body {
+  padding-top: var(--tg-space-md);
+}
+
+.tg-search-input .ant-input-affix-wrapper,
+.tg-search-input input {
+  font-size: var(--tg-font-size-lg);
+}
+
+.tg-search-results {
+  max-height: 52vh;
+  overflow-y: auto;
+  margin-top: var(--tg-space-lg);
+}
+
+.tg-search-group-title {
+  padding: var(--tg-space-md) var(--tg-space-xs) var(--tg-space-xs);
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-xs);
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tg-search-item {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-lg);
+  padding: var(--tg-space-md);
+  border-radius: var(--tg-radius-md);
+  cursor: pointer;
+}
+
+.tg-search-item:hover,
+.tg-search-item.is-active {
+  background: var(--tg-color-bg-hover);
+}
+
+.tg-search-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tg-search-item-title {
+  color: var(--tg-color-text-primary);
+  font-size: var(--tg-font-size);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-search-item-desc {
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-search-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-lg);
+  margin-top: var(--tg-space-lg);
+  padding-top: var(--tg-space-md);
+  border-top: 1px solid var(--tg-color-border-subtle);
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+}
+
+/* ---------------------------------------------------------------- 旧页面类（保留兼容） */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tg-space-lg);
+  height: var(--tg-layout-topbar-height);
+  padding: 0 var(--tg-layout-content-padding-x);
+  background: var(--tg-color-bg-topbar);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
 }
 
 /* ---------------- 会话页 ---------------- */
 
 .dialog-page {
   display: flex;
-  gap: 12px;
-  height: calc(100vh - 120px);
+  gap: var(--tg-space-lg);
+  height: calc(100vh - 160px);
   min-height: 520px;
 }
 
 .dialog-list-pane {
   display: flex;
   flex-direction: column;
-  width: 360px;
-  flex: 0 0 360px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
+  width: 340px;
+  flex: 0 0 340px;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-card);
   overflow: hidden;
 }
 
 .dialog-list-filters {
-  padding: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: var(--tg-space-lg);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
 }
 
 .dialog-list-scroll {
@@ -116,26 +1978,26 @@ body {
 }
 
 .dialog-list-footer {
-  padding: 8px 12px;
-  border-top: 1px solid #f0f0f0;
+  padding: var(--tg-space-md) var(--tg-space-lg);
+  border-top: 1px solid var(--tg-color-border-subtle);
   text-align: right;
 }
 
 .dialog-item {
   display: flex;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #fafafa;
+  gap: var(--tg-space-md);
+  padding: var(--tg-space-lg);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background-color var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
 }
 
 .dialog-item:hover {
-  background: #f7faff;
+  background: var(--tg-color-bg-hover);
 }
 
 .dialog-item.active {
-  background: #e9f2ff;
+  background: var(--tg-color-bg-selected);
 }
 
 .dialog-item-main {
@@ -146,13 +2008,14 @@ body {
 .dialog-item-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-weight: 500;
+  gap: var(--tg-space-sm);
+  font-weight: var(--tg-font-weight-medium);
+  color: var(--tg-color-text-primary);
 }
 
 .dialog-item-preview {
-  color: #8c8c8c;
-  font-size: 12px;
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -163,8 +2026,8 @@ body {
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
-  font-size: 12px;
-  color: #8c8c8c;
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-color-text-tertiary);
   flex: 0 0 auto;
 }
 
@@ -173,9 +2036,9 @@ body {
   flex-direction: column;
   flex: 1;
   min-width: 0;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border-subtle);
+  border-radius: var(--tg-radius-card);
   overflow: hidden;
 }
 
@@ -183,21 +2046,21 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  gap: var(--tg-space-md);
+  padding: var(--tg-space-lg);
+  border-bottom: 1px solid var(--tg-color-border-subtle);
 }
 
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-  background: #f7f8fa;
+  padding: var(--tg-space-xl);
+  background: var(--tg-color-bg-sunken);
 }
 
 .chat-bubble-row {
   display: flex;
-  margin-bottom: 12px;
+  margin-bottom: var(--tg-space-lg);
 }
 
 .chat-bubble-row.outgoing {
@@ -206,33 +2069,35 @@ body {
 
 .chat-bubble {
   max-width: 68%;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid #ececec;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  padding: var(--tg-space-md) var(--tg-space-lg);
+  border-radius: var(--tg-radius-lg);
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border-subtle);
+  box-shadow: var(--tg-shadow-xs);
+  color: var(--tg-color-text-primary);
   word-break: break-word;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
 .chat-bubble-row.outgoing .chat-bubble {
-  background: #d6e9ff;
-  border-color: #c3ddfd;
+  background: var(--tg-color-primary-bg);
+  border-color: var(--tg-color-primary-border);
 }
 
 .chat-bubble-meta {
   display: flex;
-  gap: 8px;
+  gap: var(--tg-space-md);
   align-items: center;
   margin-bottom: 4px;
-  font-size: 12px;
-  color: #8c8c8c;
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-color-text-tertiary);
 }
 
 .chat-composer {
-  padding: 10px 12px;
-  border-top: 1px solid #f0f0f0;
-  background: #fff;
+  padding: var(--tg-space-lg);
+  border-top: 1px solid var(--tg-color-border-subtle);
+  background: var(--tg-color-bg-card);
 }
 
 .chat-empty {
@@ -240,24 +2105,160 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #8c8c8c;
+  color: var(--tg-color-text-tertiary);
 }
 
-.code-block {
-  margin: 0;
-  max-height: 240px;
-  overflow: auto;
-  padding: 8px;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
+/* ---------------------------------------------------------------- antd 对齐 */
+
+/* 表格：表头更紧凑、行分隔更轻，卡片化圆角 */
+.tg-table-card .ant-table {
+  background: transparent;
 }
 
-.ellipsis {
-  overflow: hidden;
-  text-overflow: ellipsis;
+#root .ant-table-wrapper .ant-table-thead > tr > th {
+  font-size: var(--tg-font-size-sm);
+  font-weight: var(--tg-font-weight-semibold);
+  letter-spacing: 0.02em;
+  color: var(--tg-color-text-secondary);
   white-space: nowrap;
+}
+
+#root .ant-table-wrapper .ant-table-tbody > tr > td {
+  border-bottom-color: var(--tg-color-border-subtle);
+}
+
+#root .ant-table-wrapper .ant-table-tbody > tr:last-child > td {
+  border-bottom: none;
+}
+
+#root .ant-table-wrapper .ant-table-pagination.ant-pagination {
+  margin: var(--tg-space-lg) var(--tg-layout-card-padding);
+}
+
+#root .ant-table-wrapper .ant-table-cell-fix-right-first::after,
+#root .ant-table-wrapper .ant-table-cell-fix-left-last::after {
+  box-shadow: none;
+}
+
+.tg-table-card .ant-table-container {
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+
+/* 卡片 / 弹层：统一圆角与阴影 */
+body .ant-card {
+  border-radius: var(--tg-radius-card);
+}
+
+body .ant-modal .ant-modal-content {
+  border-radius: var(--tg-radius-card-lg);
+  box-shadow: var(--tg-shadow-xl);
+  border: 1px solid var(--tg-color-border-subtle);
+}
+
+body .ant-drawer .ant-drawer-content {
+  border-left: 1px solid var(--tg-color-border-subtle);
+}
+
+body .ant-drawer .ant-drawer-header {
+  border-bottom: 1px solid var(--tg-color-border-subtle);
+}
+
+body .ant-message .ant-message-notice-content {
+  border-radius: var(--tg-radius-lg);
+  border: 1px solid var(--tg-color-border-subtle);
+  box-shadow: var(--tg-shadow-lg);
+}
+
+body .ant-notification .ant-notification-notice {
+  border-radius: var(--tg-radius-card);
+  border: 1px solid var(--tg-color-border-subtle);
+  box-shadow: var(--tg-shadow-lg);
+}
+
+body .ant-tooltip .ant-tooltip-inner {
+  border-radius: var(--tg-radius-md);
+  font-size: var(--tg-font-size-sm);
+}
+
+body .ant-dropdown .ant-dropdown-menu {
+  border-radius: var(--tg-radius-lg);
+  border: 1px solid var(--tg-color-border-subtle);
+  box-shadow: var(--tg-shadow-lg);
+  padding: 6px;
+}
+
+body .ant-dropdown .ant-dropdown-menu-item {
+  border-radius: var(--tg-radius-md);
+}
+
+body .ant-select-dropdown {
+  border-radius: var(--tg-radius-lg);
+  border: 1px solid var(--tg-color-border-subtle);
+  box-shadow: var(--tg-shadow-lg);
+}
+
+body .ant-popover .ant-popover-inner {
+  border-radius: var(--tg-radius-lg);
+  border: 1px solid var(--tg-color-border-subtle);
+  box-shadow: var(--tg-shadow-lg);
+}
+
+/* 徽标 / 标签 */
+body .ant-badge .ant-badge-count,
+body .ant-badge .ant-badge-dot {
+  box-shadow: 0 0 0 2px var(--tg-color-bg-topbar);
+}
+
+body .ant-tag {
+  border-radius: var(--tg-radius-sm);
+  margin-inline-end: 0;
+}
+
+/* 描述列表 / 表单 */
+#root .ant-descriptions .ant-descriptions-item-label {
+  color: var(--tg-color-text-tertiary);
+  font-size: var(--tg-font-size-sm);
+}
+
+#root .ant-form-item-label > label {
+  font-size: var(--tg-font-size-sm);
+}
+
+/* 空态：深色下不要一片黑 */
+body .ant-empty .ant-empty-description {
+  color: var(--tg-color-text-tertiary);
+}
+
+/* 加载遮罩跟随主题 */
+body .ant-spin-container::after {
+  background: var(--tg-color-bg-card);
+}
+
+/* 分页 */
+#root .ant-pagination .ant-pagination-item,
+#root .ant-pagination .ant-pagination-prev,
+#root .ant-pagination .ant-pagination-next {
+  border-radius: var(--tg-radius-md);
+}
+
+/* 全局搜索快捷键提示 */
+@media (max-width: 1023px) {
+  .app-search-trigger .tg-kbd {
+    display: none;
+  }
+}
+
+/* 打印：去掉外壳 */
+@media print {
+  .app-sider,
+  .app-topbar {
+    display: none;
+  }
+
+  .app-shell,
+  .app-content {
+    height: auto;
+    overflow: visible;
+  }
 }

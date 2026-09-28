@@ -59,3 +59,25 @@ class TaskActionResponse(BaseModel):
     ok: bool = True
     task: Optional[TaskOut] = None
     message: str = ""
+
+
+# ---------------- 批量重试 ----------------
+
+class TaskBulkRetryRequest(BaseModel):
+    """批量重试：一次最多 200 条，逐条给结果（不因为某条不可重试就整体失败）。"""
+
+    task_ids: List[uuid.UUID] = Field(default_factory=list, max_length=200, description="最多 200 个任务 id")
+
+
+class TaskBulkRetryItem(BaseModel):
+    task_id: uuid.UUID
+    ok: bool = False
+    message: str = ""
+
+
+class TaskBulkRetryResponse(BaseModel):
+    ok: bool = True
+    requested: int = 0
+    succeeded: int = 0
+    failed: int = 0
+    results: List[TaskBulkRetryItem] = Field(default_factory=list)

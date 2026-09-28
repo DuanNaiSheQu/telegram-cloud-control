@@ -114,6 +114,8 @@ class RelayLinkOut(ORMModel):
     origin_body: Optional[str] = None
     origin_sender_name: Optional[str] = None
     origin_dialog_title: Optional[str] = None
+    #: 原会话 id：前端「跳原会话」深链 /dialogs 要用
+    origin_dialog_id: Optional[uuid.UUID] = None
     account_label: Optional[str] = None
     origin_created_at: Optional[datetime] = None
 

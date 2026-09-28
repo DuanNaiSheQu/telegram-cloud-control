@@ -4,8 +4,33 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Telegram 云控</title>
+    <script>
+      // 首屏主题引导：在 React 之前定下 data-theme，避免深色用户先看到一帧白屏。
+      // 只读 localStorage 的 tgcc_theme（light|dark|system），不做任何其它事情。
+      (function () {
+        try {
+          var stored = localStorage.getItem('tgcc_theme');
+          var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var mode = stored === 'light' || stored === 'dark' ? stored : dark ? 'dark' : 'light';
+          var root = document.documentElement;
+          root.dataset.theme = mode;
+          root.dataset.themePreference = stored || 'system';
+          root.style.colorScheme = mode;
+        } catch (e) {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+    <style>
+      /* 首屏占位：CSS/JS 到位前的背景色跟随主题，避免白闪 */
+      html[data-theme='dark'] body { background: #0d1117; }
+      html[data-theme='light'] body { background: #f6f7f9; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

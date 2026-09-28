@@ -1,53 +1,57 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Input,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
+import { Button, Checkbox, Input, Select, Space, Switch } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import {
-  CheckCircleTwoTone,
-  CloseCircleTwoTone,
-  ReloadOutlined,
-  SafetyCertificateOutlined,
-} from '@ant-design/icons';
+import { ReloadOutlined, SafetyCertificateOutlined, SyncOutlined } from '@ant-design/icons';
 import { accountApi, groupApi } from '../api/endpoints';
-import { useAsyncData } from '../hooks/useAsyncData';
+import { useAsyncData, useInterval } from '../hooks/useAsyncData';
+import { useTableQuery, buildActiveFilters } from '../hooks/useTableQuery';
 import { formatTime } from '../utils/format';
-import { notifySuccess } from '../utils/feedback';
-import StatusBadge from '../components/StatusBadge';
+import { toast } from '../utils/feedback';
+import {
+  DataTable,
+  FilterBar,
+  PageContainer,
+  RelativeTime,
+  SoftTag,
+  StatusBadge,
+  StatusDot,
+} from '../components';
+import { useRowSelection } from '../features/accounts/useRowSelection';
 import type { AccountOut, CheckRequest, CheckResultOut } from '../api/types';
 
 interface CheckRow extends CheckResultOut {
   checked_at: string;
 }
 
+const POLL_MS = 10_000;
+
+/** 筛选条件字段类型 */
+interface DetectionFilters extends Record<string, unknown> {
+  group_id: string | null;
+  keyword: string;
+}
+
 export default function Detection() {
-  const [keyword, setKeyword] = useState('');
-  const [groupId, setGroupId] = useState<string | undefined>(undefined);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [draftKeyword, setDraftKeyword] = useState('');
+  const selection = useRowSelection();
   const [rows, setRows] = useState<CheckRow[]>([]);
   const [checking, setChecking] = useState(false);
   const [lastScope, setLastScope] = useState<CheckRequest | null>(null);
+  const [lastLabel, setLastLabel] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
+  const q = useTableQuery<DetectionFilters>({ filters: { group_id: null, keyword: '' }, pageSize: 10 });
 
   const accounts = useAsyncData(
     () =>
       accountApi.list({
         page: 1,
         page_size: 200,
-        keyword: keyword || undefined,
-        group_id: groupId || undefined,
+        group_id: (q.filters.group_id as string | null) ?? undefined,
+        keyword: (q.filters.keyword as string) || undefined,
       }),
-    [keyword, groupId],
+    [q.paramsKey],
   );
   const groups = useAsyncData(() => groupApi.list(), []);
 
@@ -55,12 +59,12 @@ export default function Detection() {
     setChecking(true);
     try {
       const res = await accountApi.checkBatch(payload);
-      const raw = res as unknown as CheckResultOut[] | { items: CheckResultOut[] };
-      const list = Array.isArray(raw) ? raw : (raw?.items ?? []);
+      const list = Array.isArray(res) ? res : ((res as unknown as { items?: CheckResultOut[] }).items ?? []);
       const checkedAt = new Date().toISOString();
       setRows(list.map((item) => ({ ...item, checked_at: checkedAt })));
       setLastScope(payload);
-      notifySuccess(`${label}：已写 ${list.length} 条检测任务，Worker 读到后会写回状态`);
+      setLastLabel(label);
+      toast.success(`${label}：返回 ${list.length} 条结果，Worker 写回后再次刷新可看最新状态`);
       void accounts.reload();
     } catch {
       /* client 已统一提示 */
@@ -69,195 +73,254 @@ export default function Detection() {
     }
   };
 
+  // 轮询刷新：重跑最近一次检测范围，拿最新结果
+  useInterval(() => {
+    if (lastScope && !checking) void runCheck(lastScope, lastLabel || '重新检测');
+  }, autoRefresh ? POLL_MS : null);
+
+  const failedRows = useMemo(() => rows.filter((row) => !row.reachable), [rows]);
+
+  const retryFailed = () => {
+    if (!failedRows.length) return;
+    void runCheck({ account_ids: failedRows.map((row) => row.account_id), scope: 'selected' }, `重试 ${failedRows.length} 个失败项`);
+  };
+
+  const pageIds = useMemo(() => (accounts.data?.items ?? []).map((item) => item.id), [accounts.data]);
+
   const accountColumns: ColumnsType<AccountOut> = [
-    { title: '手机号', dataIndex: 'phone_masked', width: 140 },
     {
-      title: '用户名',
-      dataIndex: 'username',
-      width: 140,
-      render: (value: string | null) => value || '—',
+      title: (
+        <Checkbox
+          checked={selection.pageAllSelected(pageIds)}
+          indeterminate={selection.pageSomeSelected(pageIds) && !selection.pageAllSelected(pageIds)}
+          onChange={(event) => selection.togglePage(pageIds, event.target.checked)}
+          aria-label="选择本页全部账号"
+        />
+      ),
+      key: 'select',
+      width: 44,
+      render: (_: unknown, record) => (
+        <Checkbox
+          checked={selection.isSelected(record.id)}
+          onChange={(event) => selection.toggleOne(record.id, event.target.checked)}
+          aria-label={`选择账号 ${record.phone_masked}`}
+        />
+      ),
     },
+    { title: '手机号', dataIndex: 'phone_masked', width: 130, render: (value: string) => <span className="tg-mono">{value}</span> },
+    { title: '用户名', dataIndex: 'username', width: 120, render: (value: string | null) => value || <span className="tg-muted">—</span> },
     {
       title: '分组',
       dataIndex: 'group_name',
-      width: 120,
-      render: (value: string | null) => (value ? <Tag color="blue">{value}</Tag> : <Tag>未分组</Tag>),
+      width: 110,
+      render: (value: string | null) => (value ? <SoftTag tone="primary" size="sm">{value}</SoftTag> : <SoftTag tone="neutral" size="sm">未分组</SoftTag>),
     },
     {
       title: '状态',
       dataIndex: 'status',
       width: 110,
-      render: (_: unknown, record) => (
-        <StatusBadge status={record.status} label={record.status_label} reason={record.status_reason} />
-      ),
+      render: (_: unknown, record) => <StatusBadge status={record.status} label={record.status_label} reason={record.status_reason} size="sm" />,
     },
-    {
-      title: '最后检测',
-      dataIndex: 'last_checked_at',
-      width: 170,
-      render: (value: string | null) => formatTime(value),
-    },
-    {
-      title: '最后心跳',
-      dataIndex: 'last_heartbeat',
-      width: 170,
-      render: (value: string | null) => formatTime(value),
-    },
+    { title: '最后检测', dataIndex: 'last_checked_at', width: 150, render: (value: string | null) => <RelativeTime value={value} /> },
+    { title: '最后心跳', dataIndex: 'last_heartbeat', width: 150, render: (value: string | null) => <RelativeTime value={value} /> },
   ];
 
   const resultColumns: ColumnsType<CheckRow> = [
-    { title: '脱敏手机号', dataIndex: 'phone_masked', width: 140 },
+    { title: '脱敏手机号', dataIndex: 'phone_masked', width: 130, render: (value: string) => <span className="tg-mono">{value}</span> },
     {
       title: '连得上',
       dataIndex: 'reachable',
-      width: 110,
+      width: 100,
       render: (value: boolean) =>
         value ? (
-          <Space size={4}>
-            <CheckCircleTwoTone twoToneColor="#52c41a" /> 连得上
-          </Space>
+          <span className="tg-flex" style={{ gap: 'var(--tg-space-sm)', alignItems: 'center', color: 'var(--tg-color-success)' }}>
+            <StatusDot status="healthy" kind="account" size={8} /> 是
+          </span>
         ) : (
-          <Space size={4}>
-            <CloseCircleTwoTone twoToneColor="#ff4d4f" /> 连不上
-          </Space>
+          <span className="tg-flex" style={{ gap: 'var(--tg-space-sm)', alignItems: 'center', color: 'var(--tg-color-danger)' }}>
+            <StatusDot status="frozen" kind="account" size={8} /> 否
+          </span>
+        ),
+    },
+    {
+      title: '要验证码',
+      dataIndex: 'status',
+      width: 100,
+      render: (_: unknown, record) =>
+        record.status === 'needs_code' ? (
+          <SoftTag tone="warning" size="sm">要验证码</SoftTag>
+        ) : (
+          <span className="tg-muted">—</span>
+        ),
+    },
+    {
+      title: '会话失效',
+      dataIndex: 'status',
+      width: 100,
+      render: (_: unknown, record) =>
+        record.status === 'invalid' || record.status === 'dead' ? (
+          <SoftTag tone="danger" size="sm">会话失效</SoftTag>
+        ) : (
+          <span className="tg-muted">—</span>
         ),
     },
     {
       title: '状态',
       dataIndex: 'status',
-      width: 120,
-      render: (_: unknown, record) => <StatusBadge status={record.status} label={record.status_label} />,
+      width: 100,
+      render: (_: unknown, record) => <StatusBadge status={record.status} label={record.status_label} size="sm" />,
     },
-    {
-      title: '说明',
-      dataIndex: 'message',
-      render: (value: string) => value || '—',
-    },
+    { title: '说明', dataIndex: 'message', render: (value: string) => value || <span className="tg-muted">—</span> },
     {
       title: '关联任务',
       dataIndex: 'task_id',
-      width: 180,
+      width: 140,
       render: (value: string | null, record) =>
         value ? (
-          <Tooltip title={value}>
-            <Link to={`/tasks?account_id=${record.account_id}`}>{value.slice(0, 8)}…</Link>
-          </Tooltip>
+          <Link className="tg-mono" to={`/tasks?account_id=${record.account_id}`} style={{ fontSize: 'var(--tg-font-size-xs)' }}>
+            {value.slice(0, 8)}…
+          </Link>
         ) : (
-          '—'
+          <span className="tg-muted">—</span>
         ),
     },
+    { title: '最近检测时间', dataIndex: 'checked_at', width: 160, render: (value: string) => formatTime(value) },
     {
-      title: '检测时间',
-      dataIndex: 'checked_at',
-      width: 170,
-      render: (value: string) => formatTime(value),
+      title: '操作',
+      key: 'actions',
+      width: 80,
+      render: (_: unknown, record) => (
+        <Button size="small" icon={<ReloadOutlined />} onClick={() => void runCheck({ account_ids: [record.account_id], scope: 'selected' }, `重试 ${record.phone_masked}`)}>
+          重试
+        </Button>
+      ),
     },
   ];
 
+  const currentGroup = groups.data?.find((g) => g.id === q.filters.group_id);
+
   return (
-    <div>
-      <Card className="section-card" title="账号检测">
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message="检测会写一条 account_check 任务并立刻续一次租约，Worker 读到后读一次状态写回该行；结果为「连得上 / 要验证码 / 会话失效」。"
-        />
-        <div className="page-toolbar">
-          <Select
-            allowClear
-            placeholder="按分组筛选"
-            style={{ width: 180 }}
-            value={groupId}
-            onChange={(value) => {
-              setGroupId(value);
-              setSelectedIds([]);
-            }}
-            options={(groups.data ?? []).map((g) => ({ value: g.id, label: `${g.name}（${g.account_count}）` }))}
-          />
-          <Input.Search
-            allowClear
-            placeholder="手机号 / 用户名关键词"
-            style={{ width: 220 }}
-            onSearch={(value) => setKeyword(value.trim())}
-          />
-          <Space className="page-toolbar-right">
-            <Button icon={<ReloadOutlined />} onClick={() => void accounts.reload()} loading={accounts.loading}>
-              刷新列表
-            </Button>
+    <PageContainer
+      title="账号检测"
+      description="检测会写一条 account_check 任务，Worker 读到后回写状态；结果为「连得上 / 要验证码 / 会话失效」。"
+      actions={
+        <Space wrap>
+          <Button
+            icon={<SafetyCertificateOutlined />}
+            disabled={!selection.count}
+            loading={checking}
+            onClick={() => void runCheck({ account_ids: selection.selectedIds, scope: 'selected' }, `检测选中 ${selection.count} 个`)}
+          >
+            检测选中（{selection.count}）
+          </Button>
+          {currentGroup ? (
             <Button
-              icon={<SafetyCertificateOutlined />}
-              disabled={!selectedIds.length}
               loading={checking}
-              onClick={() =>
-                void runCheck({ account_ids: selectedIds, scope: 'selected' }, `检测选中 ${selectedIds.length} 个`)
-              }
+              onClick={() => void runCheck({ account_ids: null, scope: `group:${currentGroup.id}` }, `检测分组「${currentGroup.name}」`)}
             >
-              检测选中（{selectedIds.length}）
+              检测当前分组
             </Button>
-            {groupId ? (
-              <Button
-                loading={checking}
-                onClick={() => void runCheck({ account_ids: null, scope: `group:${groupId}` }, '检测当前分组')}
-              >
-                检测当前分组
+          ) : null}
+          <Button
+            type="primary"
+            loading={checking}
+            onClick={() => void runCheck({ account_ids: null, scope: 'all' }, '检测全部')}
+          >
+            全部检测
+          </Button>
+        </Space>
+      }
+    >
+      <FilterBar
+        collapsible
+        onReset={() => {
+          q.reset();
+          setDraftKeyword('');
+        }}
+        onSearch={() => q.setFilter('keyword', draftKeyword.trim())}
+        loading={accounts.loading}
+        activeFilters={buildActiveFilters([
+          {
+            key: 'group_id',
+            label: '分组',
+            display: currentGroup?.name,
+            clear: () => q.setFilter('group_id', null),
+          },
+          { key: 'keyword', label: '关键词', display: q.filters.keyword as string, clear: () => { setDraftKeyword(''); q.setFilter('keyword', ''); } },
+        ])}
+      >
+        <Select
+          allowClear
+          placeholder="按分组筛选"
+          style={{ width: 180 }}
+          value={(q.filters.group_id as string | null) ?? undefined}
+          onChange={(value) => {
+            q.setFilter('group_id', value ?? null);
+            selection.clear();
+          }}
+          options={(groups.data ?? []).map((g) => ({ value: g.id, label: `${g.name}（${g.account_count}）` }))}
+        />
+        <Input allowClear placeholder="手机号 / 用户名关键词" style={{ width: 220 }} value={draftKeyword} onChange={(e) => setDraftKeyword(e.target.value)} />
+      </FilterBar>
+
+      <DataTable<AccountOut>
+        rowKey="id"
+        columns={accountColumns}
+        dataSource={accounts.data?.items ?? []}
+        loading={accounts.loading}
+        error={accounts.error}
+        onRetry={() => void accounts.reload()}
+        showDensity={false}
+        title={
+          selection.count ? (
+            <span className="tg-flex" style={{ alignItems: 'center', gap: 'var(--tg-space-sm)' }}>
+              <span style={{ color: 'var(--tg-color-primary)' }}>已选 {selection.count} 个</span>
+              <Button type="link" size="small" onClick={selection.clear}>
+                取消选择
+              </Button>
+            </span>
+          ) : undefined
+        }
+        empty={{
+          art: 'accounts',
+          title: '没有符合条件的账号',
+          description: '先到账号管理建档，再来这里检测。',
+        }}
+      />
+
+      <DataTable<CheckRow>
+        rowKey={(record) => `${record.account_id}-${record.checked_at}`}
+        columns={resultColumns}
+        dataSource={rows}
+        loading={checking}
+        showDensity={false}
+        onRetry={() => lastScope && void runCheck(lastScope, lastLabel || '重新检测')}
+        title={
+          <span className="tg-flex" style={{ alignItems: 'center', gap: 'var(--tg-space-sm)' }}>
+            检测结果
+            {lastLabel ? <SoftTag tone="info" size="sm">{lastLabel}</SoftTag> : null}
+          </span>
+        }
+        toolbar={
+          <>
+            {failedRows.length ? (
+              <Button size="small" icon={<SyncOutlined />} onClick={retryFailed}>
+                重试失败项（{failedRows.length}）
               </Button>
             ) : null}
-            <Button
-              type="primary"
-              loading={checking}
-              onClick={() => void runCheck({ account_ids: null, scope: 'all' }, '检测全部')}
-            >
-              全部检测
-            </Button>
-          </Space>
-        </div>
-
-        <Table<AccountOut>
-          size="small"
-          rowKey="id"
-          loading={accounts.loading}
-          dataSource={accounts.data?.items ?? []}
-          columns={accountColumns}
-          pagination={{ pageSize: 10, showSizeChanger: false, size: 'small' }}
-          locale={{ emptyText: <Empty description="没有符合条件的账号" /> }}
-          rowSelection={{
-            preserveSelectedRowKeys: true,
-            selectedRowKeys: selectedIds,
-            onChange: (keys) => setSelectedIds(keys.map((key) => String(key))),
-          }}
-        />
-      </Card>
-
-      <Card
-        title="检测结果"
-        extra={
-          <Space>
-            <Typography.Text type="secondary">
-              {rows.length ? `最近一次检测返回 ${rows.length} 条` : '还没有发起检测'}
-            </Typography.Text>
-            <Button
-              icon={<ReloadOutlined />}
-              disabled={!lastScope}
-              loading={checking}
-              onClick={() => lastScope && void runCheck(lastScope, '重新检测')}
-            >
-              刷新结果
-            </Button>
-          </Space>
+          </>
         }
-      >
-        <Table<CheckRow>
-          size="small"
-          rowKey={(record) => `${record.account_id}-${record.task_id ?? ''}-${record.checked_at}`}
-          dataSource={rows}
-          columns={resultColumns}
-          pagination={{ pageSize: 10, showSizeChanger: false, size: 'small' }}
-          locale={{
-            emptyText: <Empty description="点上面的「检测选中」或「全部检测」查看结果" />,
-          }}
-        />
-      </Card>
-    </div>
+        extra={
+          <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-sm)' }}>
+            自动刷新（10 秒） <Switch size="small" checked={autoRefresh} onChange={setAutoRefresh} />
+          </span>
+        }
+        empty={{
+          art: 'search',
+          title: '还没有发起检测',
+          description: '点右上角「检测选中 / 检测当前分组 / 全部检测」查看结果。',
+        }}
+      />
+    </PageContainer>
   );
 }

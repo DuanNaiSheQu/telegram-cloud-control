@@ -1,27 +1,87 @@
-import { Tag, Tooltip } from 'antd';
-import { ACCOUNT_STATUS_COLORS, ACCOUNT_STATUS_LABELS } from '../constants';
+/**
+ * StatusBadge —— 账号状态徽标（7 态配色走 token）。
+ *
+ * props 契约（向后兼容旧调用：<StatusBadge status label reason />）：
+ * ┌───────────┬──────────────────────────────────────────────────────────────┐
+ * │ status    │ AccountStatus | null  状态值                                 │
+ * │ label     │ string  后端 status_label 优先，没有则用本地中文映射           │
+ * │ reason    │ string  status_reason / last_error，悬浮显示                  │
+ * │ size      │ 'sm' | 'md'  默认 'md'（sm 用于表格密集列）                    │
+ * │ showDot   │ boolean  是否带圆点，默认 true                                │
+ * │ variant   │ 'soft'（默认，浅底+描边）| 'outline' | 'text'                 │
+ * │ className │ string                                                        │
+ * └───────────┴──────────────────────────────────────────────────────────────┘
+ * 颜色：--tg-color-account-<status>-{fg,bg,border,dot}（改 tokens.ts 即整体换色）
+ */
+import type { CSSProperties } from 'react';
+import { Tooltip } from 'antd';
 import type { AccountStatus } from '../api/types';
+import { ACCOUNT_STATUS_LABELS } from '../constants';
 
-interface StatusBadgeProps {
+export interface StatusBadgeProps {
   status?: AccountStatus | null;
-  /** 后端回的 status_label 优先 */
   label?: string | null;
-  /** status_reason / last_error，鼠标悬浮看原因 */
   reason?: string | null;
+  size?: 'sm' | 'md';
+  showDot?: boolean;
+  variant?: 'soft' | 'outline' | 'text';
+  className?: string;
+  style?: CSSProperties;
 }
 
-/** 账号状态标签：正常 / 冻结 / 失效 / 永久双向 / 停用 … */
-export function StatusBadge({ status, label, reason }: StatusBadgeProps) {
-  if (!status) return <Tag>未知</Tag>;
-  const text = label || ACCOUNT_STATUS_LABELS[status] || status;
-  const color = ACCOUNT_STATUS_COLORS[status] ?? 'default';
-  const tag = <Tag color={color}>{text}</Tag>;
+export function StatusBadge({
+  status,
+  label,
+  reason,
+  size = 'md',
+  showDot = true,
+  variant = 'soft',
+  className,
+  style,
+}: StatusBadgeProps) {
+  const key = status ?? 'disabled';
+  const text = label || (status ? ACCOUNT_STATUS_LABELS[status] : '') || status || '未知';
+  const known = Boolean(status);
+
+  const colorFg = known ? `var(--tg-color-account-${key}-fg)` : 'var(--tg-color-neutral)';
+  const colorBg = known ? `var(--tg-color-account-${key}-bg)` : 'var(--tg-color-neutral-bg)';
+  const colorBorder = known ? `var(--tg-color-account-${key}-border)` : 'var(--tg-color-neutral-border)';
+  const colorDot = known ? `var(--tg-color-account-${key}-dot)` : 'var(--tg-color-neutral)';
+
+  const variantStyle: CSSProperties =
+    variant === 'soft'
+      ? { background: colorBg, borderColor: colorBorder, color: colorFg }
+      : variant === 'outline'
+        ? { background: 'transparent', borderColor: colorBorder, color: colorFg }
+        : { background: 'transparent', borderColor: 'transparent', color: colorFg, paddingLeft: 0, paddingRight: 0 };
+
+  const badge = (
+    <span
+      className={['tg-status-badge', className].filter(Boolean).join(' ')}
+      style={{
+        height: size === 'sm' ? 20 : 24,
+        fontSize: size === 'sm' ? 'var(--tg-font-size-xs)' : 'var(--tg-font-size-sm)',
+        ...variantStyle,
+        ...style,
+      }}
+    >
+      {showDot ? (
+        <span
+          className="tg-status-dot"
+          style={{ width: 6, height: 6, background: colorDot, color: colorDot }}
+          aria-hidden
+        />
+      ) : null}
+      {text}
+    </span>
+  );
+
   return reason ? (
     <Tooltip title={reason}>
-      <span style={{ cursor: 'help' }}>{tag}</span>
+      <span style={{ cursor: 'help' }}>{badge}</span>
     </Tooltip>
   ) : (
-    tag
+    badge
   );
 }
 
