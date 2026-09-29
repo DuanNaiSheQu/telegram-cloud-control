@@ -106,3 +106,27 @@
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* 有失败任务时：这一格要跳出来，一眼看到 + 可直接处理 */
+.tg-task-chip.is-danger {
+  border-color: var(--tg-color-error-border, var(--tg-color-error));
+  background: var(--tg-color-error-bg, rgba(255, 77, 79, 0.08));
+  color: var(--tg-color-error);
+  font-weight: 600;
+}
+
+.tg-task-chip.is-danger .tg-task-chip-count {
+  color: var(--tg-color-error);
+}
+
+.tg-task-chip.is-danger:hover {
+  background: var(--tg-color-error-bg, rgba(255, 77, 79, 0.14));
+}
+
+/* 顶部汇总条：右侧操作区（一键重试全部失败） */
+.tg-task-summary-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--tg-space-xs);
+}

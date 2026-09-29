@@ -6,7 +6,13 @@
  *  - GET /api/notifications（后端未就绪时自动回退为「按 dashboard 派生」的提醒）
  * 全部 silent：后端没起时不弹错误提示、不白屏，只是角标为 0。
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { readJson, writeJson } from '../../utils/storage';
+
+/** 已读通知的本地记忆（通知是按状态实时派生的，没有后端表可记） */
+const NOTICE_READ_KEY = 'tgcc_read_notices';
+/** 最多记多少条，防止 localStorage 无限增长 */
+const NOTICE_READ_LIMIT = 200;
 import { dashboardApi, notificationApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { useAsyncData, useInterval, useVisibilityRefresh } from '../../hooks/useAsyncData';
@@ -116,7 +122,7 @@ export function useShellData(): ShellData {
     const stamp = data?.generated_at ?? new Date().toISOString();
     if (counts.failed > 0) {
       items.push({
-        id: 'derived-failed',
+        id: `derived-failed:${counts.failed}`,
         kind: 'task_failed',
         kind_label: '任务失败',
         level: 'error',
@@ -129,7 +135,7 @@ export function useShellData(): ShellData {
     }
     if (counts.abnormal > 0) {
       items.push({
-        id: 'derived-abnormal',
+        id: `derived-abnormal:${counts.abnormal}`,
         kind: 'account_abnormal',
         kind_label: '账号异常',
         level: 'warning',
@@ -142,7 +148,7 @@ export function useShellData(): ShellData {
     }
     if (staleWorkers > 0) {
       items.push({
-        id: 'derived-worker',
+        id: `derived-worker:${staleWorkers}`,
         kind: 'worker_lost',
         kind_label: 'Worker 心跳',
         level: 'warning',
@@ -155,7 +161,7 @@ export function useShellData(): ShellData {
     }
     if (counts.overdue > 0) {
       items.push({
-        id: 'derived-overdue',
+        id: `derived-overdue:${counts.overdue}`,
         kind: 'task_overdue',
         kind_label: '任务逾期',
         level: 'warning',
@@ -169,8 +175,27 @@ export function useShellData(): ShellData {
     return items;
   }, [counts.abnormal, counts.failed, counts.overdue, data?.generated_at, staleWorkers]);
 
-  const notifications = notificationsError || !notificationsQuery.data ? derived : notificationsQuery.data;
-  const unreadNotifications = notifications.filter((item) => !item.read).length;
+  const allNotifications = notificationsError || !notificationsQuery.data ? derived : notificationsQuery.data;
+  // 已读记忆：通知点掉之后不能再冒出来（刷新、轮询都算）。
+  // 通知本身是按当前状态实时派生的，所以「已读」存在本地；id 里带了数量，
+  // 数量变化（比如又失败了一个任务）就是一条新提醒，会重新出现。
+  const [readNoticeIds, setReadNoticeIds] = useState<string[]>(() => {
+    const stored = readJson<string[]>(NOTICE_READ_KEY, []);
+    return Array.isArray(stored) ? stored : [];
+  });
+  const rememberRead = useCallback(
+    (ids: string[]) => {
+      setReadNoticeIds((current: string[]) => {
+        const merged = Array.from(new Set([...current, ...ids])).slice(-NOTICE_READ_LIMIT);
+        writeJson(NOTICE_READ_KEY, merged);
+        return merged;
+      });
+    },
+    [],
+  );
+  // 读过的直接不再显示（角标也只算未读的那部分）
+  const notifications = allNotifications.filter((item) => !item.read && !readNoticeIds.includes(item.id));
+  const unreadNotifications = notifications.length;
 
   const refreshNotifications = useCallback(() => {
     void notificationsQuery.reload();
@@ -178,6 +203,8 @@ export function useShellData(): ShellData {
 
   const markRead = useCallback(
     async (id: string) => {
+      // 派生通知没有后端记录，直接在本地记住已读（以前这里直接 return，所以点掉又回来）
+      rememberRead([id]);
       if (id.startsWith('derived-')) return;
       try {
         await notificationApi.markRead(id);
@@ -189,10 +216,12 @@ export function useShellData(): ShellData {
         if (!(err instanceof ApiError)) throw err;
       }
     },
-    [notificationsQuery],
+    [notificationsQuery, rememberRead],
   );
 
   const markAllRead = useCallback(async () => {
+    // 先把当前列表整体记为已读，无论后端有没有通知接口
+    rememberRead(notifications.map((item) => item.id));
     try {
       await notificationApi.markAllRead();
       notificationsQuery.setData((current) => (current ?? []).map((item) => ({ ...item, read: true })));

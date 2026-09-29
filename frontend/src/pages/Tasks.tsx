@@ -100,6 +100,7 @@ export default function Tasks() {
   });
 
   const counts = tasks.data?.counts ?? {};
+  const failedCount = counts.failed ?? 0;
   const pageItems = tasks.data?.items ?? [];
   const selectedOnPage = pageItems.filter((item) => selectedIds.includes(item.id)).length;
 
@@ -132,6 +133,33 @@ export default function Tasks() {
       void tasks.reload();
     } catch {
       /* client 已统一提示 */
+    }
+  };
+
+  /** 一键重试全部失败：先按当前筛选拉出失败任务 id，再走批量重试接口 */
+  const retryAllFailed = async () => {
+    setBatchRetrying(true);
+    try {
+      const list = await taskApi.list(
+        { status: 'failed', page: 1, page_size: 200 },
+        { silent: true },
+      );
+      const ids = (list.items ?? []).map((item) => item.id);
+      if (!ids.length) {
+        toast.info('当前没有失败的任务');
+        return;
+      }
+      const res = await api.post<BulkRetryOut>('/api/tasks/bulk/retry', { task_ids: ids }, { silent: true });
+      if (res.failed === 0) {
+        toast.success(`已重新排队 ${res.succeeded} 个失败任务`);
+      } else {
+        toast.warning(`重试完成：成功 ${res.succeeded} 个，失败 ${res.failed} 个`);
+      }
+      void tasks.reload();
+    } catch {
+      /* client 已统一提示 */
+    } finally {
+      setBatchRetrying(false);
     }
   };
 
@@ -464,7 +492,14 @@ export default function Tasks() {
       <button
         key={status}
         type="button"
-        className={['tg-task-chip', isActive ? 'is-active' : ''].filter(Boolean).join(' ')}
+        className={[
+          'tg-task-chip',
+          isActive ? 'is-active' : '',
+          // 失败数非零就标红：这一格是唯一需要立刻处理的状态
+          status === 'failed' && count > 0 ? 'is-danger' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         onClick={() => q.setFilter('status', isActive ? '' : status)}
         title={isActive ? '点击取消该状态筛选' : `只看「${TASK_STATUS_OPTIONS.find((item) => item.value === status)?.label ?? status}」`}
       >
@@ -495,7 +530,20 @@ export default function Tasks() {
             卡死
           </span>
         </Tooltip>
-        <span className="tg-task-summary-total">共 {tasks.data?.total ?? 0} 条</span>
+        <span className="tg-task-summary-actions">
+          {failedCount > 0 ? (
+            <Button
+              danger
+              size="small"
+              icon={<RedoOutlined />}
+              loading={batchRetrying}
+              onClick={() => void retryAllFailed()}
+            >
+              重试全部失败（{failedCount}）
+            </Button>
+          ) : null}
+          <span className="tg-task-summary-total">共 {tasks.data?.total ?? 0} 条</span>
+        </span>
       </div>
 
       <FilterBar
