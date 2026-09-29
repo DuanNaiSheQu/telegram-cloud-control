@@ -105,7 +105,19 @@ export default function AccountDetailDrawer({ accountId, handlers, onClose }: Pr
               {
                 title: '基本信息',
                 items: [
-                  { label: '手机号（脱敏）', value: account.phone_masked, mono: true },
+                  {
+                    label: '手机号',
+                    // 不脱敏：直接给完整号码；没有手机号的号（tdata / 会话导入）说明原因，
+                    // 而不是丢一个导入标签（如 tdata#0）让人以为号码坏了
+                    value:
+                      account.phone ||
+                      (account.phone_masked && /^\+?\d/.test(account.phone_masked)
+                        ? account.phone_masked
+                        : account.tg_user_id
+                          ? `（导入未含手机号）Telegram ID ${account.tg_user_id}`
+                          : account.phone_masked || '—'),
+                    mono: true,
+                  },
                   { label: '用户名', value: account.username || '—' },
                   { label: '用户 ID', value: account.tg_user_id ? String(account.tg_user_id) : '—', mono: true },
                   { label: '资料名称', value: account.display_name || '—' },

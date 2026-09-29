@@ -98,6 +98,15 @@ def account_label(account: Optional[TgAccount]) -> Optional[str]:
     """
     if account is None:
         return None
+    # 明文手机号优先（不脱敏）；没有才退回脱敏值 / 用户名 / 用户 ID
+    plain = ""
+    if getattr(account, "phone_enc", None):
+        try:
+            plain = (security.decrypt_secret(account.phone_enc) or "").strip()
+        except Exception:  # noqa: BLE001
+            plain = ""
+    if plain:
+        return plain
     masked = (account.phone_masked or "").strip()
     if masked and masked != "未知" and _PHONE_MASKED_RE.match(masked):
         return masked
@@ -133,6 +142,12 @@ def account_out(account: TgAccount, lease: Optional[dict] = None) -> AccountOut:
     """AccountOut 里 group_name / proxy_endpoint / worker_id / lease_until 是派生字段，
     从租约表和 joined 关系上补齐。"""
     out = AccountOut.model_validate(account)
+    # 不脱敏：直接给出完整手机号（有就显示真号；没有则空，前端会说明原因）
+    if account.phone_enc:
+        try:
+            out.phone = security.decrypt_secret(account.phone_enc) or ""
+        except Exception:  # noqa: BLE001 - 解不开（密钥轮换/脏数据）不能让接口挂
+            out.phone = ""
     out.display_label = account_label(account) or account.phone_masked or ""
     out.status_label = ACCOUNT_STATUS_LABELS.get(enum_value(account.status), "")
     out.current_task_label = CURRENT_TASK_LABELS.get(enum_value(account.current_task), "")

@@ -34,6 +34,8 @@ class AccountUpdate(BaseModel):
 class AccountOut(ORMModel):
     id: uuid.UUID
     phone_masked: str
+    # 明文手机号（自建系统，运营需要看完整号码；没有则空——比如 tdata / 会话导入的号）
+    phone: str = ""
     # 展示用标签：真手机号 > @用户名 > ID:{tg_user_id}（phone_masked 可能是导入目录标签，如 tdata#0）
     display_label: str = ""
     username: Optional[str] = None

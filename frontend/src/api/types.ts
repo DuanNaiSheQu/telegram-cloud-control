@@ -65,6 +65,8 @@ export type CurrentTask = 'idle' | 'syncing' | 'awaiting_confirm' | 'relaying';
 
 export interface AccountOut {
   /** 展示标签：真手机号 > @用户名 > ID:{tg_user_id}（phone_masked 可能是导入目录标签） */
+  /** 明文手机号（不脱敏）；tdata / 会话导入的号可能为空 */
+  phone?: string;
   display_label?: string;
   id: UUID;
   phone_masked: string;

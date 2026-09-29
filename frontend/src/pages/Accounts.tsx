@@ -701,10 +701,10 @@ export default function Accounts() {
       <ConfirmModal
         open={Boolean(deleteAccount)}
         danger
-        title={`删除账号 ${deleteAccount?.phone_masked ?? ''}？`}
+        title={`删除账号 ${deleteAccount?.display_label || deleteAccount?.phone_masked || ''}？`}
         content={<Typography.Text>删除后本号与它的会话 / 消息记录都会一并清掉，不可恢复。</Typography.Text>}
-        confirmPhrase={deleteAccount?.phone_masked ?? ''}
-        confirmPhraseHint="这是高危操作，请输入该账号的脱敏手机号确认。"
+        confirmPhrase={deleteAccount?.display_label || deleteAccount?.phone_masked || ''}
+        confirmPhraseHint="这是高危操作，请输入该账号的标识（手机号 / 用户名 / ID）确认。"
         okText="删除"
         loading={deleting}
         onOk={() => void handleDelete()}
