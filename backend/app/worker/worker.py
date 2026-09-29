@@ -37,7 +37,7 @@ from app.worker.telethon_account import AccountConnection, proxy_backend_availab
 logger = logging.getLogger(__name__)
 
 #: 一批任务里同时执行的上限，别把一批号同时打过载
-TASK_CONCURRENCY = 5
+TASK_CONCURRENCY = 10  # 默认值；实际用 settings.task_concurrency
 #: 同时建连的上限
 CONNECT_CONCURRENCY = 10
 #: Worker 心跳 TTL（告警阈值 60 秒）
@@ -68,7 +68,8 @@ class Worker:
         self.telegram_ready = bool(settings.telegram_api_id and settings.telegram_api_hash)
         self._last_renew = 0.0
         self._heartbeat_sent_at: Optional[float] = None
-        self._task_semaphore = asyncio.Semaphore(TASK_CONCURRENCY)
+        # 任务并发：多账号是并行的（各走各的连接），这里限制的是「同时在跑多少条」
+        self._task_semaphore = asyncio.Semaphore(max(1, int(settings.task_concurrency)))
         self._idle_logged = False
         self._stopped = False
 
@@ -435,6 +436,8 @@ class Worker:
                     session,
                     claimer_id=self.worker_id,
                     kind="worker",
+                    # 一轮多领一点，否则并发度上不去（领 5 条时最多只能同时跑 5 条）
+                    limit=max(settings.task_batch, settings.task_concurrency * 2),
                     account_ids=list(self.held),
                 )
         except Exception:  # noqa: BLE001

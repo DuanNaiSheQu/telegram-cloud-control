@@ -74,6 +74,17 @@ def _item(account: TgAccount, ok: bool = True, message: str = "", task_id: Optio
     )
 
 
+def _split_round_robin(targets: list[str], index: int, count: int) -> list[str]:
+    """把目标按账号轮询切分：`round_robin` 模式下每个目标只交给一个号。
+
+    比「每个号都把全部目标发一遍」更像真人分头干活，也避免同一个目标被多个号连续打扰。
+    """
+    if count <= 1 or not targets:
+        return list(targets)
+    step = max(1, count)
+    return [target for position, target in enumerate(targets) if position % step == index]
+
+
 async def _submit_campaign(
     *,
     action: str,
@@ -82,7 +93,7 @@ async def _submit_campaign(
     params: dict,
     session: AsyncSession,
     user: User,
-    per_account: Optional[Callable[[TgAccount, int], dict]] = None,
+    per_account: Optional[Callable[[TgAccount, int, int], dict]] = None,
     priority: int = 80,
 ) -> BulkResultResponse:
     """公共提交流程：解析账号范围 → 生成 batch_id → 每号一条任务（错峰入队）→ 审计 + 回执。"""
@@ -104,7 +115,8 @@ async def _submit_campaign(
             "account_count": len(accounts),
         }
         if per_account is not None:
-            payload.update(per_account(account, index))
+            # 第 3 个参数是账号总数：轮询切分需要它才能算出「这个号该拿哪些目标」
+            payload.update(per_account(account, index, len(accounts)))
         try:
             task = await enqueue_task(
                 session,
@@ -172,13 +184,20 @@ async def bulk_pm(
         "min_interval": payload.min_interval,
         "max_interval": payload.max_interval,
     }
+    round_robin = payload.dispatch == "round_robin"
     return await _submit_campaign(
         action="campaign.bulk_pm",
         task_type=TaskType.bulk_pm,
         payload_scope=payload,
-        params=params,
+        params={**params, "dispatch": payload.dispatch},
         session=session,
         user=user,
+        # 轮询模式：目标切片后每个号只跑自己那份，多号并行分摊
+        per_account=(
+            (lambda account, index, total: {"targets": _split_round_robin(payload.targets, index, total)})
+            if round_robin
+            else None
+        ),
     )
 
 
@@ -226,9 +245,15 @@ async def material_send(
         action="campaign.material_send",
         task_type=TaskType.material_send,
         payload_scope=payload,
-        params=params,
+        params={**params, "dispatch": payload.dispatch},
         session=session,
         user=user,
+        # 轮询模式：目标列表按账号切片，多号并行分摊
+        per_account=(
+            (lambda account, index, total: {"targets": _split_round_robin(payload.targets or [], index, total)})
+            if payload.dispatch == "round_robin" and payload.targets
+            else None
+        ),
     )
 
 
@@ -292,7 +317,7 @@ async def profile_update(
 ) -> BulkResultResponse:
     base = payload.profile.clean()
 
-    def per(account: TgAccount, _index: int) -> dict:
+    def per(account: TgAccount, _index: int, _total: int) -> dict:
         merged = dict(base)
         if payload.per_account and account.id in payload.per_account:
             merged.update(payload.per_account[account.id].clean())

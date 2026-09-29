@@ -23,8 +23,16 @@ import {
   Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { DeleteOutlined, InboxOutlined, PlusOutlined, ReloadOutlined, RocketOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  InboxOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  RocketOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
 import BulkResultModal from '../features/accounts/BulkResultModal';
+import AccountPickerModal from '../components/AccountPickerModal';
 import { PageContainer, StatusBadge } from '../components';
 import { campaignApi, groupApi, materialApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -49,11 +57,13 @@ import type {
   UUID,
 } from '../api/types';
 
-type ScopeValue = 'all' | 'group';
+type ScopeValue = 'all' | 'group' | 'selected';
 
 interface ScopeState {
   scope: ScopeValue;
   groupId?: UUID | null;
+  /** scope=selected 时手动勾选的账号 id */
+  ids?: string[];
   limit: number;
 }
 
@@ -67,6 +77,7 @@ const KIND_COLORS: Record<MaterialKind, string> = {
 /** 账号范围选择器：all / group:<id>；limit 默认 200 */
 function ScopeFields({ value, onChange }: { value: ScopeState; onChange: (next: ScopeState) => void }) {
   const groups = useAsyncData(() => groupApi.list(), [], { immediate: false });
+  const [pickerOpen, setPickerOpen] = useState(false);
   useEffect(() => {
     void groups.reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,8 +90,26 @@ function ScopeFields({ value, onChange }: { value: ScopeState; onChange: (next: 
         options={[
           { label: '全部可见账号', value: 'all' },
           { label: '按分组', value: 'group' },
+          { label: '手动选择', value: 'selected' },
         ]}
       />
+      {value.scope === 'selected' ? (
+        <>
+          <Button size="middle" icon={<TeamOutlined />} onClick={() => setPickerOpen(true)}>
+            选择账号{value.ids?.length ? `（已选 ${value.ids.length}）` : ''}
+          </Button>
+          <AccountPickerModal
+            open={pickerOpen}
+            title="选择要执行本次任务的账号"
+            value={value.ids ?? []}
+            onCancel={() => setPickerOpen(false)}
+            onSubmit={async (ids) => {
+              onChange({ ...value, ids });
+              setPickerOpen(false);
+            }}
+          />
+        </>
+      ) : null}
       {value.scope === 'group' ? (
         <Select
           style={{ width: 200 }}
@@ -106,6 +135,10 @@ function ScopeFields({ value, onChange }: { value: ScopeState; onChange: (next: 
 function scopePayload(scope: ScopeState): Record<string, unknown> {
   if (scope.scope === 'group' && scope.groupId) {
     return { scope: `group:${scope.groupId}`, account_ids: null, limit: scope.limit };
+  }
+  if (scope.scope === 'selected') {
+    // 手动挑号：直接把 id 列表交给后端（后端按 scope=selected 校验可见性）
+    return { scope: 'selected', account_ids: scope.ids ?? [], limit: scope.limit };
   }
   return { scope: 'all', account_ids: null, limit: scope.limit };
 }
@@ -453,6 +486,7 @@ export default function Campaigns() {
             naturalize: Boolean(values.naturalize),
             min_interval: Number(values.min_interval ?? 3),
             max_interval: Number(values.max_interval ?? 8),
+            dispatch: String(values.dispatch ?? 'each'),
           })}
           submit={(payload) => campaignApi.bulkPm(payload as unknown as BulkPmRequest)}
         >
@@ -476,6 +510,19 @@ export default function Campaigns() {
               <Switch />
             </Form.Item>
           </Space>
+          <Form.Item
+            label="分发方式"
+            name="dispatch"
+            initialValue="each"
+            tooltip="轮询分配：目标按账号轮流切分，一个目标只由一个号处理——多号并行分摊，互不重复打扰"
+          >
+            <Segmented
+              options={[
+                { label: '每个号都发一遍', value: 'each' },
+                { label: '按账号轮询分配目标', value: 'round_robin' },
+              ]}
+            />
+          </Form.Item>
         </ActionTab>
       ),
     },
@@ -524,6 +571,7 @@ export default function Campaigns() {
             targets: splitField(values.targets).length ? splitField(values.targets) : null,
             min_interval: Number(values.min_interval ?? 3),
             max_interval: Number(values.max_interval ?? 8),
+            dispatch: String(values.dispatch ?? 'each'),
           })}
           submit={(payload) => campaignApi.materialSend(payload as unknown as MaterialSendRequest)}
         >
@@ -544,6 +592,19 @@ export default function Campaigns() {
               <InputNumber min={1} max={120} />
             </Form.Item>
           </Space>
+          <Form.Item
+            label="分发方式"
+            name="dispatch"
+            initialValue="each"
+            tooltip="轮询分配：目标列表按账号轮流切分，多号并行分摊，互不重复"
+          >
+            <Segmented
+              options={[
+                { label: '每个号都发一遍', value: 'each' },
+                { label: '按账号轮询分配目标', value: 'round_robin' },
+              ]}
+            />
+          </Form.Item>
         </ActionTab>
       ),
     },

@@ -926,7 +926,12 @@ export interface CampaignScopeRequest {
   limit?: number;
 }
 
-export interface BulkPmRequest extends CampaignScopeRequest {
+export interface CampaignDispatchMixin {
+  /** each=每个号都处理全部目标；round_robin=目标按账号轮询切分 */
+  dispatch?: 'each' | 'round_robin';
+}
+
+export interface BulkPmRequest extends CampaignScopeRequest, CampaignDispatchMixin {
   targets: string[];
   text?: string | null;
   texts?: string[] | null;
@@ -942,7 +947,7 @@ export interface GroupBroadcastRequest extends CampaignScopeRequest {
   naturalize?: boolean;
 }
 
-export interface MaterialSendRequest extends CampaignScopeRequest {
+export interface MaterialSendRequest extends CampaignScopeRequest, CampaignDispatchMixin {
   material_id: UUID;
   target_group?: string | null;
   targets?: string[] | null;

@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     lease_renew_seconds: int = 10
     accounts_per_replica: int = 100
     task_batch: int = 10
+    # 同时执行多少个任务（一个任务绑定一个账号，账号之间天然互不影响）。
+    # 号池大就把它调大：20-30 个号同时干活时，这里至少给到账号数的一半。
+    task_concurrency: int = 10
     task_poll_interval: float = 2.0
     task_max_attempts: int = 5
     task_retry_base_seconds: int = 10

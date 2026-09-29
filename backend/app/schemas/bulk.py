@@ -31,6 +31,13 @@ class BulkScopeRequest(BaseModel):
     limit: int = Field(
         default=200, ge=1, le=BULK_MAX_ACCOUNTS, description=f"本次最多处理多少个号（上限 {BULK_MAX_ACCOUNTS}）"
     )
+    dispatch: str = Field(
+        default="each",
+        description=(
+            "目标怎么分给账号：each=每个号都处理全部目标（默认）；"
+            "round_robin=目标按账号轮流切分，一个目标只由一个号处理——多号并行、互不重复"
+        ),
+    )
 
 
 class BulkSyncRequest(BulkScopeRequest):
