@@ -36,6 +36,7 @@ class AccountOut(ORMModel):
     phone_masked: str
     username: Optional[str] = None
     tg_user_id: Optional[int] = None
+    api_id: Optional[int] = None
     display_name: str = ""
     age_days: Optional[int] = None
     group_count: int = 0

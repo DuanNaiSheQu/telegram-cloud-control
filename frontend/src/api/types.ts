@@ -68,6 +68,8 @@ export interface AccountOut {
   phone_masked: string;
   username?: string | null;
   tg_user_id?: number | null;
+  /** 该号登录用的 api_id（多套凭据混用时便于排查） */
+  api_id?: number | null;
   display_name: string;
   age_days?: number | null;
   group_count: number;

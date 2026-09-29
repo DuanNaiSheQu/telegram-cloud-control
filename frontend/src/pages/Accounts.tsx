@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Alert, Button, Checkbox, Dropdown, Form, Input, InputNumber, Modal, Select, Space, Tooltip, Typography } from 'antd';
+import { Alert, Avatar, Button, Checkbox, Dropdown, Form, Input, InputNumber, Modal, Select, Space, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   CloudSyncOutlined,
@@ -214,7 +214,19 @@ export default function Accounts() {
         fixed: 'left',
         render: (value: string, record) => (
           <Tooltip title={record.display_name ? `本号资料名称：${record.display_name}` : undefined}>
-            <span className="tg-mono">{value}</span>
+            <span className="tg-flex" style={{ gap: 'var(--tg-space-sm)', alignItems: 'center' }}>
+              <Avatar size={24} style={{ background: 'var(--tg-color-primary-bg)', color: 'var(--tg-color-primary)', flexShrink: 0 }}>
+                {(record.display_name || record.username || value || '?').trim().charAt(0).toUpperCase()}
+              </Avatar>
+              <span className="tg-stack" style={{ gap: 0, minWidth: 0 }}>
+                <span className="tg-mono">{value}</span>
+                {record.display_name ? (
+                  <span className="tg-muted tg-clamp-cell" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
+                    {record.display_name}
+                  </span>
+                ) : null}
+              </span>
+            </span>
           </Tooltip>
         ),
       },
@@ -269,10 +281,14 @@ export default function Accounts() {
       {
         title: '操作',
         key: 'actions',
-        width: 90,
+        width: 132,
         fixed: 'right',
         render: (_: unknown, record) => (
-          <span onClick={(event) => event.stopPropagation()}>
+          <span onClick={(event) => event.stopPropagation()} className="tg-flex" style={{ gap: 'var(--tg-space-xs)' }}>
+            {/* 单号检测直接放行内：一眼可见、一点就走，不用进菜单找 */}
+            <Button size="small" type="link" icon={<SafetyCertificateOutlined />} onClick={() => void handleCheck(record)}>
+              检测
+            </Button>
             <Dropdown
               trigger={['click']}
               menu={{
@@ -436,9 +452,22 @@ export default function Accounts() {
     dataIndex: 'client_kind',
     width: 110,
     render: (value: string) => {
-      const label = value === 'android' ? 'Android' : value === 'ios' ? 'iOS' : value === 'tdesktop' ? 'Desktop' : '未对齐';
+      const label =
+        value === 'android' ? '官方 Android' : value === 'ios' ? '官方 iOS' : value === 'tdesktop' ? '官方 Desktop' : '未对齐';
       return <SoftTag tone={value ? 'neutral' : 'warning'} size="sm">{label}</SoftTag>;
     },
+  };
+
+  // API 配置：这个号是用哪套 api_id 登录的（多套凭据混用时便于排查限流来源）
+  const apiColumn: ColumnsType<AccountOut>[number] = {
+    title: 'API 配置',
+    dataIndex: 'api_id',
+    width: 110,
+    render: (value: number | null) => (
+      <span className="tg-mono" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
+        {value ? `API ID: ${value}` : <span className="tg-muted">—</span>}
+      </span>
+    ),
   };
 
   const healthColumn: ColumnsType<AccountOut>[number] = {
@@ -459,7 +488,7 @@ export default function Accounts() {
     },
   };
 
-  const columns: ColumnsType<AccountOut> = [selectColumn, clientColumn, healthColumn, ...baseColumns];
+  const columns: ColumnsType<AccountOut> = [selectColumn, clientColumn, apiColumn, healthColumn, ...baseColumns];
 
   const bulkMenuItems = [
     { key: 'warmup', label: '官方养号（上线/翻会话）' },

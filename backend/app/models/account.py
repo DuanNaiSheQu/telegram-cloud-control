@@ -74,6 +74,8 @@ class TgAccount(Base, TimestampMixin):
     phone_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     phone_masked: Mapped[str] = mapped_column(String(32), nullable=False, default="未知")
     tg_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
+    # 这个号是通过哪套 API 凭据登录的（多套凭据混用时便于排查限流来源）
+    api_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
     username: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     display_name: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     # 号龄（天），由首次登录时间推算

@@ -509,6 +509,7 @@ async def import_accounts(
             phone_hash=security.short_hash(item.phone) if item.phone else None,
             phone_masked=mask_phone(item.phone) if item.phone else label[:32],
             tg_user_id=item.tg_user_id,
+            api_id=item.api_id or (settings.telegram_api_id or None),
             username=item.username,
             display_name=item.display_name or "",
             status=AccountStatus.healthy if item.session else AccountStatus.pending,
