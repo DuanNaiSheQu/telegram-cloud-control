@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import asyncio
 import os
 import pathlib
@@ -58,6 +59,8 @@ def ensure_display() -> dict:
     print(f"   已启动虚拟显示 {display}（无桌面环境也能跑真窗口）", flush=True)
     return env
 
+
+logger = logging.getLogger(__name__)
 
 PEIQI_ID = 8590651516
 PEIQI_USERNAME = "PeiQiBot"
@@ -157,7 +160,12 @@ async def main() -> None:
         payload = ""
         for _ in range(20):
             await asyncio.sleep(1.5)
-            for message in await client.get_messages(chat, limit=8):
+            try:
+                recent = await client.get_messages(chat, limit=8)
+            except BaseException as exc:  # noqa: BLE001 - 被群拒时读不到历史，属正常
+                logger.warning("读群消息失败：%s", type(exc).__name__)
+                continue
+            for message in recent:
                 if getattr(message, "id", 0) <= before_max or getattr(message, "sender_id", None) != PEIQI_ID:
                     continue
                 for entry in scan_buttons(message)["urls"]:

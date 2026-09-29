@@ -30,8 +30,10 @@ const url = fs.readFileSync(urlFile, 'utf8').trim();
 let browser = null;
 let browserLabel = '';
 const launchArgs = [
-  // 不用屏幕外坐标：那会让 Chrome 挂起渲染进程（页面会被关掉）。
-  // 藏窗口统一交给下面的 CDP 最小化。
+  // 藏窗口的两个要点：
+  //   1) 不用屏幕外坐标（会让 Chrome 挂起渲染进程，页面被关掉）；
+  //   2) 先把窗口开小，再在页面加载前就最小化——这样即使有闪现也只是一小块、极短。
+  // 真正的「完全不可见」要在 Linux + Xvfb 下跑（服务器上就是这种环境）。
   '--window-size=1000,760',
   '--disable-blink-features=AutomationControlled',
   '--no-first-run',
