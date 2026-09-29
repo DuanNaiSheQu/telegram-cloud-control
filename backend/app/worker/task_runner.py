@@ -29,6 +29,9 @@ from app.core import leases as lease_core
 from app.core.tasks import complete_task, fail_task
 from app.db import session_scope
 from app.models import (
+    MATERIAL_KIND_LABELS,
+    Material,
+    MaterialKind,
     ACCOUNT_STATUS_LABELS,
     AccountStatus,
     Dialog,
@@ -862,7 +865,10 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             digits = max(2, min(int(payload.get("username_random_digits") or 4), 8))
             payload["username"] = f"{prefix}{rng.randint(10 ** (digits - 1), 10**digits - 1)}"
 
-        if not any(key in payload for key in ("first_name", "last_name", "bio", "about", "username", "photo_url")):
+        if not any(
+            key in payload
+            for key in ("first_name", "last_name", "bio", "about", "username", "photo_url", "photo_material_id")
+        ):
             raise TaskFailure("修改资料任务没有可执行字段", retryable=False)
         client = self._client(account.id)
         changed: list[str] = []
@@ -887,7 +893,21 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
                     raise TaskFailure(f"用户名不符合规则：{exc}", retryable=False) from exc
                 await client(functions.account.UpdateUsernameRequest(username=username))
                 changed.append("username")
-            if payload.get("photo_url"):
+            if payload.get("photo_material_id"):
+                # 从素材库选的头像：直接用本地文件上传，不走 URL 下载（素材库本身就是给运营准备的图）
+                material = await session.get(Material, uuid.UUID(str(payload["photo_material_id"])))
+                if material is None:
+                    raise TaskFailure("头像素材不存在（可能已被删除）", retryable=False)
+                if material.kind != MaterialKind.photo:
+                    raise TaskFailure(
+                        f"头像只能用图片素材，当前选的是「{MATERIAL_KIND_LABELS.get(material.kind.value, material.kind.value)}」",
+                        retryable=False,
+                    )
+                path = self._material_path(material)
+                uploaded = await client.upload_file(path)
+                await client(functions.photos.UploadProfilePhotoRequest(file=uploaded))
+                changed.append("photo")
+            elif payload.get("photo_url"):
                 await self._upload_profile_photo(client, str(payload["photo_url"]))
                 changed.append("photo")
         except UsernameOccupiedError as exc:

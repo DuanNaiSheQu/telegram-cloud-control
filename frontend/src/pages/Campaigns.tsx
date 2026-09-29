@@ -33,6 +33,7 @@ import {
 } from '@ant-design/icons';
 import BulkResultModal from '../features/accounts/BulkResultModal';
 import AccountPickerModal from '../components/AccountPickerModal';
+import MaterialPicker from '../features/materials/MaterialSelect';
 import { PageContainer, StatusBadge } from '../components';
 import { campaignApi, groupApi, materialApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
@@ -767,6 +768,7 @@ export default function Campaigns() {
                 bio: one(bioLines),
                 username: String(values.username ?? '').trim() || null,
                 photo_url: String(values.photo_url ?? '').trim() || null,
+                photo_material_id: (values.photo_material_id as string | undefined) ?? null,
               },
               first_name_pool: nameLines.length > 1 ? nameLines : null,
               last_name_pool: lastLines.length > 1 ? lastLines : null,
@@ -824,8 +826,15 @@ export default function Campaigns() {
               />
             </Form.Item>
           </Space>
-          <Form.Item label="头像图片地址" name="photo_url">
-            <Input placeholder="https://…/avatar.jpg" />
+          <Form.Item
+            label="头像（推荐从素材库选）"
+            name="photo_material_id"
+            tooltip="直接选素材库里的图片；也可以改下面的地址字段，二选一"
+          >
+            <MaterialPicker kinds={['photo']} placeholder="从素材库选一张图片（可选）" />
+          </Form.Item>
+          <Form.Item label="或填头像图片地址" name="photo_url">
+            <Input placeholder="https://…/avatar.jpg" style={{ maxWidth: 420 }} />
           </Form.Item>
         </ActionTab>
       ),

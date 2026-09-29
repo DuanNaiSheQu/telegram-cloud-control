@@ -2,6 +2,7 @@
  * 账号管理页面私有弹窗（新建 / 改分组代理 / 改资料 / 批量操作参数）。
  * 只被 pages/Accounts.tsx 使用；通用交互走 components/ 的 ConfirmModal、AccountLoginWizard 等。
  */
+import MaterialSelect from '../materials/MaterialSelect';
 import { useEffect, useState } from 'react';
 import { Alert, Form, Input, Modal, Radio, Select, Space, Typography } from 'antd';
 import { accountBulkApi, accountApi } from '../../api/endpoints';
@@ -260,7 +261,14 @@ export function ProfileModal({
         <Form.Item label="用户名（username）" name="username">
           <Input placeholder="不带 @ 的用户名（可选）" allowClear />
         </Form.Item>
-        <Form.Item label="头像地址（photo_url）" name="photo_url">
+        <Form.Item
+          label="头像"
+          name="photo_material_id"
+          tooltip="直接从素材库选图片（推荐）；也可以填图片地址，两者二选一"
+        >
+          <MaterialSelect kinds={['photo']} placeholder="从素材库选一张图片（可选）" />
+        </Form.Item>
+        <Form.Item label="或填头像地址（photo_url）" name="photo_url">
           <Input placeholder="https://…（可选）" allowClear />
         </Form.Item>
       </Form>

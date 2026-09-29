@@ -58,6 +58,9 @@ from app.models import (
     TaskType,
     TgAccount,
     User,
+
+    Material,
+    MaterialKind,
 )
 from app.redis_client import get_redis
 from app.schemas import (
@@ -117,6 +120,8 @@ class ProfileUpdateRequest(BaseModel):
     bio: Optional[str] = Field(default=None, max_length=255)
     username: Optional[str] = Field(default=None, max_length=32)
     photo_url: Optional[str] = Field(default=None, max_length=512)
+    # 头像也可以直接从素材库选（图片素材），二选一
+    photo_material_id: Optional[uuid.UUID] = None
 
 
 # ---------------- 模块内工具 ----------------
@@ -789,9 +794,23 @@ async def update_profile(
     """资料改动由 Worker 用该号自己的会话调 Telegram，API 只入队。"""
     await assert_account_access(session, user, account_id)
     account = await _load_account(session, account_id)
-    data = {key: value for key, value in payload.model_dump().items() if value is not None}
+    # UUID（例如 photo_material_id）转字符串，否则写不进 JSONB 载荷
+    data = {
+        key: (str(value) if isinstance(value, uuid.UUID) else value)
+        for key, value in payload.model_dump().items()
+        if value is not None
+    }
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="没有要修改的字段")
+    # 头像素材先校验：不存在/不是图片就直接 404，别等 Worker 跑起来才失败
+    if payload.photo_material_id is not None:
+        material = await session.get(Material, payload.photo_material_id)
+        if material is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="头像素材不存在（可能已被删除）")
+        if material.kind != MaterialKind.photo:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="头像只能用图片素材，当前选的是其它类型"
+            )
     task = await enqueue_task(
         session,
         type=TaskType.update_profile,

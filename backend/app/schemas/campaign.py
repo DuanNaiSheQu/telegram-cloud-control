@@ -204,6 +204,8 @@ class ProfileFields(BaseModel):
     bio: Optional[str] = None
     username: Optional[str] = None
     photo_url: Optional[str] = None
+    # 头像直接选素材库里的图片（与 photo_url 二选一）
+    photo_material_id: Optional[uuid.UUID] = None
 
     @field_validator("username")
     @classmethod
@@ -221,7 +223,12 @@ class ProfileFields(BaseModel):
             raise ValueError(str(exc)) from exc
 
     def clean(self) -> Dict[str, Any]:
-        return {key: value for key, value in self.model_dump().items() if value not in (None, "")}
+        # UUID（例如 photo_material_id）要转成字符串才能进 JSONB 载荷
+        return {
+            key: (str(value) if isinstance(value, uuid.UUID) else value)
+            for key, value in self.model_dump().items()
+            if value not in (None, "")
+        }
 
 
 class ProfileBulkRequest(BulkScopeRequest):
