@@ -46,6 +46,7 @@ from app.models import (
 )
 from app.services.inbound import preview_of, publish_message, upsert_dialog
 from app.services.throttle import note_flood
+from app.services.username import USERNAME_RULE_TEXT, normalize_username, validate_username
 from app.worker import login as login_flow
 from app.worker import metrics
 from app.worker.campaign_tasks import CampaignTasksMixin
@@ -878,15 +879,24 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
                 await client(functions.account.UpdateProfileRequest(**profile))
                 changed.extend(sorted(profile))
             if payload.get("username"):
-                await client(functions.account.UpdateUsernameRequest(username=str(payload["username"])))
+                # 兜底清洗：历史任务里可能存着 `@name` 或 t.me 链接，直接发会被 Telegram 拒绝
+                username = normalize_username(str(payload["username"]))
+                try:
+                    validate_username(username or "")
+                except ValueError as exc:
+                    raise TaskFailure(f"用户名不符合规则：{exc}", retryable=False) from exc
+                await client(functions.account.UpdateUsernameRequest(username=username))
                 changed.append("username")
             if payload.get("photo_url"):
                 await self._upload_profile_photo(client, str(payload["photo_url"]))
                 changed.append("photo")
         except UsernameOccupiedError as exc:
-            raise TaskFailure(f"用户名已被占用：{payload.get('username')}", retryable=False) from exc
+            raise TaskFailure(f"用户名已被别人占用：{payload.get('username')}，换一个", retryable=False) from exc
         except UsernameInvalidError as exc:
-            raise TaskFailure(f"用户名不合法：{payload.get('username')}", retryable=False) from exc
+            raise TaskFailure(
+                f"用户名不被 Telegram 接受：{payload.get('username')}（规则：{USERNAME_RULE_TEXT}）",
+                retryable=False,
+            ) from exc
         except Exception as exc:  # noqa: BLE001
             await self._apply_status(session, account, exc)
             raise self._failure(exc, "修改资料失败", retryable=False) from exc

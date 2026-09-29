@@ -785,8 +785,12 @@ export default function Campaigns() {
             <Form.Item label="姓氏（多行=候选池）" name="last_name">
               <Input.TextArea placeholder={'Chen\nWang\nLi'} autoSize={{ minRows: 2, maxRows: 6 }} style={{ width: 200 }} />
             </Form.Item>
-            <Form.Item label="固定用户名（@ 后面部分）" name="username">
-              <Input placeholder="单个号才用，批量建议用右边的前缀" style={{ width: 240 }} />
+            <Form.Item
+              label="固定用户名（@ 后面部分）"
+              name="username"
+              tooltip="直接填用户名即可；带 @ 或 t.me 链接会被自动清洗。规则：5-32 位，字母/数字/下划线，以字母开头"
+            >
+              <Input placeholder="例如 woieduanai（@ 会自动去掉）" style={{ width: 240 }} />
             </Form.Item>
           </Space>
           <Form.Item label="简介（多行=候选池）" name="bio">

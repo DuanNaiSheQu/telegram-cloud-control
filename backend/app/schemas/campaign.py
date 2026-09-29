@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.config import settings
 from app.schemas.bulk import BulkScopeRequest
+from app.services.username import normalize_username, validate_username
 from app.schemas.common import ORMModel
 from app.models.material import MaterialKind
 
@@ -203,6 +204,21 @@ class ProfileFields(BaseModel):
     bio: Optional[str] = None
     username: Optional[str] = None
     photo_url: Optional[str] = None
+
+    @field_validator("username")
+    @classmethod
+    def _check_username(cls, value):
+        """用户名先清洗再校验：`@woieduanai`、`t.me/woieduanai` 都会被整理成 `woieduanai`。
+
+        不清洗的话会原样发给 Telegram，然后报「用户名不合法」——但其实是多了个 @，
+        运营同学很难从那句话里看出来。
+        """
+        if value in (None, ""):
+            return None
+        try:
+            return validate_username(str(value))
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
 
     def clean(self) -> Dict[str, Any]:
         return {key: value for key, value in self.model_dump().items() if value not in (None, "")}
