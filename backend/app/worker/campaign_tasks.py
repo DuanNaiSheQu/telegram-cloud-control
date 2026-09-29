@@ -646,6 +646,78 @@ class CampaignTasksMixin:
             raise TaskFailure(f"加群全部失败，首错：{first_error}", retryable=False)
         return {"joined": joined, "already": already, "total": len(raw_targets), "results": results[:50]}
 
+    async def _screen_groups(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
+        """筛群：批量检测一批群的成色，决定值不值得投。
+
+        对手（彩虹/云端漫步）都有这个工具，因为「发进死群」等于白烧号。每个群只做一次
+        `GetFullChannel`（只读），拿到：有效性、人数、在线数、类型、是否需审核加入、
+        能否发言（默认禁言权限）、慢速模式、简介。
+        """
+        assert account is not None
+        self._ensure_sendable(account)
+        payload = dict(task.payload or {})
+        raw_targets = [str(item).strip() for item in (payload.get("targets") or []) if str(item).strip()]
+        if not raw_targets:
+            raise TaskFailure("筛群任务缺少目标", retryable=False)
+        limit = max(1, min(int(payload.get("limit") or len(raw_targets)), 200))
+        raw_targets = raw_targets[:limit]
+        client = self._client(account.id)
+        rng = self._campaign_rng(task, payload)
+        min_interval = self._interval_of(payload, "min_interval", 1.5)
+        max_interval = self._interval_of(payload, "max_interval", 4.0)
+
+        results: list[dict] = []
+        usable = 0
+        for index, target in enumerate(raw_targets):
+            row: dict = {"target": target}
+            try:
+                entity = await resolve_entity(client, target)
+                full = await client(functions.channels.GetFullChannelRequest(channel=entity))
+                fc = getattr(full, "full_chat", None)
+                is_megagroup = bool(getattr(fc, "megagroup", False))
+                is_broadcast = bool(getattr(fc, "broadcast", False))
+                banned = getattr(fc, "default_banned_rights", None)
+                can_send = not bool(getattr(banned, "send_messages", False)) if banned is not None else True
+                members = getattr(fc, "participants_count", None)
+                online = getattr(fc, "online_count", None)
+                row.update(
+                    {
+                        "ok": True,
+                        "title": getattr(entity, "title", None) or "",
+                        "username": getattr(entity, "username", None),
+                        "tg_chat_id": getattr(entity, "id", None),
+                        "kind": "超级群" if is_megagroup else ("频道" if is_broadcast else "普通群"),
+                        "members": members,
+                        "online": online,
+                        "needs_approval": bool(getattr(fc, "join_request", False)),
+                        "can_send": can_send,
+                        "slowmode": int(getattr(fc, "slowmode_seconds", 0) or 0),
+                        "about": (getattr(fc, "about", "") or "")[:140],
+                    }
+                )
+                # 投放价值：能发言 + 有人 + 不需要审核加入
+                row["worth_it"] = bool(can_send and not row["needs_approval"] and (members or 0) > 0)
+                if row["worth_it"]:
+                    usable += 1
+            except BaseException as exc:  # noqa: BLE001 - 单个群失败继续
+                row.update({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
+            results.append(row)
+            if (index + 1) % 5 == 0 or index == len(raw_targets) - 1:
+                await self._report_progress(
+                    session, task, stage="screening",
+                    detail=f"已检测 {index + 1}/{len(raw_targets)} 个群，其中 {usable} 个值得投放",
+                    scanned=index + 1, found=usable, total=len(raw_targets),
+                )
+            if index < len(raw_targets) - 1:
+                await sleep_human(min_interval, max_interval, rng)
+
+        return {
+            "total": len(raw_targets),
+            "usable": usable,
+            "results": results,
+            "summary": f"检测 {len(raw_targets)} 个群，{usable} 个值得投放（可发言、需审核=否、有人）",
+        }
+
     async def _leave_group(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """退群：频道用 LeaveChannel，普通群用 DeleteChatUser；可选删除本地会话。"""
         assert account is not None

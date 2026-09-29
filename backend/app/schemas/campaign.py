@@ -412,3 +412,18 @@ class GenerateTextsRequest(BaseModel):
     count: int = Field(default=10, ge=1, le=50, description="生成几条")
     style: str = Field(default="自然口语，像真人随手打的，不要广告腔", max_length=200, description="语气风格")
     language: str = Field(default="中文", max_length=20, description="语言")
+
+class ScreenGroupsRequest(BulkScopeRequest):
+    """筛群：给一批群链接/用户名，检测成色。"""
+
+    targets: List[str] = Field(default_factory=list, description="群链接 / @username / chat_id，一行或逗号分隔")
+    limit: int = Field(default=200, ge=1, le=200, description="最多检测多少个群")
+    min_interval: float = Field(default=1.5, ge=0.5, le=30, description="两次检测之间的最小间隔（秒）")
+    max_interval: float = Field(default=4.0, ge=0.5, le=60, description="最大间隔（秒）")
+
+    @model_validator(mode="after")
+    def _check(self):
+        self.targets = _validate_targets(self.targets)
+        if not self.targets:
+            raise ValueError("targets 不能为空")
+        return self

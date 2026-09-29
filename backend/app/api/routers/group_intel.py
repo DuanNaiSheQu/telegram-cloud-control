@@ -34,6 +34,7 @@ from app.core.audit import write_audit
 from app.core.tasks import enqueue_task
 from app.models import (
     GROUP_EVENT_LABELS,
+    Lease,
     AccountStatus,
     TASK_STATUS_LABELS,
     Dialog,
@@ -241,14 +242,27 @@ async def inspect_groups(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在")
     else:
         clause = scope_clause(TgAccount.id, await visible_account_ids(session, user))
-        conditions = [TgAccount.status == AccountStatus.healthy, TgAccount.session_enc.is_not(None)]
+        now = datetime.now(tz=timezone.utc)
+        # 关键：必须挑「**当前被 Worker 持有租约**」的号。
+        # Worker 只处理自己租约内账号的任务——挑一个没有租约的号，任务会永远挂在「待执行」
+        # 而不报任何错（这个坑我自己踩过：看起来入队成功，实际永远不动）。
+        leased = select(Lease.account_id).where(Lease.lease_until > now)
+        conditions = [
+            TgAccount.status == AccountStatus.healthy,
+            TgAccount.session_enc.is_not(None),
+            TgAccount.id.in_(leased),
+        ]
         if clause is not None:
             conditions.append(clause)
         account = await session.scalar(select(TgAccount).where(*conditions).limit(1))
         if account is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="没有可用的号来做体检（需要状态正常且已导入会话）；冻结 / 失效的号读不了群。",
+                detail=(
+                    "当前没有「已上线且持有 Worker 租约」的号可供体检。"
+                    "Worker 只处理自己租约内的账号任务——请先在账号管理里确认号已上线（在线状态），"
+                    "或点击「批量检测」让 Worker 重新认领。"
+                ),
             )
 
     task = await enqueue_task(
