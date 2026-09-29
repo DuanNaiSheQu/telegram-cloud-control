@@ -470,6 +470,102 @@ interface ActionFormProps {
   children: React.ReactNode;
 }
 
+/** 资料模板：把「名字池 / 简介池 / 用户名规则 / 头像」整套存起来，下次一键套用。
+ *
+ *  为什么做在浏览器里（localStorage）而不是服务端：改资料是低频操作，
+ *  模板属于操作者个人的填写习惯，不值得为它开一张表 + 一套增删改查接口；
+ *  存在本地反而更直接——唯一代价是换浏览器要重新存一次。
+ */
+const PROFILE_TEMPLATE_KEY = 'cloudctl.profile_templates';
+
+const PROFILE_TEMPLATE_FIELDS = [
+  'first_name', 'last_name', 'bio', 'fixed_username',
+  'username_prefix', 'username_digits', 'pool_mode', 'photo_material_id', 'photo_url',
+] as const;
+
+function ProfileTemplates() {
+  const form = Form.useFormInstance();
+  const [templates, setTemplates] = useState<Record<string, Record<string, unknown>>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(PROFILE_TEMPLATE_KEY) ?? '{}') as Record<string, Record<string, unknown>>;
+    } catch {
+      return {};
+    }
+  });
+  const [naming, setNaming] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [message, setMessage] = useState('');
+
+  const persist = (next: Record<string, Record<string, unknown>>) => {
+    setTemplates(next);
+    localStorage.setItem(PROFILE_TEMPLATE_KEY, JSON.stringify(next));
+  };
+
+  const saveCurrent = () => {
+    const name = draftName.trim();
+    if (!name) return;
+    const values = form.getFieldsValue(true) as Record<string, unknown>;
+    const snapshot: Record<string, unknown> = {};
+    PROFILE_TEMPLATE_FIELDS.forEach((key) => {
+      const value = values[key];
+      if (value !== undefined && value !== null && value !== '') snapshot[key] = value;
+    });
+    persist({ ...templates, [name]: snapshot });
+    setNaming(false);
+    setDraftName('');
+    setMessage(`已保存模板「${name}」`);
+  };
+
+  const applyTemplate = (name: string) => {
+    form.setFieldsValue(templates[name]);
+    setMessage(`已套用模板「${name}」`);
+  };
+
+  const removeTemplate = (name: string) => {
+    const next = { ...templates };
+    delete next[name];
+    persist(next);
+    setMessage(`已删除模板「${name}」`);
+  };
+
+  const names = Object.keys(templates);
+
+  return (
+    <div className="tg-template-bar" style={{ gridColumn: '1 / -1' }}>
+      <span className="tg-template-label">资料模板</span>
+      {names.length === 0 && <span className="tg-template-empty">还没有模板，填好下面内容后点右侧保存</span>}
+      {names.map((name) => (
+        <span key={name} className="tg-template-chip">
+          <button type="button" onClick={() => applyTemplate(name)} title="套用这套资料">
+            {name}
+          </button>
+          <button type="button" className="tg-template-del" onClick={() => removeTemplate(name)} title="删除">
+            ×
+          </button>
+        </span>
+      ))}
+      {naming ? (
+        <span className="tg-template-save">
+          <Input
+            size="small"
+            autoFocus
+            placeholder="模板名，例如「印尼号-男」"
+            value={draftName}
+            style={{ width: 200 }}
+            onChange={(event) => setDraftName(event.target.value)}
+            onPressEnter={saveCurrent}
+          />
+          <Button size="small" type="primary" onClick={saveCurrent}>保存</Button>
+          <Button size="small" onClick={() => setNaming(false)}>取消</Button>
+        </span>
+      ) : (
+        <Button size="small" onClick={() => setNaming(true)}>＋ 保存当前为模板</Button>
+      )}
+      {message && <span className="tg-template-msg">{message}</span>}
+    </div>
+  );
+}
+
 /** 节奏预设按钮：靠 Form.useFormInstance 拿到当前表单实例，一键套用整组参数 */
 function RhythmPresets() {
   const form = Form.useFormInstance();
@@ -1021,7 +1117,7 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="批量改资料"
-          description="一批号改名 / 简介 / 用户名 / 头像。文字框里写一行=所有号统一改成它，写多行=当成候选池，每个号拿不同的值（避免一批号资料完全一样）。留空的字段不改。"
+          description="一批号改名 / 简介 / 用户名 / 头像。文字框里写一行=所有号统一改成它，写多行=当成候选池，每个号拿不同的值（避免一批号资料完全一样）。留空的字段不改。可把整套配置存成模板，下次一键套用。"
           buildPayload={(scope, values) => {
             // 一行 = 统一值；多行 = 候选池（按号顺序轮流取 或 随机取）
             const nameLines = splitField(values.first_name);
@@ -1048,6 +1144,7 @@ export default function Campaigns() {
           }}
           submit={(payload) => campaignApi.profileUpdate(payload as unknown as ProfileBulkRequest)}
         >
+          <ProfileTemplates />
           <Space wrap align="start">
             <Form.Item label="名字（多行=候选池）" name="first_name">
               <Input.TextArea placeholder={'David\nAlex\n小林'} autoSize={{ minRows: 2, maxRows: 6 }} style={{ width: 200 }} />

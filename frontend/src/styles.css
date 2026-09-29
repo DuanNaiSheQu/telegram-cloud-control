@@ -3283,3 +3283,44 @@ body .ant-spin-container::after {
 }
 .tg-preset-btn b { font-size: 12.5px; font-weight: 600; color: var(--tg-color-text); }
 .tg-preset-btn span { font-size: 11.5px; line-height: 1.45; color: var(--tg-color-text-secondary); }
+
+/* 资料模板条：一键套用/保存整套资料配置 */
+.tg-template-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--tg-color-primary) 5%, var(--tg-color-bg-card));
+  border: 1px solid var(--tg-color-border);
+  border-radius: 10px;
+}
+.tg-template-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tg-color-primary);
+  white-space: nowrap;
+}
+.tg-template-label::after { content: '：'; }
+.tg-template-empty { font-size: 12px; color: var(--tg-color-text-secondary); }
+.tg-template-chip {
+  display: inline-flex;
+  align-items: center;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.tg-template-chip > button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--tg-color-text);
+  padding: 4px 8px;
+}
+.tg-template-chip > button:hover { color: var(--tg-color-primary); }
+.tg-template-del { color: var(--tg-color-text-secondary) !important; padding: 4px 8px 4px 4px !important; }
+.tg-template-del:hover { color: #d4380d !important; }
+.tg-template-save { display: inline-flex; align-items: center; gap: 6px; }
+.tg-template-msg { font-size: 12px; color: var(--tg-color-primary); }
