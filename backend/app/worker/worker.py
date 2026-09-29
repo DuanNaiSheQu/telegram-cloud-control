@@ -69,6 +69,8 @@ class Worker:
         self.telegram_ready = bool(settings.telegram_api_id and settings.telegram_api_hash)
         self._last_renew = 0.0
         self._heartbeat_sent_at: Optional[float] = None
+        #: 常驻续租协程（与任务执行解耦，见 _renew_loop）
+        self._renew_task: Optional[asyncio.Task] = None
         # 任务并发：多账号是并行的（各走各的连接），这里限制的是「同时在跑多少条」
         self._task_semaphore = asyncio.Semaphore(max(1, int(settings.task_concurrency)))
         self._idle_logged = False
@@ -127,6 +129,9 @@ class Worker:
                 "环境里没有 python-socks / PySocks：配了代理的号无法建连，会在 last_error 里写明原因",
                 extra={"worker_id": self.worker_id},
             )
+        # 续租独立成常驻协程：一整个任务批次是 await 跑完的（官方养号一轮就 79 秒），
+        # 挂在主循环里的话租约 TTL 撑不到下一轮，号会被判失效、新任务也领不进来
+        self._renew_task = asyncio.create_task(self._renew_loop())
 
     async def run_forever(self) -> None:
         """主循环：每轮认领租约、维护连接、续租心跳、执行任务。"""
@@ -170,6 +175,13 @@ class Worker:
         if self._stopped:
             return
         self._stopped = True
+        if self._renew_task is not None:
+            renew_task, self._renew_task = self._renew_task, None
+            renew_task.cancel()
+            try:
+                await renew_task
+            except BaseException:  # noqa: BLE001 - 取消时的异常无需上报
+                pass
         self.log.info(
             "开始优雅退出：断开连接并释放租约",
             extra={"worker_id": self.worker_id, "held": len(self.held)},
@@ -329,6 +341,26 @@ class Worker:
                 self.log.warning("检测请求触发的续租失败", extra={"worker_id": self.worker_id})
 
     # ---------------- 续租 / 心跳 / 展示状态 ----------------
+
+    async def _renew_loop(self) -> None:
+        """常驻续租：每 lease_renew_seconds 一次，与任务执行彻底解耦。
+
+        任务批次在主循环里是整段 await 的（官方养号一轮 79 秒），续租若挂在主循环上，
+        30 秒的租约 TTL 一到就过期——号被判给别人、新任务也领不进来，
+        页面上就堆一片「待执行」。
+        """
+        while not self.stopping.is_set():
+            try:
+                await asyncio.wait_for(
+                    self.stopping.wait(), timeout=max(1.0, settings.lease_renew_seconds)
+                )
+                return  # 收到停止信号
+            except asyncio.TimeoutError:
+                pass
+            try:
+                await self._renew_cycle()
+            except Exception:  # noqa: BLE001 - 单次失败不影响下一轮
+                self.log.exception("后台续租循环异常", extra={"worker_id": self.worker_id})
 
     async def _renew_cycle(self) -> None:
         """每 lease_renew_seconds 一次：续租 + 两种心跳 + 指标 + current_task。"""
@@ -502,9 +534,7 @@ class Worker:
             await self._maintain_connections()
         else:
             self._log_idle_once()
-        now = time.monotonic()
-        if self._last_renew == 0.0 or now - self._last_renew >= settings.lease_renew_seconds:
-            await self._renew_cycle()
+        # 续租不在这里做：一整个任务批次会把本循环 await 住，续租交给常驻的 _renew_loop
         await self._execute_tasks()
 
     def _log_idle_once(self) -> None:

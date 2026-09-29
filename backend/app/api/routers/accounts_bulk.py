@@ -716,13 +716,23 @@ async def bulk_probe(
 
     items: List[BulkAccountResult] = []
     task_ids: List[uuid.UUID] = []
+    # 同一次批量验活生成的 N 条任务打同一个 batch_id：
+    # 页面上就能看出「这是我从 5 个号点的那一次验活」，而不是一堆互不相干的单条任务。
+    # （营销任务早就有这个标记，批量验活这条入口漏了。）
+    batch_id = uuid.uuid4()
     for account in accounts:
         try:
             task = await enqueue_task(
                 session,
                 type=TaskType.account_check,
                 account_id=account.id,
-                payload={"deep": True, "write_probe": bool(payload.write_probe), "source": "bulk_probe"},
+                payload={
+                    "deep": True,
+                    "write_probe": bool(payload.write_probe),
+                    "source": "bulk_probe",
+                    "batch_id": str(batch_id),
+                    "account_count": len(accounts),
+                },
                 created_by=user.id,
                 priority=40,
             )

@@ -265,6 +265,30 @@ export default function Tasks() {
         render: (_: unknown, record) => <TaskTypeTag type={record.type} label={record.type_label} />,
       },
       {
+        title: '批次',
+        key: 'batch',
+        width: 130,
+        render: (_: unknown, record) => {
+          // 同一次提交（选 N 个号做同一件事）会生成 N 条任务，共用同一个 batch_id。
+          // 单看任务列表就是一盘散沙——看不出哪些是「我这次操作」产生的一批。
+          const batch = ((record.payload as Record<string, unknown> | null)?.batch_id as string) ?? '';
+          if (!batch) return <span className="tg-muted">—</span>;
+          const total = (record.payload as Record<string, unknown> | null)?.account_count;
+          return (
+            <Tooltip title={`批次 ${batch}${total ? `（共 ${total} 个号）` : ''} —— 点击只看这一批`}>
+              <Button
+                type="link"
+                size="small"
+                className="tg-mono"
+                style={{ padding: 0 }}
+                onClick={() => q.setFilters({ batch: batch })}
+              >
+                {batch.slice(0, 8)}
+              </Button>
+            </Tooltip>
+          );
+        },
+      },
         title: '状态',
         key: 'status',
         dataIndex: 'status',

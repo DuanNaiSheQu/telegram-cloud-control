@@ -106,9 +106,12 @@ def task_filter_conditions(
     account_id: Optional[uuid.UUID],
     bot_id: Optional[uuid.UUID],
     only_failed: bool,
+    batch: Optional[str] = None,
 ) -> list:
     """任务列表 / 导出的公共筛选条件（多个调用方共用一份，口径才不会走偏）。"""
     conditions = []
+    if batch:
+        conditions.append(Task.payload["batch_id"].astext == batch)
     if ids is not None:
         # operator 只看自己号上的任务；Bot 任务不属于任何员工号，对 operator 隐藏
         conditions.append(Task.account_id.in_(ids))
@@ -194,6 +197,13 @@ async def list_tasks(
     account_id: Optional[uuid.UUID] = Query(default=None),
     bot_id: Optional[uuid.UUID] = Query(default=None),
     only_failed: bool = Query(default=False, description="只看失败与等待确认的任务"),
+    batch: Optional[str] = Query(
+        default=None,
+        description=(
+            "按批次筛选：同一次提交（选 N 个号做同一件事）生成的任务共享 payload.batch_id，"
+            "传它就能只看这一批，而不是在一堆单条任务里翻"
+        ),
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     sort: Optional[str] = Query(default=None, description="排序字段，见 TASK_SORT_FIELDS"),
@@ -203,7 +213,7 @@ async def list_tasks(
 ) -> TaskListResponse:
     """counts 用同一批筛选条件（但不含 status），所以点状态标签时数字不会乱跳。"""
     ids = await visible_account_ids(session, user)
-    conditions = task_filter_conditions(ids, status_filter, type_filter, account_id, bot_id, only_failed)
+    conditions = task_filter_conditions(ids, status_filter, type_filter, account_id, bot_id, only_failed, batch)
 
     total = await session.scalar(select(func.count()).select_from(Task).where(*conditions))
     order_by = build_order_by(
@@ -226,7 +236,7 @@ async def list_tasks(
         ).all()
     )
 
-    count_conditions = task_filter_conditions(ids, None, type_filter, account_id, bot_id, only_failed)
+    count_conditions = task_filter_conditions(ids, None, type_filter, account_id, bot_id, only_failed, batch)
     rows = await session.execute(
         select(Task.status, func.count()).where(*count_conditions).group_by(Task.status)
     )
