@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 import time
 import uuid
 from typing import Any, Optional
@@ -18,7 +19,7 @@ from sqlalchemy import case, exists, func, literal, select, update
 from app.config import settings
 from app.core import events as core_events
 from app.core import leases as lease_core
-from app.core.tasks import claim_tasks, reclaim_stale_running
+from app.core.tasks import requeue_stale_running, claim_tasks, reclaim_stale_running
 from app.db import dispose_engine, session_scope
 from app.models import (
     AccountStatus,
@@ -90,6 +91,13 @@ class Worker:
                     session,
                     claimer_id=self.worker_id,
                     older_than_seconds=max(60, settings.lease_ttl_seconds * 2),
+                )
+                # 再跨 worker 回收一次：worker_id 带 pid，重启后**换了名字**，
+                # 旧进程留下的 running 任务不属于新 worker，上面那步永远收不到它们——
+                # 于是页面上就出现「执行中」卡住不动的僵尸任务。
+                # 这里按时间窗回收（10 分钟无进展即视为中断），多副本部署也不会误伤别人的活。
+                recovered += await requeue_stale_running(
+                    session, started_before=datetime.now(tz=timezone.utc) - timedelta(minutes=10)
                 )
         except Exception:  # noqa: BLE001 - 数据库暂时不通也要能起来重试
             self.log.exception("回收僵尸任务失败", extra={"worker_id": self.worker_id})

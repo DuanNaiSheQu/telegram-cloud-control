@@ -304,3 +304,36 @@ __all__ = [
     "reclaim_stale_running",
     "and_",
 ]
+
+
+async def requeue_stale_running(session: AsyncSession, *, started_before: datetime) -> int:
+    """回收「卡在执行中」的任务：把开始时间早于某个时刻、却还挂在 running 的任务放回队列。
+
+    为什么需要：Worker 重启（部署、崩溃）时，正在执行的任务不会被它自己收尾——
+    状态会一直停在 running，页面上看起来就是「执行中」永远不会结束、进度永远是 0。
+    这里按「开始时间早于阈值」把它们找回来：还能重试的回到 pending（重新排队），
+    次数用完了就标失败并写明原因。
+
+    返回回收条数。
+    """
+    rows = list(
+        (
+            await session.scalars(
+                select(Task).where(Task.status == TaskStatus.running, Task.started_at < started_before)
+            )
+        ).all()
+    )
+    for task in rows:
+        if task.attempts >= task.max_attempts:
+            task.status = TaskStatus.failed
+            task.error = "任务在「执行中」被中断（Worker 重启或崩溃），且重试次数已用完"
+            task.completed_at = _now()
+        else:
+            task.status = TaskStatus.pending
+            task.started_at = None
+            task.lease_until = None
+            task.next_run_at = _now()
+            task.error = "任务在「执行中」被中断（Worker 重启），已重新排队"
+    if rows:
+        await session.flush()
+    return len(rows)
