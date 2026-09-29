@@ -587,6 +587,9 @@ export default function Campaigns() {
             max_interval: Number(values.max_interval ?? 8),
             dispatch: String(values.dispatch ?? 'each'),
             material_id: (values.material_id as string | undefined) ?? null,
+            // 「用 Bot 私信」原来只做了 UI 开关、没接提交，这里补上（后端据此走 Bot 通道）
+            via_bot: Boolean(values.via_bot),
+            bot_id: (values.bot_id as string | undefined) ?? null,
             // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
             send_window: String(values.send_window ?? '').trim(),
             daily_quota: Number(values.daily_quota ?? 0),
