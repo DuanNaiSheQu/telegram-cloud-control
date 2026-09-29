@@ -7,6 +7,32 @@
 
 ---
 
+## v0.3.25 — 2026-03-30
+
+主题：**自己编码会话串**——修掉 telethon 1.45 带来的 `'bytes' object has no attribute 'key'`。
+
+### 修复
+
+- 现象：tdata 包里已能识别出账号目录，但转换时报
+  `AttributeError: 'bytes' object has no attribute 'key'`，导入失败。
+- 根因在 telethon 自身：1.45 起 `StringSession.save()` 内部访问 `self.auth_key.key`，
+  期望 `auth_key` 是 `AuthKey` 对象；而我们从 tdata / .session 里拿到的是 256 字节原始密钥，
+  赋值后调用 `save()` 必然抛错。也就是说**所有会话组装路径**在 1.45 下都会崩
+  （tdata 导入、`.session` 文件导入都受影响），跟 tdata 格式无关。
+- 修法：不再调用 telethon 的 `save()`，按它自己的字符串格式直接打包——
+  `'1' + base64url(struct.pack('>B{ip_len}sH256s', dc_id, ip, port, auth_key))`。
+  格式是 Telethon 多年稳定的约定，自己打包同时也把「升 telethon 就崩」这个隐患去掉了。
+- 顺带对密钥长度做校验（非 256 字节直接给可读提示，说明 tdata 不完整）。
+
+### 验证
+
+- 生成的串用 **telethon 自己的解析器**回读校验：`dc_id`、`server_address`、`port`、
+  256 字节 `auth_key` 全部一致（强校验，不是只看长度）。
+- 接口端到端：多号结构 zip 上传后返回 200，提示已不含 `bytes` 报错，
+  而是逐目录说明原因（测试用的是假数据，真实 tdata 需实机确认）。
+
+---
+
 ## v0.3.24 — 2026-03-30
 
 主题：**tdata 支持「一个包里多个号」**（每号一个子目录的打包方式）。

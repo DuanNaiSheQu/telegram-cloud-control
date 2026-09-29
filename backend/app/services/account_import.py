@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import base64
 import io
+import ipaddress
 import logging
 import pathlib
 import random
 import re
 import shutil
 import sqlite3
+import struct
 import tempfile
 import uuid
 import zipfile
@@ -349,14 +351,22 @@ def parse_session_file(data: bytes, filename: str = "session") -> ParsedAccount:
 
 
 def build_string_session(auth_key: bytes, dc_id: int) -> str:
-    """auth_key + dc_id → Telethon StringSession 串。"""
-    from telethon.sessions import StringSession
+    """auth_key + dc_id → Telethon StringSession 串（自己编码，不依赖 telethon 内部实现）。
 
-    session = StringSession()
+    格式（Telethon 自己的约定，稳定多年）：
+        `'1' + base64url( struct.pack('>BIPsH256s', dc_id, ip, port, auth_key) )`
+
+    为什么不直接 `StringSession().save()`：telethon 1.45 起 `Session.auth_key` 期望的是
+    `AuthKey` 对象，内部会访问 `self.auth_key.key`；而我们手上是 256 字节的原始密钥，
+    赋值后调用 `save()` 会抛 `AttributeError: 'bytes' object has no attribute 'key'`——
+    这是升级 telethon 后暴露出来的坑，自己打包就完全绕开了。
+    """
     server_address, port = DC_ENDPOINTS.get(int(dc_id), DC_ENDPOINTS[2])
-    session.set_dc(int(dc_id), server_address, port)
-    session.auth_key = auth_key
-    return session.save()
+    if len(auth_key) != 256:
+        raise ImportError_(f"会话密钥长度异常（{len(auth_key)} 字节，应为 256）：这个 tdata 可能不完整")
+    ip = ipaddress.ip_address(server_address).packed
+    payload = struct.pack(f">B{len(ip)}sH256s", int(dc_id), ip, int(port), auth_key)
+    return "1" + base64.urlsafe_b64encode(payload).decode("ascii")
 
 
 # ---------------- tdata（Telegram Desktop 目录） ----------------
@@ -366,6 +376,53 @@ TDATA_HINT = (
     "`uv pip install --python .venv/bin/python opentele2` 或 `pip install opentele2`。"
     "装不上时的兜底路径：用 Telegram Desktop 导出会话后走「.session 文件」导入，或在手机端用验证码登录。"
 )
+
+
+def _session_from_tdesktop(tdesk: Any) -> list[ParsedAccount]:
+    """从已加载的 TDesktop 里直接取 authKey + dcId，自己组装 StringSession。
+
+    为什么不用 opentele 的 `ToTelethon()`：它在部分版本上会走 serialize 路径并抛
+    `AttributeError: 'bytes' object has no attribute 'key'`（把 bytes 当成对象用）。
+    这里只读它已经解密好的 `account.authKey`（`key` 是 256 字节的密钥、`dcId` 是数据中心），
+    然后用我们自己的 `build_string_session` 组装——链路更短，也不受上层 API 变化影响。
+    """
+    results: list[ParsedAccount] = []
+    tdesk_dc = getattr(tdesk, "MainDcId", None)
+    for index, account in enumerate(list(getattr(tdesk, "accounts", []) or [])):
+        auth = getattr(account, "authKey", None) or getattr(account, "localKey", None)
+        if auth is None:
+            continue
+        key_bytes = auth if isinstance(auth, (bytes, bytearray)) else getattr(auth, "key", None)
+        if not key_bytes:
+            continue
+        dc_raw = getattr(auth, "dcId", None) or getattr(account, "MainDcId", None) or tdesk_dc or 2
+        # dcId 可能是枚举（值就是 1-5），也可能是对象，统一取 int
+        try:
+            dc_id = int(getattr(dc_raw, "value", dc_raw))
+        except (TypeError, ValueError):
+            dc_id = 2
+        if dc_id not in DC_ENDPOINTS:
+            dc_id = 2
+        user_id = None
+        for attr in ("UserId", "id", "user_id"):
+            raw = getattr(account, attr, None)
+            if raw:
+                try:
+                    user_id = int(getattr(raw, "value", raw))
+                except (TypeError, ValueError):
+                    user_id = None
+                break
+        results.append(
+            ParsedAccount(
+                source="tdata",
+                label=f"#{index}",
+                session=build_string_session(bytes(key_bytes), dc_id),
+                dc_id=dc_id,
+                tg_user_id=user_id,
+                extra={"note": "tdata 直接组装会话（未走 ToTelethon）"},
+            )
+        )
+    return results
 
 
 async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAccount]:
@@ -438,6 +495,14 @@ async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAc
                 if not tdesk.isLoaded():
                     errors.append(f"{label}：tdata 未加载成功（目录可能不完整）")
                     continue
+                # 先走「直接组装」（快且不受上层 API 变化影响），不行再退回 ToTelethon
+                direct = _session_from_tdesktop(tdesk)
+                if direct:
+                    for item in direct:
+                        item.label = f"{label}{item.label}"
+                        results.append(item)
+                    continue
+
                 raw_accounts = list(getattr(tdesk, "accounts", []) or [None])
                 for index, account in enumerate(raw_accounts):
                     session_path = workdir / f"converted-{root_index}-{index}.session"
