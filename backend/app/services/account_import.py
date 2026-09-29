@@ -765,6 +765,11 @@ async def import_accounts(
             app_version=item.app_version or fingerprint["app_version"],
             lang_code=fingerprint["lang_code"],
             lang_pack=fingerprint["lang_pack"],
+            # client_kind 是页面判断「官方 Android / iOS / 未对齐」的依据。
+            # 导入时就在写 device_model / system_version / lang_pack 这些身份字段了，
+            # 唯独漏了它，于是新号一律显示「未对齐」，得等 Worker 连过一次才补上——
+            # 而连接时用的本来就是同一套 fingerprint，这里直接写上即可，前后一致。
+            client_kind=fingerprint["lang_pack"] or "android",
             health_score=100 if item.session else 60,
             warmup_started_at=now if start_warmup else None,
         )
