@@ -93,6 +93,25 @@ async def collect_links(client: TelegramClient, bot: Any) -> set[str]:
     return found
 
 
+async def leave_and_rejoin(client: TelegramClient, chat: Any) -> bool:
+    """退群再申请 —— 用来重置验证机会。
+
+    NuoMi/佩奇都是「每个号在每个群只有一次机会」，用掉就不再发链接。
+    实测发现退群后重新申请会重新触发验证，所以失败重试可以走这条路，不必换号。
+    """
+    try:
+        await client(functions.channels.LeaveChannelRequest(channel=chat))
+        await asyncio.sleep(4)
+    except BaseException:  # noqa: BLE001 - 本来就不在群里也算正常
+        pass
+    try:
+        await client(functions.channels.JoinChannelRequest(channel=chat))
+        await asyncio.sleep(3)
+        return True
+    except BaseException:  # noqa: BLE001
+        return False
+
+
 async def member_state(client: TelegramClient, chat: Any) -> Optional[str]:
     """回查自己在群里的身份 —— 这是判断验证是否成功的可靠依据。"""
     try:
