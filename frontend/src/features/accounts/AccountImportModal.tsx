@@ -26,7 +26,7 @@ interface Props {
 }
 
 const KIND_TIP: Record<string, string> = {
-  phone: '每行一个号码，可写成 `+8613800138000,北京一组`；导入后走验证码登录拿会话。',
+  phone: '每行一个号码，号码后可用逗号加备注；导入后走验证码登录拿会话。',
   session_string: '每行一个 Telethon StringSession；也支持 `手机号,session` 或 `session,备注`。',
   session_file: '选一个或多个 .session 文件（Telethon / Pyrogram 的 SQLite 会话），自动转成 StringSession。',
   tdata: '把 Telegram Desktop 的 tdata 目录打包成 zip 上传；一个包里可以含多个账号。',
@@ -212,7 +212,7 @@ export default function AccountImportModal({ open, onClose, onImported }: Props)
             onChange={(event) => setText(event.target.value)}
             placeholder={
               kind === 'phone'
-                ? '+8613800138000,北京一组\n+8613900139000,上海二组'
+                ? '+8613800138000\n+8613900139000,备注'
                 : '1BVtsOK...（一行一个）\n+8613800138000,1BVtsOK...'
             }
             style={{ fontFamily: 'var(--tg-font-family-mono, monospace)' }}

@@ -38,7 +38,7 @@ def main():
     check("tdata 可用性已上报", "tdata_available" in r.json(), r.json().get("tdata_available"))
 
     # 2) 手机号清单预览
-    phones="+8613800138001,北京一组\n+8613900139002\nbad-number\n# 注释行"
+    phones="+8613800138001,备注\n+8613900139002\nbad-number\n# 注释行"
     r=api.post("/api/accounts/import/parse", data={"kind":"phone","text":phones})
     body=r.json()
     check("手机号预览解析", r.status_code==200 and body["total"]==3 and body["failed"]==1, f"total={body.get('total')} failed={body.get('failed')}")

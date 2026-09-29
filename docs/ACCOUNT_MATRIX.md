@@ -14,7 +14,7 @@
 
 | 方式 | 输入 | 行为 | 说明 |
 |---|---|---|---|
-| 手机号清单 | 每行一个号，可带备注：`+8613800138000,北京一组` | 建档，状态 `待登录` | 之后走「登录向导」发验证码拿会话 |
+| 手机号清单 | 每行一个号，号码后可用逗号加备注 | 建档，状态 `待登录` | 之后走「登录向导」发验证码拿会话 |
 | Session 串 | 每行一个 Telethon StringSession；也支持 `手机号,session` / `session,备注` | 解析校验后加密入库，状态直接 `正常` | 最常用的批量方式 |
 | `.session` 文件 | Telethon / Pyrogram 的 SQLite 会话文件，可多选 | 读 `auth_key` + `dc_id` 组装成 StringSession 入库 | 兼容 hex / base64 / BLOB 三种存法 |
 | `tdata` 目录 | Telegram Desktop 的 tdata 打包成 zip（可含多账号） | 交给 `opentele2` 转成 Telethon 会话 | **可选依赖**：没装时接口会明确提示不可用并给替代路径 |
