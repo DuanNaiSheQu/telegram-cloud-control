@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import events
+from app.services.chat_id import normalize_chat_id
 from app.models import Bot, Dialog, DialogChannel, DialogKind, Message, MessageDirection, MessageStatus
 
 
@@ -35,6 +36,9 @@ async def upsert_dialog(
     peer_display: str = "",
     member_count: Optional[int] = None,
 ) -> Dialog:
+    # 规范化会话 id：同一个群不论来自哪条同步路径，都落成同一条会话记录
+    # （否则会出现「一个群两个对话」——原始 id 与 -100 形态各建一条）
+    tg_chat_id = normalize_chat_id(tg_chat_id, kind.value if hasattr(kind, "value") else str(kind))
     dialog = await session.scalar(
         select(Dialog).where(
             Dialog.channel == channel,
