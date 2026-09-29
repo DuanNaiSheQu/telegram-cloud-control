@@ -391,7 +391,14 @@ async def join_group(
         action="campaign.join_group",
         task_type=TaskType.join_group,
         payload_scope=payload,
-        params={"target": targets[0] if targets else "", "targets": targets, "dispatch": payload.dispatch},
+        params={
+            "target": targets[0] if targets else "",
+            "targets": targets,
+            "dispatch": payload.dispatch,
+            # 加群后自动过验证（佩奇 Cap / NuoMi Turnstile）
+            "auto_verify": payload.auto_verify,
+            "verify_timeout": payload.verify_timeout,
+        },
         session=session,
         user=user,
         # 轮询模式：群按账号轮流切分，一个群只由一个号去加（避免所有号都去挤同一个群）

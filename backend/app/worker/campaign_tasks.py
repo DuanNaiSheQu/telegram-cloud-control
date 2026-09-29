@@ -704,7 +704,9 @@ class CampaignTasksMixin:
                     continue
                 try:
                     target_chat = await resolve_chat_entity(client, item["target"], session=session)
-                    outcome = await verifier.handle(target_chat)
+                    outcome = await verifier.handle(
+                        target_chat, timeout=float(payload.get("verify_timeout") or 150)
+                    )
                     item["verify"] = outcome
                     if outcome.get("passed"):
                         verified += 1

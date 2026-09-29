@@ -800,6 +800,9 @@ export default function Campaigns() {
             min_interval: Number(values.min_interval ?? 3),
             max_interval: Number(values.max_interval ?? 8),
             dispatch: String(values.dispatch ?? 'each'),
+            // 入群验证：佩奇(Cap)/NuoMi(Turnstile) 自动过，失败退群重进重试
+            auto_verify: values.auto_verify !== false,
+            verify_timeout: Number(values.verify_timeout ?? 150),
             // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
             send_window: String(values.send_window ?? '').trim(),
             daily_quota: Number(values.daily_quota ?? 0),
@@ -890,6 +893,23 @@ export default function Campaigns() {
                 { label: '按账号轮询分配群', value: 'round_robin' },
               ]}
             />
+          </Form.Item>
+          <Form.Item
+            label="自动过入群验证"
+            name="auto_verify"
+            valuePropName="checked"
+            initialValue
+            tooltip="识别佩奇(Cap) / NuoMi(Turnstile) 等验证机器人，自动打开浏览器完成验证，再回查能否发言确认放行；失败会自动退群重进重试（每个号在每个群原本只有一次验证机会，退群重进可重置）"
+          >
+            <Switch checkedChildren="自动过" unCheckedChildren="跳过" />
+          </Form.Item>
+          <Form.Item
+            label="验证等待时长（秒）"
+            name="verify_timeout"
+            initialValue={150}
+            tooltip="等验证机器人发来验证消息的最长时间。验证链接寿命很短（NuoMi 60 秒、佩奇 300 秒），设太长没有意义"
+          >
+            <InputNumber min={30} max={600} step={30} style={{ width: 160 }} addonAfter="秒" />
           </Form.Item>
         </ActionTab>
       ),

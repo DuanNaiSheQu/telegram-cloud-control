@@ -173,6 +173,16 @@ class JoinGroupRequest(BulkScopeRequest):
     targets: Optional[List[str]] = Field(
         default=None, description="多个群（每行一个，最多 50 个）；与 target 二选一，同时给则合并"
     )
+    auto_verify: bool = Field(
+        default=True,
+        description=(
+            "加群后自动过入群验证：识别佩奇(Cap)/NuoMi(Turnstile) 等验证机器人，"
+            "自动打开浏览器完成验证并回查能否发言；失败会退群重进重试。"
+        ),
+    )
+    verify_timeout: int = Field(
+        default=150, ge=30, le=600, description="等待验证消息的秒数（验证链接寿命很短，不宜过长）"
+    )
 
     @model_validator(mode="after")
     def _merge_targets(self):
