@@ -58,7 +58,20 @@ async def resolve_entity(client: Any, raw: Any) -> Any:
             return entity
         except Exception as exc:  # noqa: BLE001 - 换下一个候选继续试
             last_error = exc
-    # 最后一招：交给 telethon 用自己的缓存直接处理原始值（例如已同步过的用户名）
+    # 兜底一：拉一次会话列表把 Telethon 的实体缓存填上。
+    # 有些群/频道没有公开用户名，或执行号还没入群，缓存里就什么都没有；
+    # 拉一次 dialogs 能把「该号确实在的那些会话」补进缓存，之后按 id 就能解析。
+    try:
+        await client.get_dialogs(limit=200)
+        for candidate in candidates:
+            try:
+                return await client.get_entity(candidate)
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+    except Exception as exc:  # noqa: BLE001 - 拉列表失败不阻塞，继续走下面的兜底
+        logger.debug("预热会话缓存失败：%s", exc)
+
+    # 兜底二：交给 telethon 用它的缓存直接处理原始值（例如已同步过的用户名）
     try:
         return await client.get_entity(raw)
     except Exception as exc:  # noqa: BLE001
