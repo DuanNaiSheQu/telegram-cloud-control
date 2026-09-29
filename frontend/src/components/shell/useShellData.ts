@@ -13,6 +13,8 @@ import { readJson, writeJson } from '../../utils/storage';
 const NOTICE_READ_KEY = 'tgcc_read_notices';
 /** 最多记多少条，防止 localStorage 无限增长 */
 const NOTICE_READ_LIMIT = 200;
+/** 侧栏失败角标「已看过」的失败数 */
+const FAILED_SEEN_KEY = 'tgcc_failed_seen';
 import { dashboardApi, notificationApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { useAsyncData, useInterval, useVisibilityRefresh } from '../../hooks/useAsyncData';
@@ -51,6 +53,8 @@ export interface ShellData {
   refreshNotifications: () => void;
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
+  /** 任务失败已看过：进任务中心时调用，之后侧栏角标只在出现新失败时才亮 */
+  markFailuresSeen: () => void;
 }
 
 const EMPTY_COUNTS: ShellCounts = {
@@ -197,6 +201,22 @@ export function useShellData(): ShellData {
   const notifications = allNotifications.filter((item) => !item.read && !readNoticeIds.includes(item.id));
   const unreadNotifications = notifications.length;
 
+  // 侧栏「失败」角标同样是「看过就不再提醒」：进过任务中心之后，
+  // 只有**新的失败**（失败数比看过的多）才重新亮红点——否则那个 17 会一直挂着。
+  const [seenFailedCount, setSeenFailedCount] = useState<number>(() => {
+    const stored = readJson<number>(FAILED_SEEN_KEY, 0);
+    return typeof stored === 'number' && stored >= 0 ? stored : 0;
+  });
+  const failedUnseen = Math.max(0, (counts.failed ?? 0) - seenFailedCount);
+  const markFailuresSeen = useCallback(() => {
+    setSeenFailedCount((current: number) => {
+      const next = Math.max(current, counts.failed ?? 0);
+      if (next === current) return current; // 没变化就不写盘
+      writeJson(FAILED_SEEN_KEY, next);
+      return next;
+    });
+  }, [counts.failed]);
+
   const refreshNotifications = useCallback(() => {
     void notificationsQuery.reload();
   }, [notificationsQuery]);
@@ -232,7 +252,9 @@ export function useShellData(): ShellData {
 
   return {
     dashboard: data,
-    counts,
+    // 侧栏角标只反映「还没看过的失败」——看过任务中心的失败之后，只有新增失败才再亮
+    counts: { ...counts, failed: failedUnseen },
+    markFailuresSeen,
     workers,
     staleWorkers,
     generatedAt: data?.generated_at,

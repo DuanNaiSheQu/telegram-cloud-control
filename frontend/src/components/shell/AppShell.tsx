@@ -45,6 +45,13 @@ export function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   const shell = useShellData();
+
+  // 进任务中心 = 看过失败了：侧栏那个红色角标随之消失，
+  // 之后只有出现**新的**失败（失败数增加）才重新亮起来。
+  useEffect(() => {
+    if (location.pathname.startsWith('/tasks')) shell.markFailuresSeen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, shell.markFailuresSeen]);
   const { status: wsStatus } = useWebSocket(true);
 
   const collapsed = isNarrow ? true : (userCollapsed ?? isCompact);
