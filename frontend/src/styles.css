@@ -3654,3 +3654,35 @@ body .ant-spin-container::after {
 }
 .login-brand-links a:hover { color: #fff; text-decoration: underline; }
 .login-brand-links-sep { color: rgba(255, 255, 255, 0.35); }
+
+/* 声明弹窗里的赞助商：居中并列、拉开间距，各自 logo 与说明纵向居中 */
+.about-sponsors {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 24px 64px;
+  padding: 6px 0 2px;
+}
+.about-sponsor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 170px;
+  text-decoration: none;
+}
+.about-sponsor img {
+  height: 34px;
+  width: auto;
+  max-width: 190px;
+  object-fit: contain;
+  transition: opacity 0.15s ease;
+}
+.about-sponsor span {
+  font-size: 12px;
+  color: var(--tg-color-text-secondary);
+  white-space: nowrap;
+}
+.about-sponsor:hover img { opacity: 0.78; }
+.about-sponsor:hover span { color: var(--tg-color-primary); }

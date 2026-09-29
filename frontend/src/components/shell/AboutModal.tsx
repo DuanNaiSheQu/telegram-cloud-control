@@ -76,16 +76,17 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
       <Divider orientation="left" plain style={{ margin: '16px 0 12px' }}>
         赞助商
       </Divider>
-      <Space size={24} wrap align="center" style={{ paddingLeft: 2 }}>
-        <a href="https://cafinx.com" target="_blank" rel="noreferrer">
-          <img src="/sponsors/cafinx.png" alt="CAFINX 虚拟卡" style={{ height: 30 }} />
-          <div style={{ fontSize: 12, color: '#8c8c8c' }}>跨境收付虚拟卡</div>
+      {/* 两家赞助商居中并列、彼此拉开距离 —— 挨在一起会显得像一个组合 logo */}
+      <div className="about-sponsors">
+        <a className="about-sponsor" href="https://cafinx.com" target="_blank" rel="noreferrer">
+          <img src="/sponsors/cafinx.png" alt="CAFINX 虚拟卡" />
+          <span>跨境收付虚拟卡</span>
         </a>
-        <a href="https://cafinxsim.com" target="_blank" rel="noreferrer">
-          <img src="/sponsors/cafinxsim.png" alt="CAFINXSIM" style={{ height: 30 }} />
-          <div style={{ fontSize: 12, color: '#8c8c8c' }}>全球 eSIM 流量卡</div>
+        <a className="about-sponsor" href="https://cafinxsim.com" target="_blank" rel="noreferrer">
+          <img src="/sponsors/cafinxsim.png" alt="CAFINXSIM" />
+          <span>全球 eSIM 流量卡</span>
         </a>
-      </Space>
+      </div>
 
       <Divider orientation="left" plain style={{ margin: '16px 0 12px' }}>
         ⚠️ 使用声明
