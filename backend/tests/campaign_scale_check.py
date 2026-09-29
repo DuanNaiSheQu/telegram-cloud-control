@@ -121,6 +121,27 @@ def main():
     r = c.post("/api/campaigns/join-group", headers=H, json={"scope": "all", "targets": []})
     check("空目标被拦", r.status_code == 422, r.status_code)
 
+    # 3.6) 退群 / 强拉：多目标 + 兼容单目标
+    r = c.post("/api/campaigns/leave-group", headers=H, json={
+        "scope": "selected", "account_ids": [str(ids[0])],
+        "targets": ["@a", "@b", "@c"], "dispatch": "each",
+    })
+    check("退群多群入队", r.status_code == 200 and r.json()["succeeded"] == 1, r.json().get("message"))
+
+    r = c.post("/api/campaigns/leave-group", headers=H, json={
+        "scope": "selected", "account_ids": [str(ids[0])], "target": "@legacy_leave",
+    })
+    check("退群单目标兼容", r.status_code == 200 and r.json()["succeeded"] == 1, r.json().get("message"))
+
+    r = c.post("/api/campaigns/force-add", headers=H, json={
+        "scope": "selected", "account_ids": [str(ids[0]), str(ids[1])],
+        "groups": ["@g1", "@g2"], "members": ["@m1"], "dispatch": "round_robin",
+    })
+    check("强拉多群入队", r.status_code == 200 and r.json()["succeeded"] == 2, r.json().get("message"))
+
+    r = c.post("/api/campaigns/force-add", headers=H, json={"scope": "all", "groups": [], "members": ["@m1"]})
+    check("强拉空群被拦", r.status_code == 422, r.status_code)
+
     # 4) 并发配置存在
     from app.config import settings
     check("并发可配且默认提升", settings.task_concurrency >= 10 and settings.task_batch >= 10,

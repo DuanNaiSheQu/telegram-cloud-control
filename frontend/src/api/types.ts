@@ -962,11 +962,15 @@ export interface JoinGroupRequest extends CampaignScopeRequest {
 export interface LeaveGroupRequest extends CampaignScopeRequest {
   target: string;
   delete_history?: boolean;
+  /** 多个群，一行一个 */
+  targets?: string[] | null;
 }
 
 export interface ForceAddRequest extends CampaignScopeRequest {
   group: string;
   members: string[];
+  /** 多个目标群，一行一个 */
+  groups?: string[] | null;
 }
 
 export interface ProfileFields {

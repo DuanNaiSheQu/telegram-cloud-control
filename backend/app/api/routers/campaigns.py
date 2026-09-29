@@ -307,7 +307,12 @@ async def leave_group(
         action="campaign.leave_group",
         task_type=TaskType.leave_group,
         payload_scope=payload,
-        params={"target": payload.target.strip(), "delete_history": payload.delete_history},
+        params={
+            "target": (payload.targets or [""])[0],
+            "targets": payload.targets,
+            "delete_history": payload.delete_history,
+            "dispatch": payload.dispatch,
+        },
         session=session,
         user=user,
     )
@@ -323,7 +328,12 @@ async def force_add(
         action="campaign.force_add",
         task_type=TaskType.force_add_member,
         payload_scope=payload,
-        params={"group": payload.group.strip(), "members": payload.members},
+        params={
+            "group": (payload.groups or [""])[0],
+            "groups": payload.groups,
+            "members": payload.members,
+            "dispatch": payload.dispatch,
+        },
         session=session,
         user=user,
     )

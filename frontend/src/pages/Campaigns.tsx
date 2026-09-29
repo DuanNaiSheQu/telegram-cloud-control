@@ -691,16 +691,30 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="批量退群"
-          description="一批号退出同一个群。支持 @用户名、数字群 ID 或会话 ID。"
+          description="一批号退出一个或多个群，一行一个。支持 @用户名、数字群 ID 或会话 ID；群多时可选「按账号轮询分配」，让每个号分头退不同的群。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
-            target: String(values.target ?? '').trim(),
+            targets: splitField(values.targets),
             delete_history: values.delete_history !== false,
+            dispatch: String(values.dispatch ?? 'each'),
           })}
           submit={(payload) => campaignApi.leaveGroup(payload as unknown as LeaveGroupRequest)}
         >
-          <Form.Item label="要退的群" name="target" rules={[{ required: true, message: '必填' }]}>
-            <Input placeholder="@用户名 / 群 ID / 会话 ID" />
+          <Form.Item label="要退的群（一行一个，可批量）" name="targets" rules={[{ required: true, message: '至少一个群' }]}>
+            <Input.TextArea placeholder={'@group_a\n-1001234567890\nt.me/group_c'} autoSize={{ minRows: 3, maxRows: 10 }} />
+          </Form.Item>
+          <Form.Item
+            label="分发方式"
+            name="dispatch"
+            initialValue="each"
+            tooltip="轮询分配：群按账号轮流切分，一个群只由一个号去退"
+          >
+            <Segmented
+              options={[
+                { label: '每个号都退全部群', value: 'each' },
+                { label: '按账号轮询分配群', value: 'round_robin' },
+              ]}
+            />
           </Form.Item>
           <Form.Item label="退出后删除该会话记录" name="delete_history" valuePropName="checked" initialValue={true}>
             <Switch />
@@ -714,16 +728,17 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="强拉进群"
-          description="把成员拉进目标群。执行号必须是该群管理员（普通群需成员为执行号的联系人）。成员：@用户名、手机号或数字用户 ID，每行一个，最多 50。"
+          description="把成员拉进一个或多个目标群。执行号必须是这些群的管理员（普通群需成员为执行号的联系人）。成员：@用户名、手机号或数字用户 ID，每行一个，最多 50。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
-            group: String(values.group ?? '').trim(),
+            groups: splitField(values.groups),
             members: splitField(values.members),
+            dispatch: String(values.dispatch ?? 'each'),
           })}
           submit={(payload) => campaignApi.forceAdd(payload as unknown as ForceAddRequest)}
         >
-          <Form.Item label="目标群" name="group" rules={[{ required: true, message: '必填' }]}>
-            <Input placeholder="@用户名 / 群 ID / 会话 ID" />
+          <Form.Item label="目标群（一行一个，可批量）" name="groups" rules={[{ required: true, message: '至少一个群' }]}>
+            <Input.TextArea placeholder={'@group_a\n-1001234567890'} autoSize={{ minRows: 2, maxRows: 8 }} />
           </Form.Item>
           <Form.Item label="要拉进的成员（每行一个）" name="members" rules={[{ required: true, message: '至少一个成员' }]}>
             <Input.TextArea placeholder="@user1\n@user2" autoSize={{ minRows: 3, maxRows: 8 }} />

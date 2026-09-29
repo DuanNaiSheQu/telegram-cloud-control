@@ -457,49 +457,71 @@ class CampaignTasksMixin:
         """退群：频道用 LeaveChannel，普通群用 DeleteChatUser；可选删除本地会话。"""
         assert account is not None
         payload = dict(task.payload or {})
-        target = str(payload.get("target") or "").strip()
-        if not target:
+        raw_targets = [str(item).strip() for item in (payload.get("targets") or []) if str(item).strip()]
+        single = str(payload.get("target") or "").strip()
+        if single and single not in raw_targets:
+            raw_targets.insert(0, single)
+        if not raw_targets:
             raise TaskFailure("退群任务缺少目标", retryable=False)
         client = self._client(account.id)
-        try:
-            entity = await client.get_entity(target)
-        except ValueError as exc:
-            raise TaskFailure(f"找不到要退的群：{target}", retryable=False) from exc
-        except Exception as exc:  # noqa: BLE001
-            raise TaskFailure(f"群打不开（{target}）：{describe_exception(exc)}", retryable=is_network_error(exc)) from exc
-        try:
-            if isinstance(entity, (tl_types.Channel, tl_types.ChannelForbidden)):
-                await client(functions.channels.LeaveChannelRequest(channel=entity))
-            else:
-                await client(functions.messages.DeleteChatUserRequest(chat_id=int(entity.id), user_id="me"))
-            if payload.get("delete_history", True):
-                try:
-                    await client.delete_dialog(entity)
-                except Exception:  # noqa: BLE001 - 删本地会话失败不影响退群结果
-                    self.log.debug(
-                        "删除会话记录失败",
-                        extra={"account_id": str(account.id), "tg_chat_id": getattr(entity, "id", None)},
-                    )
-        except Exception as exc:  # noqa: BLE001
-            await self._apply_status(session, account, exc)
-            raise self._failure(exc, "退群失败") from exc
-        return {"left": True, "tg_chat_id": getattr(entity, "id", None)}
+        rng = self._campaign_rng(task, payload)
+        min_interval = self._interval_of(payload, "min_interval", 5.0)
+        max_interval = self._interval_of(payload, "max_interval", 20.0)
+        left = failed = 0
+        results: list[dict] = []
+        for index, target in enumerate(raw_targets):
+            try:
+                entity = await client.get_entity(target)
+            except ValueError:  # noqa: BLE001 - 找不到的群单独记，不拖垮整批
+                failed += 1
+                results.append({"target": target, "left": False, "error": "找不到该群（可能已不在群里）"})
+                continue
+            except Exception as exc:  # noqa: BLE001
+                failed += 1
+                results.append({"target": target, "left": False, "error": describe_exception(exc)})
+                continue
+            try:
+                if isinstance(entity, (tl_types.Channel, tl_types.ChannelForbidden)):
+                    await client(functions.channels.LeaveChannelRequest(channel=entity))
+                else:
+                    await client(functions.messages.DeleteChatUserRequest(chat_id=int(entity.id), user_id="me"))
+                if payload.get("delete_history", True):
+                    try:
+                        await client.delete_dialog(entity)
+                    except Exception:  # noqa: BLE001 - 删本地会话失败不影响退群结果
+                        self.log.debug(
+                            "删除会话记录失败",
+                            extra={"account_id": str(account.id), "tg_chat_id": getattr(entity, "id", None)},
+                        )
+                left += 1
+                results.append({"target": target, "left": True, "tg_chat_id": getattr(entity, "id", None)})
+            except Exception as exc:  # noqa: BLE001 - 单个群失败继续下一个
+                failed += 1
+                results.append({"target": target, "left": False, "error": describe_exception(exc)})
+            if index < len(raw_targets) - 1:
+                await sleep_human(min_interval, max_interval, rng)
+        if left == 0 and failed and len(raw_targets) == failed:
+            raise TaskFailure(f"退群全部失败，首错：{results[0].get('error')}", retryable=False)
+        return {"left": left, "failed": failed, "total": len(raw_targets), "results": results[:50]}
 
     async def _force_add_member(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """强拉进群：把 members 拉进 group（执行号须为该群管理员）。"""
         assert account is not None
         payload = dict(task.payload or {})
-        group_raw = str(payload.get("group") or "").strip()
+        groups_raw = [str(item).strip() for item in (payload.get("groups") or []) if str(item).strip()]
+        single_group = str(payload.get("group") or "").strip()
+        if single_group and single_group not in groups_raw:
+            groups_raw.insert(0, single_group)
         members = [str(item).strip() for item in (payload.get("members") or []) if str(item).strip()]
-        if not group_raw or not members:
+        if not groups_raw or not members:
             raise TaskFailure("强拉任务缺少群或成员", retryable=False)
         # 强拉成员同样是高风险动作
         await self._throttle_gate(account, task)
         client = self._client(account.id)
         try:
-            group = await client.get_entity(group_raw)
+            group = await client.get_entity(groups_raw[0])
         except ValueError as exc:
-            raise TaskFailure(f"找不到目标群：{group_raw}", retryable=False) from exc
+            raise TaskFailure(f"找不到目标群：{groups_raw[0]}", retryable=False) from exc
         except Exception as exc:  # noqa: BLE001
             raise TaskFailure(f"群打不开（{group_raw}）：{describe_exception(exc)}", retryable=is_network_error(exc)) from exc
 

@@ -145,13 +145,45 @@ class JoinGroupRequest(BulkScopeRequest):
 
 
 class LeaveGroupRequest(BulkScopeRequest):
-    target: str = Field(description="要退的群：@username / 数字 chat_id / 会话 dialog_id")
+    target: Optional[str] = Field(default=None, description="单个群：@username / 数字 chat_id / 会话 dialog_id")
+    targets: Optional[List[str]] = Field(default=None, description="多个群（每行一个，最多 50 个）；与 target 二选一")
     delete_history: bool = Field(default=True, description="退出后同时删除该会话记录")
+
+    @model_validator(mode="after")
+    def _merge_targets(self):
+        merged = [str(item).strip() for item in (self.targets or []) if str(item).strip()]
+        if self.target and str(self.target).strip():
+            merged.insert(0, str(self.target).strip())
+        merged = list(dict.fromkeys(merged))
+        if not merged:
+            raise ValueError("至少给一个群")
+        if len(merged) > 50:
+            raise ValueError("单次最多 50 个群，请分批")
+        self.targets = merged
+        return self
 
 
 class ForceAddRequest(BulkScopeRequest):
-    group: str = Field(description="目标群：@username / 数字 chat_id / 会话 dialog_id（执行号须为该群管理员）")
+    group: Optional[str] = Field(
+        default=None, description="单个目标群：@username / 数字 chat_id / 会话 dialog_id（执行号须为该群管理员）"
+    )
+    groups: Optional[List[str]] = Field(
+        default=None, description="多个目标群（每行一个，最多 20 个）；与 group 二选一，同时给则合并"
+    )
     members: List[str] = Field(description="要拉进群的成员：@username / 手机号 / 数字 user_id，最多 50 个")
+
+    @model_validator(mode="after")
+    def _merge_groups(self):
+        merged = [str(item).strip() for item in (self.groups or []) if str(item).strip()]
+        if self.group and str(self.group).strip():
+            merged.insert(0, str(self.group).strip())
+        merged = list(dict.fromkeys(merged))
+        if not merged:
+            raise ValueError("至少给一个目标群")
+        if len(merged) > 20:
+            raise ValueError("单次最多 20 个群，请分批")
+        self.groups = merged
+        return self
 
     @model_validator(mode="after")
     def _check_members(self):
