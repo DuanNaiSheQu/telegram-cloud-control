@@ -318,6 +318,16 @@ export const groupIntelApi = {
   stats: () => api.get<GroupIntelStats>('/api/group-intel/stats'),
   /** 批量采集：对选中的号采它们已加入的群（只读，不发言） */
   collect: (payload: GroupCollectRequest) => api.post<BulkResultOut>('/api/group-intel/collect', payload),
+  /** 按关键词找公开群：走 Telegram 原生搜索（不用第三方群目录站） */
+  searchGroups: (payload: {
+    scope?: string;
+    account_ids?: string[];
+    keywords: string[];
+    per_keyword?: number;
+    min_members?: number;
+    kind?: 'any' | 'group' | 'channel';
+    limit?: number;
+  }) => api.post<BulkResultOut>('/api/group-intel/search-groups', payload),
   // 关键词监听：规则 CRUD + 命中流水
   keywordWatches: () => api.get<{ items: KeywordWatchOut[]; total: number }>('/api/group-intel/keyword-watches'),
   createKeywordWatch: (payload: {

@@ -22,6 +22,7 @@ import {
   Tabs,
   Tag,
   Tooltip,
+  Select,
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -68,6 +69,13 @@ export default function GroupIntel() {
   const [msgIncludeBots, setMsgIncludeBots] = useState(false);
   const [msgLimit, setMsgLimit] = useState(1000);
   const [msgKeywords, setMsgKeywords] = useState('');
+  // 按关键词找群：走 Telegram 原生搜索，结果直接落进群档案
+  const [findOpen, setFindOpen] = useState(false);
+  const [findBusy, setFindBusy] = useState(false);
+  const [findKeywords, setFindKeywords] = useState('');
+  const [findPer, setFindPer] = useState(50);
+  const [findMinMembers, setFindMinMembers] = useState(500);
+  const [findKind, setFindKind] = useState<'any' | 'group' | 'channel'>('group');
   const [memberScope, setMemberScope] = useState<'all' | 'human' | 'bot'>('all');
   const [collectOpen, setCollectOpen] = useState(false);
   const [collectBusy, setCollectBusy] = useState(false);
@@ -382,6 +390,9 @@ export default function GroupIntel() {
           </Button>
           <Button icon={<LinkOutlined />} onClick={() => setLinkOpen(true)}>
             按链接采集
+          </Button>
+          <Button icon={<SearchOutlined />} onClick={() => setFindOpen(true)}>
+            按关键词找群
           </Button>
           <Button type="primary" icon={<CloudDownloadOutlined />} onClick={() => setCollectOpen(true)}>
             采集群情报
@@ -744,6 +755,83 @@ export default function GroupIntel() {
           </div>
         </div>
       </Modal>
+      <Modal
+        open={findOpen}
+        title="按关键词找公开群"
+        okText="开始搜索"
+        cancelText="取消"
+        confirmLoading={findBusy}
+        onCancel={() => setFindOpen(false)}
+        onOk={async () => {
+          const keywords = findKeywords
+            .split(/[,\n，]/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+          if (!keywords.length) {
+            toast.warning('至少填一个关键词');
+            return;
+          }
+          setFindBusy(true);
+          try {
+            const res = await groupIntelApi.searchGroups({
+              scope: 'all',
+              keywords,
+              per_keyword: findPer,
+              min_members: findMinMembers,
+              kind: findKind,
+            });
+            setFindOpen(false);
+            setCollectResult(res);
+            void jobs.reload();
+            void profiles.reload();
+          } catch {
+            /* client 已统一提示 */
+          } finally {
+            setFindBusy(false);
+          }
+        }}
+      >
+        <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="用 Telegram 原生搜索找群，不依赖第三方目录站"
+            description="输入关键词，系统直接调 Telegram 的公开搜索，实时返回匹配的群/频道（连成员数一起给），找到的群会落进下面的群档案——之后可以接着用「筛群」判断值不值得投。全程只读：不加群、不发言。"
+          />
+          <div className="tg-stack" style={{ gap: 2 }}>
+            <span>关键词（逗号或换行分隔，最多 20 个）</span>
+            <Input.TextArea
+              rows={2}
+              style={{ maxWidth: 460 }}
+              placeholder={'USDT\n开卡\ncrypto 中文'}
+              value={findKeywords}
+              onChange={(e) => setFindKeywords(e.target.value)}
+            />
+          </div>
+          <Space size="large" wrap>
+            <span>
+              每个词取
+              <InputNumber min={1} max={100} value={findPer} onChange={(v) => setFindPer(Number(v) || 50)} style={{ width: 90, margin: '0 6px' }} />
+              个
+            </span>
+            <span>
+              成员数 ≥
+              <InputNumber min={0} max={1000000} step={100} value={findMinMembers} onChange={(v) => setFindMinMembers(Number(v) || 0)} style={{ width: 120, margin: '0 6px' }} />
+            </span>
+            <Select
+              value={findKind}
+              onChange={setFindKind}
+              style={{ width: 130 }}
+              options={[
+                { value: 'group', label: '只要群' },
+                { value: 'channel', label: '只要频道' },
+                { value: 'any', label: '群和频道' },
+              ]}
+            />
+          </Space>
+        </div>
+      </Modal>
+
       <KeywordWatchPanel />
       <ReplyRulePanel />
     </PageContainer>
