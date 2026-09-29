@@ -74,7 +74,10 @@ export default function BrandPanel() {
           <span className="login-brand-status-dot" aria-hidden />
           控制台服务运行中
         </span>
-        <span>开源项目 · 数据留在自己的服务器 · v1.0.0</span>
+        <span>
+          开源项目 · 数据留在自己的服务器 · v
+          {typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : ''}
+        </span>
       </div>
     </section>
   );
