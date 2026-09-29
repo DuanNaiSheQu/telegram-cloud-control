@@ -376,6 +376,9 @@ async def persist_identity(
     if client_kind and not account.client_kind:
         # 连上以后把实际使用的官方客户端平台写回，页面就不再显示「未对齐」
         account.client_kind = client_kind
+    if not account.api_id and settings.telegram_api_id:
+        # 补齐 API 配置：早期导入的号没记 api_id，连上后按当前部署写入
+        account.api_id = int(settings.telegram_api_id)
     if user is not None:
         account.tg_user_id = getattr(user, "id", None) or account.tg_user_id
         account.username = getattr(user, "username", None) or account.username
@@ -389,9 +392,18 @@ async def persist_identity(
     if reset_authorized_at or account.authorized_at is None:
         account.authorized_at = now
     account.age_days = max(0, (now - account.authorized_at).days) if account.authorized_at else None
-    account.status = AccountStatus.healthy
-    account.status_reason = ""
-    account.last_error = ""
+    # 连得上 ≠ 能干活：冻结、失效、人工停用这些账号级状态不能被「连接成功」冲掉。
+    # 之前这里无条件写 healthy，导致检测刚标出的「冻结」在下次重连后又被改回「正常」。
+    sticky = {
+        AccountStatus.frozen,
+        AccountStatus.dead,
+        AccountStatus.invalid,
+        AccountStatus.disabled,
+    }
+    if account.status not in sticky:
+        account.status = AccountStatus.healthy
+        account.status_reason = ""
+        account.last_error = ""
     account.last_checked_at = now
     account.last_heartbeat = now
     await session.flush()

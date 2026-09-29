@@ -60,6 +60,8 @@ class AccountOut(ORMModel):
     # ---------- 账号矩阵 ----------
     import_source: str = "manual"
     device_model: str = ""
+    # 对齐的官方客户端平台（android / ios / tdesktop）；空表示还没对齐
+    client_kind: str = ""
     health_score: int = 100
     health_checked_at: Optional[datetime] = None
     health_detail: dict = {}

@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from telethon import functions
 from telethon.errors import UsernameInvalidError, UsernameOccupiedError
+from telethon.errors import FrozenMethodInvalidError
 
 from app.config import settings
 from app.core import audit as audit_core
@@ -678,6 +679,10 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             raise TaskFailure("该号不在本进程的租约里，稍后由持有它的 Worker 检测", retryable=True, requeue_after=10)
         try:
             me = await conn.ensure_and_get_me()
+            # 冻结探测：被冻结的号 get_me() 一样能通过，真正被拒的是写操作。
+            # 这里用 updateProfile 传「当前值」——不改动任何资料，但能问出冻结状态
+            # （此前只做读探测，导致冻结号在列表里一直显示「正常」）。
+            await self._probe_frozen(account, conn, me)
         except AccountUnavailable as exc:
             account.last_checked_at = _now()
             account.last_error = str(exc)[:512]
@@ -707,6 +712,47 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             result["health"] = health
             result["health_score"] = account.health_score
         return result
+
+    async def _probe_frozen(self, account: TgAccount, conn: AccountConnection, me: Any) -> None:
+        """用「原值 updateProfile」探测账号是否被冻结。
+
+        冻结号的读操作（get_me / 读会话）与在线状态上报都正常，只有写操作会被
+        `FrozenMethodInvalidError` 拒绝——所以只做读检测的「检测」按钮看不出冻结。
+        这里传当前 first_name/last_name，等于一次空写：不改动资料，但能拿到真实结论。
+        """
+        if me is None:
+            return
+        client = conn.require_client()
+        try:
+            await client(
+                functions.account.UpdateProfileRequest(
+                    first_name=getattr(me, "first_name", None) or "",
+                    last_name=getattr(me, "last_name", None) or "",
+                )
+            )
+        except FrozenMethodInvalidError as exc:
+            account.status = AccountStatus.frozen
+            account.status_reason = (
+                "账号已被 Telegram 冻结：改资料/发消息等写操作不可用，"
+                "需要找 @SpamBot 申诉解冻（冻结期间只能当只读观察号）"
+            )
+            account.last_error = describe_exception(exc)[:512]
+            flags = dict(account.risk_flags or {})
+            flags["frozen_detected_at"] = _now().isoformat()
+            account.risk_flags = flags
+            await self._apply_status  # 状态已直接写入，这里仅保持语义清晰
+            self.log.warning(
+                "检测发现账号被冻结",
+                extra={"worker_id": self.worker.worker_id, "account_id": str(account.id)},
+            )
+        except BaseException as exc:  # noqa: BLE001 - 其它写错误（限流等）不在这里判死
+            wait = flood_wait_seconds(exc)
+            if wait:
+                account.last_error = f"写权限探测被限流（{wait}s）：{describe_exception(exc)}"[:512]
+            elif is_network_error(exc):
+                pass
+            else:
+                account.last_error = describe_exception(exc)[:512]
 
     async def _deep_probe(
         self,
