@@ -38,7 +38,7 @@ def main():
     check("tdata 可用性已上报", "tdata_available" in r.json(), r.json().get("tdata_available"))
 
     # 2) 手机号清单预览
-    phones="+8613800138001,备注\n+8613900139002\nbad-number\n# 注释行"
+    phones="+113800138001,备注\n+113900139002\nbad-number\n# 注释行"
     r=api.post("/api/accounts/import/parse", data={"kind":"phone","text":phones})
     body=r.json()
     check("手机号预览解析", r.status_code==200 and body["total"]==3 and body["failed"]==1, f"total={body.get('total')} failed={body.get('failed')}")
@@ -50,7 +50,7 @@ def main():
     check("导入批次返回", bool(body.get("batch_id")), body.get("batch_id"))
 
     # 4) 重复导入去重
-    r=api.post("/api/accounts/import", data={"kind":"phone","text":"+8613800138001\n+8613900139002"})
+    r=api.post("/api/accounts/import", data={"kind":"phone","text":"+113800138001\n+113900139002"})
     check("重复号码被识别为重复", r.json().get("duplicate")==2, r.json().get("duplicate"))
 
     # 5) 伪造 session 串：应当解析失败并被标红（不写库）

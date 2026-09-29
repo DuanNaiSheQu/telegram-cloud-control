@@ -85,7 +85,7 @@ export function CreateAccountModal({
           name="phone"
           rules={[{ required: true, message: '请输入手机号' }]}
         >
-          <Input placeholder="+8613800000000" allowClear />
+          <Input placeholder="+12025550143" allowClear />
         </Form.Item>
         <Form.Item label="分组（可选）" name="group_id">
           <Select allowClear placeholder="不选则不分组" options={groups.map((g) => ({ value: g.id, label: g.name }))} />

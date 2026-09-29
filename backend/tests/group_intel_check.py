@@ -41,9 +41,9 @@ async def seed() -> None:
     from app.models import AccountStatus, Dialog, DialogChannel, DialogKind, GroupEvent, GroupMember, GroupProfile, TgAccount
 
     async with db.SessionFactory() as s:
-        acc = TgAccount(phone_enc=security.encrypt_secret(f"+8613700{int(SUF,16)%100000:05d}"),
-                        phone_hash=security.short_hash(f"+8613700{int(SUF,16)%100000:05d}"),
-                        phone_masked="+8613****0000", display_name=f"情报号-{SUF}",
+        acc = TgAccount(phone_enc=security.encrypt_secret(f"+113700{int(SUF,16)%100000:05d}"),
+                        phone_hash=security.short_hash(f"+113700{int(SUF,16)%100000:05d}"),
+                        phone_masked="+1138****0000", display_name=f"情报号-{SUF}",
                         status=AccountStatus.healthy, import_source="session_string")
         s.add(acc); await s.flush()
         dialog = Dialog(channel=DialogChannel.user_account, kind=DialogKind.group, account_id=acc.id,

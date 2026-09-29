@@ -74,7 +74,7 @@ export function formatBytes(bytes: number): string {
 /** 千分位数字：12345 → 12,345 */
 export function formatNumber(value?: number | null): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
-  return value.toLocaleString('zh-CN');
+  return value.toLocaleString('zh-Hans');
 }
 
 /** 紧凑数字：12345 → 1.2万（看板卡片用） */

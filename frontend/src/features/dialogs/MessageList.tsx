@@ -219,5 +219,5 @@ export function MessageList({
 
 function dayjsFormat(iso: string): string {
   // 轻量时间展示（气泡内只显示时:分）
-  return new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('zh-Hans', { hour: '2-digit', minute: '2-digit' });
 }

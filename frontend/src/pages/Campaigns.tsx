@@ -457,7 +457,7 @@ export default function Campaigns() {
           submit={(payload) => campaignApi.bulkPm(payload as unknown as BulkPmRequest)}
         >
           <Form.Item label="私信目标" name="targets" rules={[{ required: true, message: '至少一个目标' }]}>
-            <Input.TextArea placeholder="@user1\n@user2\n+8613800138000" autoSize={{ minRows: 3, maxRows: 6 }} />
+            <Input.TextArea placeholder="@user1\n@user2\n+12025550143" autoSize={{ minRows: 3, maxRows: 6 }} />
           </Form.Item>
           <Form.Item label="文本（所有号同一句）" name="text">
             <Input.TextArea placeholder="填了统一文本就忽略文本池" autoSize={{ minRows: 2, maxRows: 4 }} />

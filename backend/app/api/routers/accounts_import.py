@@ -47,7 +47,7 @@ IMPORT_FORMATS: list[dict[str, Any]] = [
         "kind": "phone",
         "label": "手机号清单",
         "accept": ".txt,.csv",
-        "description": "每行一个号码，号码后可用逗号加备注；建档后用验证码登录拿到会话。",
+        "description": "每行一个号码（如 +12025550143），号码后可用逗号加备注；建档后用验证码登录拿到会话。",
     },
     {
         "kind": "session_string",

@@ -69,7 +69,7 @@ async def seed() -> None:
 
     api = Api()
     api.token = api.post("/api/auth/login", json={"username": "admin", "password": "admin12345"}).json()["access_token"]
-    account = api.post("/api/accounts", json={"phone": f"+8613400{int(SUFFIX, 16) % 100000:05d}3", "remark": f"验证备注-{SUFFIX}"}).json()
+    account = api.post("/api/accounts", json={"phone": f"+113400{int(SUFFIX, 16) % 100000:05d}3", "remark": f"验证备注-{SUFFIX}"}).json()
     STATE["account"] = account["id"]
     api.client.close()
 

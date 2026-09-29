@@ -32,7 +32,7 @@ class OfficialClient:
     system_version: str
     app_version: str
     lang_pack: str
-    system_lang_code: str = "zh-CN"
+    system_lang_code: str = "zh-Hans"
 
 
 #: 官方客户端版本表（公开的发布线，按平台分组；新增时只追加，别改历史值）
@@ -46,10 +46,10 @@ OFFICIAL_CLIENTS: tuple[OfficialClient, ...] = (
     OfficialClient("vivo V2254A", "SDK 33", "10.12.0", "android"),
     OfficialClient("OnePlus CPH2449", "SDK 34", "11.2.3", "android"),
     # Telegram iOS
-    OfficialClient("iPhone 15 Pro", "iOS 17.5", "11.2.0", "ios", "zh-Hans-CN"),
-    OfficialClient("iPhone 14 Pro Max", "iOS 17.4", "11.1.0", "ios", "zh-Hans-CN"),
-    OfficialClient("iPhone 13", "iOS 16.7", "10.9.1", "ios", "zh-Hans-CN"),
-    OfficialClient("iPad Pro 11", "iPadOS 17.5", "11.2.0", "ios", "zh-Hans-CN"),
+    OfficialClient("iPhone 15 Pro", "iOS 17.5", "11.2.0", "ios", "zh-Hans"),
+    OfficialClient("iPhone 14 Pro Max", "iOS 17.4", "11.1.0", "ios", "zh-Hans"),
+    OfficialClient("iPhone 13", "iOS 16.7", "10.9.1", "ios", "zh-Hans"),
+    OfficialClient("iPad Pro 11", "iPadOS 17.5", "11.2.0", "ios", "zh-Hans"),
     # Telegram Desktop
     OfficialClient("Desktop", "Windows 11", "5.3.1 x64", "tdesktop", "zh-hans"),
     OfficialClient("Desktop", "macOS 14.5", "5.3.1", "tdesktop", "zh-hans"),

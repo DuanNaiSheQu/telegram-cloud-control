@@ -101,7 +101,7 @@ export function StatCard({
   }
 
   const clickable = Boolean(onClick);
-  const displayValue = typeof value === 'number' ? value.toLocaleString('zh-CN') : value;
+  const displayValue = typeof value === 'number' ? value.toLocaleString() : value;
 
   return (
     <div

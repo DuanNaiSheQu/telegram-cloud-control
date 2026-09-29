@@ -29,9 +29,9 @@ async def seed():
     from app import db, security
     from app.models import AccountStatus, GroupEvent, GroupMember, GroupProfile, Task, TaskStatus, TaskType, TgAccount
     async with db.SessionFactory() as s:
-        phone = f"+8613500{int(SUF, 16) % 100000:05d}"
+        phone = f"+113500{int(SUF, 16) % 100000:05d}"
         acc = TgAccount(phone_enc=security.encrypt_secret(phone), phone_hash=security.short_hash(phone),
-                        phone_masked="+8613****0002", display_name=f"进度号-{SUF}", status=AccountStatus.healthy)
+                        phone_masked="+1138****0002", display_name=f"进度号-{SUF}", status=AccountStatus.healthy)
         s.add(acc); await s.flush()
         batch = str(uuid.uuid4())
         chat_id = -(10**12 + int(SUF, 16) % 10**6)

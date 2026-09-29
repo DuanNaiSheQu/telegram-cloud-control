@@ -42,7 +42,7 @@ async def seed() -> None:
     headers = {"Authorization": f"Bearer {token}"}
     created = api.post(
         "/api/accounts",
-        json={"phone": f"+8613700{int(SUFFIX, 16) % 100000:05d}9", "remark": f"验证备注-{SUFFIX}"},
+        json={"phone": f"+113700{int(SUFFIX, 16) % 100000:05d}9", "remark": f"验证备注-{SUFFIX}"},
         headers=headers,
     )
     assert created.status_code in (200, 201), created.text

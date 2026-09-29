@@ -74,7 +74,7 @@ async def main() -> int:
 
         account = TgAccount(
             phone_masked="138****0001",
-            phone_enc=encrypt_secret("+8613800000001"),
+            phone_enc=encrypt_secret("+113800000001"),
             status=AccountStatus.healthy,
             group_id=group.id,
             proxy_id=proxy.id,

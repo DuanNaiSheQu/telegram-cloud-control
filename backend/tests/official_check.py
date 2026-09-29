@@ -63,9 +63,9 @@ async def seed():
     from app import db, security
     from app.models import AccountStatus, TgAccount
     async with db.SessionFactory() as s:
-        phone = f"+8613400{int(SUF, 16) % 100000:05d}"
+        phone = f"+113400{int(SUF, 16) % 100000:05d}"
         acc = TgAccount(phone_enc=security.encrypt_secret(phone), phone_hash=security.short_hash(phone),
-                        phone_masked="+8613****0003", display_name=f"养号-{SUF}", status=AccountStatus.healthy,
+                        phone_masked="+1138****0003", display_name=f"养号-{SUF}", status=AccountStatus.healthy,
                         client_kind="android", official_limits={"flood_wait": 45, "flood_add_peer": 25},
                         official_synced_at=datetime.now(tz=timezone.utc))
         s.add(acc); await s.commit(); return acc.id

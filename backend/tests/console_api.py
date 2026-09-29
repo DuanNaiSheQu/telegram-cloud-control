@@ -111,7 +111,7 @@ async def seed() -> None:
 
     accounts = []
     for i in (1, 2, 3):
-        phone = f"+8613900{int(SUFFIX, 16) % 100000:05d}{i}"
+        phone = f"+113900{int(SUFFIX, 16) % 100000:05d}{i}"
         created = api.post(
             "/api/accounts",
             json={"phone": phone, "group_id": group["id"], "proxy_id": proxy["id"], "remark": f"验证备注-{SUFFIX}-{i}"},

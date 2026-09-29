@@ -182,7 +182,7 @@ def random_fingerprint(rng: Optional[random.Random] = None) -> dict[str, str]:
 # ---------------- 手机号清单 ----------------
 
 def parse_phone_list(text: str) -> list[ParsedAccount]:
-    """每行一个号码，支持 `+8613800138000,备注` 或制表符分隔。"""
+    """每行一个号码，支持 `+12025550143,备注` 或制表符分隔。"""
     accounts: list[ParsedAccount] = []
     for raw_line in (text or "").splitlines():
         line = raw_line.strip()
@@ -205,7 +205,7 @@ def parse_phone_list(text: str) -> list[ParsedAccount]:
             )
         )
     if not accounts:
-        raise ImportError_("手机号清单是空的：每行一个号码，可写成 `+8613800138000,备注`")
+        raise ImportError_("手机号清单是空的：每行一个号码，可写成 `+12025550143,备注`")
     return accounts
 
 
@@ -220,7 +220,7 @@ def normalize_phone(value: str) -> Optional[str]:
 
 
 def mask_phone(phone: str) -> str:
-    """脱敏展示：+8613800138000 → +8613****8000。"""
+    """脱敏展示：+12025550143 → +1202****0143。"""
     digits = re.sub(r"\D", "", phone or "")
     if len(digits) < 7:
         return phone or "未知"

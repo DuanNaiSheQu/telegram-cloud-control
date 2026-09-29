@@ -88,8 +88,8 @@ async def seed() -> None:
         "/api/proxies",
         json={"name": f"删除验证代理-{SUFFIX}", "scheme": "socks5", "host": "127.0.0.1", "port": 1080},
     ).json()
-    account = api.post("/api/accounts", json={"phone": f"+8613500{int(SUFFIX, 16) % 100000:05d}7", "remark": f"验证备注-{SUFFIX}"}).json()
-    account_del = api.post("/api/accounts", json={"phone": f"+8613501{int(SUFFIX, 16) % 100000:05d}7", "remark": f"验证备注-删除用-{SUFFIX}"}).json()
+    account = api.post("/api/accounts", json={"phone": f"+113500{int(SUFFIX, 16) % 100000:05d}7", "remark": f"验证备注-{SUFFIX}"}).json()
+    account_del = api.post("/api/accounts", json={"phone": f"+113501{int(SUFFIX, 16) % 100000:05d}7", "remark": f"验证备注-删除用-{SUFFIX}"}).json()
     operator = api.post(
         "/api/users",
         json={"username": f"c3-op-{SUFFIX}", "password": "op-pass-1234", "role": "operator"},

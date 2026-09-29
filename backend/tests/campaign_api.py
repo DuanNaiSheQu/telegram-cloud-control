@@ -99,7 +99,7 @@ def part_a(api: Api) -> None:
 
 def part_b(api: Api, group_id: str) -> None:
     scope = {"scope": f"group:{group_id}", "account_ids": None, "limit": 10}
-    r = api.post("/api/campaigns/bulk-pm", json={**scope, "targets": ["@durov", "+8613800000000"], "texts": ["你好", "在吗"], "min_interval": 2, "max_interval": 4})
+    r = api.post("/api/campaigns/bulk-pm", json={**scope, "targets": ["@durov", "+113800000000"], "texts": ["你好", "在吗"], "min_interval": 2, "max_interval": 4})
     check("B1 批量私信入队", r.status_code == 200 and r.json()["succeeded"] == 3, r.text[:150])
     STATE["batch_pm"] = r.json()["task_ids"]
 
@@ -219,7 +219,7 @@ async def seed(api: Api) -> None:
     STATE["group"] = group["id"]
     accounts = []
     for i in (1, 2, 3):
-        phone = f"+8613810{int(SUFFIX, 16) % 100000:05d}{i}"
+        phone = f"+113810{int(SUFFIX, 16) % 100000:05d}{i}"
         created = api.post("/api/accounts", json={"phone": phone, "group_id": group["id"], "remark": f"营销验收-{SUFFIX}-{i}"})
         assert created.status_code in (200, 201), created.text
         accounts.append(created.json()["id"])

@@ -212,8 +212,8 @@ export default function AccountImportModal({ open, onClose, onImported }: Props)
             onChange={(event) => setText(event.target.value)}
             placeholder={
               kind === 'phone'
-                ? '+8613800138000\n+8613900139000,备注'
-                : '1BVtsOK...（一行一个）\n+8613800138000,1BVtsOK...'
+                ? '+12025550143\n+447700900123,备注'
+                : '1BVtsOK...（一行一个）\n+12025550143,1BVtsOK...'
             }
             style={{ fontFamily: 'var(--tg-font-family-mono, monospace)' }}
           />

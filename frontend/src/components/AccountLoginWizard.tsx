@@ -169,7 +169,7 @@ export function AccountLoginWizard({ open, account, groups, proxies, onCancel, o
                   : '验证码只发到这个号自己，不导入别人的会话文件。'
               }
             >
-              <Input placeholder="+8613800000000" allowClear />
+              <Input placeholder="+12025550143" allowClear />
             </Form.Item>
             <Form.Item label="分组（可选）" name="group_id">
               <Select

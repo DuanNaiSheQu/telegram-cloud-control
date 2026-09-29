@@ -24,9 +24,9 @@ from app.models import AccountStatus, TgAccount
 SUF = uuid.uuid4().hex[:6]
 async def mk():
     async with db.SessionFactory() as s:
-        phone=f"+8613600{int(SUF,16)%100000:05d}"
+        phone=f"+113600{int(SUF,16)%100000:05d}"
         acc=TgAccount(phone_enc=security.encrypt_secret(phone), phone_hash=security.short_hash(phone),
-                      phone_masked="+8613****0001", display_name=f"链接采集-{SUF}", status=AccountStatus.healthy,
+                      phone_masked="+1138****0001", display_name=f"链接采集-{SUF}", status=AccountStatus.healthy,
                       session_enc=security.encrypt_secret("1BVtsOKfakeSessionForShape"), import_source="session_string")
         s.add(acc); await s.commit(); return acc.id
 acc_id = run(mk())
