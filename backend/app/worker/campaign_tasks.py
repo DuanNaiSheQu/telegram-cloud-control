@@ -43,6 +43,7 @@ from app.services.ai import ai_service
 from app.services.inbound import publish_message
 from app.services.throttle import action_cost, allow_action, note_flood, record_action
 from app.worker.handlers import MessageData, persist_message
+from app.worker.entities import resolve_entity
 from app.worker.humanize import (
     naturalize,
     persona_messages,
@@ -582,7 +583,7 @@ class CampaignTasksMixin:
         results: list[dict] = []
         for index, target in enumerate(raw_targets):
             try:
-                entity = await client.get_entity(target)
+                entity = await resolve_entity(client, target)
             except ValueError:  # noqa: BLE001 - 找不到的群单独记，不拖垮整批
                 failed += 1
                 results.append({"target": target, "left": False, "error": "找不到该群（可能已不在群里）"})

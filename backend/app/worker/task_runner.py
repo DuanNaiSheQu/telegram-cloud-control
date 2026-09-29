@@ -56,6 +56,7 @@ from app.worker.campaign_tasks import CampaignTasksMixin
 from app.worker.group_intel import GroupIntelMixin
 from app.worker.official_tasks import OfficialTasksMixin
 from app.worker.handlers import MessageData, message_data_from_telethon, persist_message
+from app.worker.entities import resolve_entity
 from app.worker.humanize import pick_for_index, pick_random
 from app.worker.telethon_account import (
     AccountConnection,
@@ -337,9 +338,13 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             ) from exc
 
     async def _resolve_entity(self, client: Any, dialog: Dialog) -> Any:
-        """tg_chat_id → Telethon 实体；打不开按约定清该号租约。"""
+        """tg_chat_id → Telethon 实体；打不开按约定清该号租约。
+
+        id 形态不统一：频道的原始 id 是正数，必须带 `-100` 前缀才能被识别，
+        直接传正数会被当成用户（报 PeerUser 找不到）——统一交给 resolve_entity 处理。
+        """
         try:
-            return await client.get_entity(dialog.tg_chat_id)
+            return await resolve_entity(client, dialog.tg_chat_id)
         except Exception as exc:  # noqa: BLE001
             network = is_network_error(exc)
             raise TaskFailure(
