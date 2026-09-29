@@ -24,6 +24,7 @@ from telethon.errors import (
     UserNotMutualContactError,
     UserNotParticipantError,
     ChannelPrivateError,
+    InviteRequestSentError,
 )
 from telethon.tl import types as tl_types
 
@@ -45,7 +46,8 @@ from app.services.ai import ai_service
 from app.services.inbound import publish_message
 from app.services.throttle import action_cost, allow_action, note_flood, record_action
 from app.worker.handlers import MessageData, persist_message
-from app.worker.entities import resolve_entity
+from app.worker.entities import resolve_chat_entity, resolve_entity
+from app.worker.group_verify import GroupVerifier
 from app.worker.humanize import (
     naturalize,
     persona_messages,
@@ -666,6 +668,14 @@ class CampaignTasksMixin:
                     detail=f"已加入 {joined}/{len(raw_targets)}：{target}",
                     joined=joined, total=len(raw_targets),
                 )
+            except InviteRequestSentError as exc:
+                # 审核制群：申请已提交就算走到了位——佩奇/NuoMi 的验证正是发生在这个阶段，
+                # 后续 auto_verify 会去把验证过掉，管理员才会放行。判成失败会直接跳过验证。
+                joined += 1
+                results.append({
+                    "target": target, "joined": True, "pending_approval": True,
+                    "detail": describe_exception(exc),
+                })
             except (UserAlreadyParticipantError, InviteHashExpiredError) as exc:
                 already += 1
                 results.append({"target": target, "joined": False, "already": True, "detail": describe_exception(exc)})
@@ -683,7 +693,39 @@ class CampaignTasksMixin:
         if joined == 0 and already == 0 and results:
             first_error = next((item.get("error") for item in results if item.get("error")), "未知原因")
             raise TaskFailure(f"加群全部失败，首错：{first_error}", retryable=False)
-        return {"joined": joined, "already": already, "total": len(raw_targets), "results": results[:50]}
+
+        # 加群后自动过验证：佩奇走 Cap、NuoMi 走 Turnstile，通道不同但都交给真 Chrome 打开。
+        # 之所以挂在加群流程里同步做：验证链接寿命很短（佩奇 300s、NuoMi 60s），事后补来不及。
+        verified = failed_verify = 0
+        if joined > 0 and payload.get("auto_verify", True):
+            verifier = GroupVerifier(client)
+            for item in results:
+                if not item.get("joined"):
+                    continue
+                try:
+                    target_chat = await resolve_chat_entity(client, item["target"], session=session)
+                    outcome = await verifier.handle(target_chat)
+                    item["verify"] = outcome
+                    if outcome.get("passed"):
+                        verified += 1
+                        item["verified"] = True
+                    elif outcome.get("attempted"):
+                        failed_verify += 1
+                        item["verified"] = False
+                        item["verify_error"] = outcome.get("error") or outcome.get("reason") or "验证未通过"
+                except BaseException as exc:  # noqa: BLE001 - 单个群验证出问题不该拖垮整批
+                    item["verify_error"] = f"{type(exc).__name__}: {str(exc)[:120]}"
+
+        summary = {
+            "joined": joined,
+            "already": already,
+            "total": len(raw_targets),
+            "results": results[:50],
+        }
+        if verified or failed_verify:
+            summary["verified"] = verified
+            summary["verify_failed"] = failed_verify
+        return summary
 
     async def _screen_groups(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """筛群：批量检测一批群的成色，决定值不值得投。
