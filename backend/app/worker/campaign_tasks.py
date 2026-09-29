@@ -202,9 +202,22 @@ class CampaignTasksMixin:
         text: str,
         *,
         reply_to: Any = None,
+        material: Any = None,
     ) -> Any:
-        """发一条并回填；FloodWait 交给调用方决定重试策略。"""
-        sent = await client.send_message(entity, text, reply_to=reply_to)
+        """发一条并回填；FloodWait 交给调用方决定重试策略。
+
+        `material` 非空时发的是素材（图片/视频/文档），文本作为配文（caption）一起发——
+        这样「批量私信 / 群发」也能带图带文件，不必非走单独的素材群发入口。
+        """
+        if material is not None and getattr(material, "kind", None) != MaterialKind.text:
+            path = self._material_path(material)
+            kwargs: dict[str, Any] = {"caption": text or None}
+            if material.kind == MaterialKind.document:
+                kwargs["force_document"] = True
+            sent = await client.send_file(entity, path, reply_to=reply_to, **kwargs)
+            text = text or f"[{MATERIAL_KIND_LABELS.get(material.kind.value, material.kind.value)}]"
+        else:
+            sent = await client.send_message(entity, text, reply_to=reply_to)
         await self._record_campaign_sent(session, task, account, entity, text, sent)
         # 每发出一条就记一个额度：吵群/拟人这类高频动作会很快撞到当日上限
         await self._throttle_record(account, task, cost=1)
@@ -229,6 +242,16 @@ class CampaignTasksMixin:
 
     # ---------------- 批量私信 ----------------
 
+    async def _payload_material(self, session: Any, payload: dict) -> Any:
+        """payload 里可选带 `material_id`：批量私信 / 群发想配图配文件时用它。"""
+        material_id = payload.get("material_id")
+        if not material_id:
+            return None
+        material = await session.get(Material, uuid.UUID(str(material_id)))
+        if material is None:
+            raise TaskFailure("素材不存在（可能已被删除），请重新选择", retryable=False)
+        return material
+
     async def _bulk_pm(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """批量私信：向 payload.targets 逐个发消息，目标之间随机间隔。"""
         assert account is not None
@@ -241,6 +264,7 @@ class CampaignTasksMixin:
         client = self._client(account.id)
         rng = self._campaign_rng(task, payload)
         text = self._campaign_text(payload, rng)
+        material = await self._payload_material(session, payload)
         min_interval = self._interval_of(payload, "min_interval", 3.0)
         max_interval = self._interval_of(payload, "max_interval", 8.0)
 
@@ -249,7 +273,9 @@ class CampaignTasksMixin:
         for index, raw in enumerate(targets):
             try:
                 entity = await self._resolve_member_entity(client, raw)
-                await self._campaign_send_one(session, task, account, client, entity, text)
+                await self._campaign_send_one(
+                    session, task, account, client, entity, text, material=material
+                )
                 sent += 1
             except TaskFailure as exc:
                 failed += 1
@@ -276,8 +302,9 @@ class CampaignTasksMixin:
         entity = await self._resolve_group_entity(session, task, payload, client)
         rng = self._campaign_rng(task, payload)
         text = self._campaign_text(payload, rng)
+        material = await self._payload_material(session, payload)
         try:
-            await self._campaign_send_one(session, task, account, client, entity, text)
+            await self._campaign_send_one(session, task, account, client, entity, text, material=material)
         except Exception as exc:  # noqa: BLE001
             await self._apply_status(session, account, exc)
             raise self._failure(exc, "群发失败") from exc

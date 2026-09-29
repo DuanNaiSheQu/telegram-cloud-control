@@ -78,6 +78,10 @@ class BulkPmRequest(BulkScopeRequest, _TextPoolMixin):
     targets: List[str] = Field(default_factory=list, description="私信目标：@username / 手机号 / 数字 user_id")
     min_interval: float = Field(default=3.0, ge=1, le=60, description="同一号每两个目标之间的最小间隔（秒）")
     max_interval: float = Field(default=8.0, ge=1, le=120, description="同一号每两个目标之间的最大间隔（秒）")
+    material_id: Optional[uuid.UUID] = Field(
+        default=None,
+        description="可选：附带素材（图片/视频/文档），文本会作为配文一起发；不填则只发文本",
+    )
 
     @model_validator(mode="after")
     def _check_targets(self):
@@ -93,6 +97,10 @@ class BulkPmRequest(BulkScopeRequest, _TextPoolMixin):
 
 class GroupBroadcastRequest(BulkScopeRequest, _TextPoolMixin):
     target_group: str = Field(description="目标群：@username / 数字 chat_id / 会话 dialog_id")
+    material_id: Optional[uuid.UUID] = Field(
+        default=None,
+        description="可选：附带素材（图片/视频/文档），文本会作为配文一起发；不填则只发文本",
+    )
 
 
 class MaterialSendRequest(BulkScopeRequest):

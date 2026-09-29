@@ -85,6 +85,15 @@ def _split_round_robin(targets: list[str], index: int, count: int) -> list[str]:
     return [target for position, target in enumerate(targets) if position % step == index]
 
 
+async def _ensure_material(session: AsyncSession, material_id) -> None:
+    """带素材的批量动作：入队前就把「素材不存在」拦掉，别等 Worker 跑起来才报错。"""
+    if not material_id:
+        return
+    material = await session.get(Material, material_id)
+    if material is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="素材不存在（可能已被删除）")
+
+
 async def _submit_campaign(
     *,
     action: str,
@@ -183,7 +192,10 @@ async def bulk_pm(
         "naturalize": payload.naturalize,
         "min_interval": payload.min_interval,
         "max_interval": payload.max_interval,
+        # 可选附带素材：文本作为配文一起发
+        "material_id": str(payload.material_id) if payload.material_id else None,
     }
+    await _ensure_material(session, payload.material_id)
     round_robin = payload.dispatch == "round_robin"
     return await _submit_campaign(
         action="campaign.bulk_pm",
@@ -209,11 +221,13 @@ async def group_broadcast(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> BulkResultResponse:
+    await _ensure_material(session, payload.material_id)
     params = {
         "target_group": payload.target_group.strip(),
         "texts": payload.texts,
         "text": payload.text,
         "naturalize": payload.naturalize,
+        "material_id": str(payload.material_id) if payload.material_id else None,
     }
     return await _submit_campaign(
         action="campaign.group_broadcast",

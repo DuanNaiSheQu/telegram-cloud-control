@@ -132,6 +132,34 @@ function ScopeFields({ value, onChange }: { value: ScopeState; onChange: (next: 
   );
 }
 
+/** 可选素材选择：把素材库里的图片/视频/文档配在文本一起发（批量私信 / 群发共用） */
+function MaterialPickField({ value, onChange }: { value?: string | null; onChange?: (next: string | null) => void }) {
+  const materials = useAsyncData(() => materialApi.list({ page: 1, page_size: 100 }), [], { immediate: false });
+  useEffect(() => {
+    void materials.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <Form.Item
+      label="附带素材（可选）"
+      tooltip="选了素材就按素材发：图片/视频/文档带配文，文本作为配文一起发；留空则只发文本"
+    >
+      <Select
+        allowClear
+        style={{ width: 320 }}
+        placeholder="不附带素材，只发文本"
+        value={value ?? undefined}
+        loading={materials.loading}
+        onChange={(next) => onChange?.(next ?? null)}
+        options={(materials.data?.items ?? []).map((item) => ({
+          value: item.id,
+          label: `[${item.kind_label ?? item.kind}] ${item.name}`,
+        }))}
+      />
+    </Form.Item>
+  );
+}
+
 function scopePayload(scope: ScopeState): Record<string, unknown> {
   if (scope.scope === 'group' && scope.groupId) {
     return { scope: `group:${scope.groupId}`, account_ids: null, limit: scope.limit };
@@ -487,6 +515,7 @@ export default function Campaigns() {
             min_interval: Number(values.min_interval ?? 3),
             max_interval: Number(values.max_interval ?? 8),
             dispatch: String(values.dispatch ?? 'each'),
+            material_id: (values.material_id as string | undefined) ?? null,
           })}
           submit={(payload) => campaignApi.bulkPm(payload as unknown as BulkPmRequest)}
         >
@@ -498,6 +527,14 @@ export default function Campaigns() {
           </Form.Item>
           <Form.Item label="文本池（按账号取模分配，每行一条）" name="texts">
             <Input.TextArea placeholder="第一号发这句\n第二号发这句\n…" autoSize={{ minRows: 3, maxRows: 6 }} />
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, next) => prev.material_id !== next.material_id}>
+            {({ getFieldValue, setFieldValue }) => (
+              <MaterialPickField
+                value={getFieldValue('material_id')}
+                onChange={(next) => setFieldValue('material_id', next)}
+              />
+            )}
           </Form.Item>
           <Space wrap>
             <Form.Item label="目标间最小间隔（秒）" name="min_interval" initialValue={3}>
