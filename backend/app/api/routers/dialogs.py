@@ -19,6 +19,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.bots import manager
+from app.api.routers.accounts_bulk import scope_clause
+from app.services.account_label import account_label
 from app.api.deps import (
     assert_account_access,
     assert_dialog_access,
@@ -268,6 +270,61 @@ async def list_dialogs(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/inbox", summary="客服收件箱：未读优先的待处理会话（跨账号）")
+async def inbox(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+    limit: int = Query(default=100, ge=1, le=500),
+    only_unread: bool = Query(default=False, description="只看有未读的"),
+) -> dict:
+    """把「有人刚发来消息、还没处理」的会话排到最前面——不用逐个号去翻会话。
+
+    排序逻辑：**有未读的优先**，其次按最后消息时间倒序。返回里带上账号标签，
+    点进任一条就能在会话页直接回复（回复能力本来就有，这里只是补「集中视图」）。
+    """
+    ids = await visible_account_ids(session, user)
+    conditions = [Dialog.kind == DialogKind.private, Dialog.channel == DialogChannel.user_account]
+    clause = scope_clause(Dialog.account_id, ids)
+    if clause is not None:
+        conditions.append(clause)
+    if only_unread:
+        conditions.append(Dialog.unread_count > 0)
+
+    rows = list(
+        (
+            await session.scalars(
+                select(Dialog)
+                .where(*conditions)
+                .order_by((Dialog.unread_count > 0).desc(), Dialog.last_message_at.desc().nulls_last())
+                .limit(limit)
+            )
+        ).all()
+    )
+    accounts = {
+        row.id: row
+        for row in (
+            await session.scalars(select(TgAccount).where(TgAccount.id.in_({item.account_id for item in rows if item.account_id})))
+        ).all()
+    } if rows else {}
+    return {
+        "items": [
+            {
+                "dialog_id": str(row.id),
+                "account_id": str(row.account_id) if row.account_id else None,
+                "account_label": account_label(accounts.get(row.account_id)) if row.account_id else None,
+                "title": row.title or row.peer_display or str(row.tg_chat_id),
+                "username": row.username,
+                "unread_count": int(row.unread_count or 0),
+                "last_message_at": row.last_message_at,
+                "last_message_preview": row.last_message_preview or "",
+            }
+            for row in rows
+        ],
+        "total": len(rows),
+        "unread_total": sum(int(row.unread_count or 0) for row in rows),
+    }
 
 
 @router.get("/{dialog_id}", response_model=DialogOut, summary="会话详情")
