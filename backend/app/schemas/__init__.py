@@ -72,6 +72,7 @@ from app.schemas.common import OkResponse, ORMModel, Page, PageQuery
 from app.schemas.group_intel import (
     CollectLinkRequest,
     CollectMessagesRequest,
+    InspectGroupsRequest,
     GroupCollectRequest,
     GroupEventListResponse,
     GroupEventOut,

@@ -30,6 +30,7 @@ from app.services.group_intel import (
     upsert_profile,
 )
 from app.worker.entities import resolve_chat_entity, resolve_entity
+from app.worker.campaign_tasks import _invite_hash_of, _username_from_target
 from app.worker.telethon_account import TaskFailure, describe_exception, flood_wait_seconds
 
 logger = logging.getLogger(__name__)
@@ -235,6 +236,105 @@ class GroupIntelMixin:
             "sampled": sampled,
             "profile_id": str(profile.id),
         }
+
+    async def _inspect_groups(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
+        """筛群：批量体检一批群链接（只读）。
+
+        运营要的是「这批群链接哪些还能用、值得进」——所以逐条给出：
+        是否存在、类型（群 / 超级群 / 频道）、人数、**能否发言**、是否需要审核加入、
+        是否隐藏成员名单、当前号是否已在群里。全程只读，不发消息、不加群。
+        """
+        assert account is not None
+        payload = dict(task.payload or {})
+        raw_links = [str(item).strip() for item in (payload.get("links") or []) if str(item).strip()]
+        if not raw_links:
+            raise TaskFailure("筛群任务缺少 links", retryable=False)
+        client = self._client(account.id)
+        rng = self._campaign_rng(task, payload)
+        min_interval = self._interval_of(payload, "min_interval", 2.0)
+        max_interval = self._interval_of(payload, "max_interval", 6.0)
+        results: list[dict] = []
+        ok_count = 0
+
+        for index, raw in enumerate(raw_links[:200]):
+            item: dict = {"input": raw, "ok": False}
+            try:
+                username = _username_from_target(raw) or raw.lstrip("@").strip()
+                invite_hash = _invite_hash_of(raw)
+                entity = None
+                if invite_hash:
+                    # 邀请链接：只能探到「是否有效」，拿不到群资料（未加入前 Telegram 不给）
+                    try:
+                        info = await client(functions.messages.CheckChatInviteRequest(hash=invite_hash))
+                        chat = getattr(info, "chat", None)
+                        title = getattr(chat, "title", None) or getattr(info, "title", None) or ""
+                        item.update({"ok": True, "kind": "invite", "title": title,
+                                     "already_joined": bool(getattr(info, "already", False))})
+                    except BaseException as exc:  # noqa: BLE001
+                        item["error"] = f"邀请链接无效或已过期（{type(exc).__name__}）"
+                    results.append(item)
+                    continue
+                if username:
+                    entity = await client.get_entity(f"@{username}")
+                else:
+                    item["error"] = "无法识别的群标识（支持 @用户名 / t.me/xxx / t.me/+hash）"
+                    results.append(item)
+                    continue
+
+                is_channel = isinstance(entity, tl_types.Channel)
+                item["kind"] = (
+                    "channel" if getattr(entity, "broadcast", False) else "megagroup" if getattr(entity, "megagroup", False) else "chat"
+                )
+                item["kind_label"] = {"channel": "频道", "megagroup": "超级群", "chat": "普通群"}.get(item["kind"], item["kind"])
+                item["title"] = getattr(entity, "title", "") or ""
+                item["username"] = getattr(entity, "username", None)
+                item["tg_chat_id"] = getattr(entity, "id", None)
+                item["ok"] = True
+
+                if is_channel:
+                    full = await client(functions.channels.GetFullChannelRequest(channel=entity))
+                    fc = full.full_chat
+                    item["member_count"] = getattr(fc, "participants_count", None)
+                    item["about"] = (getattr(fc, "about", "") or "")[:200]
+                    item["members_hidden"] = bool(getattr(fc, "participants_hidden", False))
+                    item["join_request"] = bool(getattr(fc, "join_request", False))
+                    # 能否发言：看默认禁言权限（普通成员能不能发）
+                    rights = getattr(fc, "default_banned_rights", None)
+                    item["can_send"] = not bool(getattr(rights, "send_messages", False)) if rights else True
+                    item["slowmode"] = getattr(fc, "slowmode_seconds", None)
+                    try:
+                        await client(functions.channels.GetParticipantRequest(channel=entity, participant="me"))
+                        item["joined"] = True
+                    except BaseException:  # noqa: BLE001 - 不在群里是常态
+                        item["joined"] = False
+                ok_count += 1
+            except BaseException as exc:  # noqa: BLE001 - 单条失败不影响整批
+                name = type(exc).__name__
+                if "UsernameNotOccupied" in name or "UsernameInvalid" in name:
+                    item["error"] = "这个用户名不存在"
+                elif "ChannelPrivate" in name:
+                    item["error"] = "私有群/频道，当前号无权访问（可能须先加入）"
+                elif "Frozen" in name:
+                    item["error"] = "当前号被冻结，无法体检"
+                else:
+                    item["error"] = f"{name}: {str(exc)[:100]}"
+            results.append(item)
+
+            if index < len(raw_links) - 1:
+                await sleep_human(min_interval, max_interval, rng)
+            if (index + 1) % 5 == 0:
+                await self._report_progress(
+                    session, task, stage="inspecting",
+                    detail=f"已体检 {index + 1}/{len(raw_links)} 个链接，其中 {ok_count} 个可用",
+                    scanned=index + 1, found=ok_count, total=len(raw_links),
+                )
+
+        await self._report_progress(
+            session, task, stage="done",
+            detail=f"体检完成：{len(raw_links)} 个链接，{ok_count} 个可用",
+            scanned=len(raw_links), found=ok_count, total=len(raw_links),
+        )
+        return {"total": len(raw_links), "ok": ok_count, "failed": len(raw_links) - ok_count, "results": results[:200]}
 
     async def _collect_messages(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """采集群内对话：按时间范围扫消息，把发言的人落成成员档案。

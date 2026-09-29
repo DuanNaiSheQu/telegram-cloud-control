@@ -154,3 +154,12 @@ class CollectMessagesRequest(BaseModel):
         max_length=10,
         description="只捞聊到这些词的人（留空=全量扫；命中走 Telegram 服务端搜索，比本地过滤准）",
     )
+
+
+class InspectGroupsRequest(BaseModel):
+    """筛群：批量体检群链接（只读）。"""
+
+    links: List[str] = Field(default_factory=list, min_length=1, max_length=200, description="群链接 / @用户名，一行一个")
+    account_id: Optional[uuid.UUID] = Field(default=None, description="用哪个号体检（留空自动挑一个可用的）")
+    min_interval: float = Field(default=2.0, ge=0.5, le=30, description="每条之间最小间隔（秒）")
+    max_interval: float = Field(default=6.0, ge=0.5, le=60, description="最大间隔（秒）")

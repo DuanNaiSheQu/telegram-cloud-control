@@ -113,6 +113,7 @@ class TaskType(str, enum.Enum):
     warmup_activity = "warmup_activity"  # 官方节奏养号：上线→翻会话→（可选）已读/打字→下线，不发消息
     appeal_spam = "appeal_spam"          # 模拟真人向 @SpamBot 申诉：/start → 看状态 → 点「这是误判」
     collect_messages = "collect_messages"  # 采集群内对话：按时间范围扫消息，把发言者落成成员档案
+    inspect_groups = "inspect_groups"    # 筛群：批量体检群链接（有效性/人数/类型/能否发言/是否审核）
     # Bot（API 执行）
     relay_to_staff = "relay_to_staff"    # 转发到员工群
     bot_reply = "bot_reply"              # 官方 Bot 自动回复
@@ -153,6 +154,7 @@ TASK_TYPE_LABELS = {
     "warmup_activity": "官方养号活动",
     "appeal_spam": "申诉解封",
     "collect_messages": "采集群内对话",
+    "inspect_groups": "筛群体检",
     "relay_to_staff": "转发到员工群",
     "bot_reply": "Bot 自动回复",
     "bot_broadcast": "Bot 群发/转发",

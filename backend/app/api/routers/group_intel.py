@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session, visible_account_ids
 from app.api.routers import build_order_by, enum_value, publish_task_safely
+from app.api.routers.accounts_bulk import scope_clause
 from app.services.account_label import account_label
 from app.api.routers.accounts_bulk import _empty, _item, _resolve_accounts, _response
 from app.config import settings
@@ -33,6 +34,7 @@ from app.core.audit import write_audit
 from app.core.tasks import enqueue_task
 from app.models import (
     GROUP_EVENT_LABELS,
+    AccountStatus,
     TASK_STATUS_LABELS,
     Dialog,
     DialogChannel,
@@ -48,6 +50,7 @@ from app.models import (
 )
 from app.schemas import (
     BulkAccountResult,
+    InspectGroupsRequest,
     BulkResultResponse,
     CollectMessagesRequest,
     CollectLinkRequest,
@@ -213,6 +216,74 @@ async def collect_group_intel(
         message=f"已排队采集 {len(dialogs)} 个群（{len(task_ids)} 条任务），Worker 会逐个只读拉取",
         truncated=truncated,
         task_ids=task_ids,
+    )
+
+
+@router.post("/inspect-groups", response_model=BulkResultResponse, summary="筛群：批量体检群链接（只读）")
+async def inspect_groups(
+    payload: InspectGroupsRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """把一批群链接做一次体检：是否存在、类型（群 / 超级群 / 频道）、人数、
+    **能不能发言**、是否需要审核加入、是否隐藏成员名单、当前号是否已在群里。
+
+    全程**只读**——不发言、不加群、不改任何东西，所以不会因这个动作触发风控。
+    """
+    links = [item.strip() for item in payload.links if item.strip()]
+    if not links:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="links 不能为空")
+
+    # 选号：指定优先；否则挑一个状态正常、有会话的号
+    if payload.account_id is not None:
+        account = await session.get(TgAccount, payload.account_id)
+        if account is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在")
+    else:
+        clause = scope_clause(TgAccount.id, await visible_account_ids(session, user))
+        conditions = [TgAccount.status == AccountStatus.healthy, TgAccount.session_enc.is_not(None)]
+        if clause is not None:
+            conditions.append(clause)
+        account = await session.scalar(select(TgAccount).where(*conditions).limit(1))
+        if account is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="没有可用的号来做体检（需要状态正常且已导入会话）；冻结 / 失效的号读不了群。",
+            )
+
+    task = await enqueue_task(
+        session,
+        type=TaskType.inspect_groups,
+        account_id=account.id,
+        payload={
+            "links": links,
+            "min_interval": payload.min_interval,
+            "max_interval": payload.max_interval,
+            "source": "manual_inspect_groups",
+        },
+        created_by=user.id,
+        priority=65,
+    )
+    await write_audit(
+        session,
+        action="group_intel.inspect_groups",
+        user_id=user.id,
+        target_type="account",
+        target_id=str(account.id),
+        detail={"links": len(links)},
+    )
+    await session.commit()
+    return BulkResultResponse(
+        ok=True,
+        action="inspect_groups",
+        message=f"已排队体检 {len(links)} 个群链接（用 {account_label(account) or '可用号'}，只读不发消息）",
+        requested=len(links),
+        succeeded=1,
+        failed=0,
+        skipped=0,
+        truncated=False,
+        task_ids=[task.id],
+        items=[],
     )
 
 
