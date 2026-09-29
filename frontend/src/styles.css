@@ -2917,16 +2917,24 @@ body .ant-spin-container::after {
 /* ---- 表单排版：分组标题 + 自适应网格 ----
    放在全局样式里，营销中心的各功能页都能直接用，不必各自引入一份 CSS */
 .tg-form-group-title {
-  margin: var(--tg-space-lg) 0 var(--tg-space-sm);
-  padding-left: 8px;
+  margin: var(--tg-space-lg) 0 var(--tg-space-md);
+  padding: 10px 14px;
   border-left: 3px solid var(--tg-color-primary);
+  background: var(--tg-color-bg-hover);
+  border-radius: var(--tg-radius-md, 8px);
   font-weight: var(--tg-font-weight-semibold);
-  font-size: var(--tg-font-size-sm);
-  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size-md);
+  color: var(--tg-color-text);
+  letter-spacing: 0.2px;
+}
+/* 表单区收敛宽度：宽屏下不要让输入框拉到 2000px，那种"散"的观感比挤更难用 */
+.tg-action-form {
+  max-width: 1180px;
 }
 .tg-form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 230px));
+  justify-content: start;
   gap: var(--tg-space-md) var(--tg-space-lg);
   align-items: start;
 }
@@ -2938,4 +2946,12 @@ body .ant-spin-container::after {
 .tg-form-grid .ant-input-number,
 .tg-form-grid .ant-select {
   width: 100%;
+}
+/* 提交区：把账号范围与提交按钮收进一张卡，别散在页面底部 */
+.tg-submit-bar {
+  margin-top: var(--tg-space-lg);
+  padding: var(--tg-space-lg);
+  border: 1px solid var(--tg-color-border);
+  border-radius: var(--tg-radius-md, 8px);
+  background: var(--tg-color-bg-card);
 }

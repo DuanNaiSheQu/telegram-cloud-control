@@ -490,9 +490,9 @@ function ActionTab({ title, description, submit, buildPayload, children }: Actio
   return (
     <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
       <Alert type="info" showIcon message={title} description={description} />
-      <Form form={form} layout="vertical" onFinish={(values) => void onFinish(values)}>
+      <Form form={form} layout="vertical" className="tg-action-form" onFinish={(values) => void onFinish(values)}>
         {children}
-        <Form.Item label="账号范围">
+        <Form.Item label="账号范围" className="tg-submit-bar">
         <Typography.Text type="secondary" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
           冻结 / 失效 / 停用的号会自动跳过（它们发不出去消息）；检测 / 申诉解封 / 官方养号不受此限制。
         </Typography.Text>
@@ -538,13 +538,13 @@ export default function Campaigns() {
         >
           <div className="tg-form-group-title">内容：发什么、发给谁</div>
           <Form.Item label="私信目标" name="targets" rules={[{ required: true, message: '至少一个目标' }]}>
-            <Input.TextArea placeholder="@user1\n@user2\n+12025550143" autoSize={{ minRows: 3, maxRows: 6 }} />
+            <Input.TextArea placeholder="@user1\n@user2\n+12025550143" autoSize={{ minRows: 3, maxRows: 6 }} style={{ maxWidth: 820 }} />
           </Form.Item>
           <Form.Item label="文本（所有号同一句）" name="text">
-            <Input.TextArea placeholder="填了统一文本就忽略文本池" autoSize={{ minRows: 2, maxRows: 4 }} />
+            <Input.TextArea placeholder="填了统一文本就忽略文本池" autoSize={{ minRows: 2, maxRows: 4 }} style={{ maxWidth: 820 }} />
           </Form.Item>
           <Form.Item label="文本池（按账号取模分配，每行一条）" name="texts">
-            <Input.TextArea placeholder="第一号发这句\n第二号发这句\n…" autoSize={{ minRows: 3, maxRows: 6 }} />
+            <Input.TextArea placeholder="第一号发这句\n第二号发这句\n…" autoSize={{ minRows: 3, maxRows: 6 }} style={{ maxWidth: 820 }} />
           </Form.Item>
           <Form.Item noStyle shouldUpdate={(prev, next) => prev.material_id !== next.material_id}>
             {({ getFieldValue, setFieldValue }) => (
