@@ -133,6 +133,7 @@ def account_out(account: TgAccount, lease: Optional[dict] = None) -> AccountOut:
     """AccountOut 里 group_name / proxy_endpoint / worker_id / lease_until 是派生字段，
     从租约表和 joined 关系上补齐。"""
     out = AccountOut.model_validate(account)
+    out.display_label = account_label(account) or account.phone_masked or ""
     out.status_label = ACCOUNT_STATUS_LABELS.get(enum_value(account.status), "")
     out.current_task_label = CURRENT_TASK_LABELS.get(enum_value(account.current_task), "")
     group = unloaded_attr(account, "group")

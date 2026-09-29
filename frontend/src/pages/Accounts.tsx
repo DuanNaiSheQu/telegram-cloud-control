@@ -223,7 +223,7 @@ export default function Accounts() {
                 {(record.display_name || record.username || value || '?').trim().charAt(0).toUpperCase()}
               </Avatar>
               <span className="tg-stack" style={{ gap: 0, minWidth: 0 }}>
-                <span className="tg-mono">{value}</span>
+                <span className="tg-mono">{record.display_label || value}</span>
                 {record.display_name ? (
                   <span className="tg-muted tg-clamp-cell" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
                     {record.display_name}

@@ -107,7 +107,14 @@ export default function Detection() {
         />
       ),
     },
-    { title: '手机号', dataIndex: 'phone_masked', width: 130, render: (value: string) => <span className="tg-mono">{value}</span> },
+    {
+      title: '账号',
+      dataIndex: 'phone_masked',
+      width: 150,
+      render: (value: string, record: AccountOut) => (
+        <span className="tg-mono">{record.display_label || value}</span>
+      ),
+    },
     { title: '用户名', dataIndex: 'username', width: 120, render: (value: string | null) => value || <span className="tg-muted">—</span> },
     {
       title: '分组',
@@ -126,7 +133,14 @@ export default function Detection() {
   ];
 
   const resultColumns: ColumnsType<CheckRow> = [
-    { title: '脱敏手机号', dataIndex: 'phone_masked', width: 130, render: (value: string) => <span className="tg-mono">{value}</span> },
+    {
+      title: '账号',
+      dataIndex: 'phone_masked',
+      width: 150,
+      render: (value: string, record: { account_label?: string | null; phone_masked?: string }) => (
+        <span className="tg-mono">{record.account_label || value}</span>
+      ),
+    },
     {
       title: '连得上',
       dataIndex: 'reachable',

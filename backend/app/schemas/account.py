@@ -34,6 +34,8 @@ class AccountUpdate(BaseModel):
 class AccountOut(ORMModel):
     id: uuid.UUID
     phone_masked: str
+    # 展示用标签：真手机号 > @用户名 > ID:{tg_user_id}（phone_masked 可能是导入目录标签，如 tdata#0）
+    display_label: str = ""
     username: Optional[str] = None
     tg_user_id: Optional[int] = None
     api_id: Optional[int] = None

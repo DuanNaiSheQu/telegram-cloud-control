@@ -64,6 +64,8 @@ export type AccountStatus =
 export type CurrentTask = 'idle' | 'syncing' | 'awaiting_confirm' | 'relaying';
 
 export interface AccountOut {
+  /** 展示标签：真手机号 > @用户名 > ID:{tg_user_id}（phone_masked 可能是导入目录标签） */
+  display_label?: string;
   id: UUID;
   phone_masked: string;
   username?: string | null;
