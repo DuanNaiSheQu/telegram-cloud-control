@@ -376,6 +376,7 @@ async def cache_avatar(client: Any, account: TgAccount, *, me: Any = None) -> Op
     target_dir = base / "avatars"
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / f"{account.id}.jpg"
+    part = target.with_name(target.name + ".part")
 
     # 先判断有没有头像：photo 为空说明没设置，避免无谓下载
     has_photo = True
@@ -388,12 +389,16 @@ async def cache_avatar(client: Any, account: TgAccount, *, me: Any = None) -> Op
         return None
 
     try:
-        downloaded = await client.download_profile_photo(me or "me", file=str(target))
+        downloaded = await client.download_profile_photo(me or "me", file=str(part))
     except BaseException as exc:  # noqa: BLE001 - 头像下载失败不能影响连接
+        part.unlink(missing_ok=True)
         logger.debug("下载头像失败：%s", exc)
         return None
-    if downloaded is None and not target.is_file():
+    if downloaded is None:
+        part.unlink(missing_ok=True)
         return None
+    # 先下到 .part 再原子替换：接口只读最终文件，不会碰到写了一半的图（否则页面显示破图）
+    part.replace(target)
     return str(target)
 
 

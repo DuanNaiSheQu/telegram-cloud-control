@@ -834,13 +834,12 @@ async def account_avatar(
     path = base / "avatars" / f"{account_id}.jpg"
     # 没缓存过头像时返回一张 1x1 透明图（HTTP 200），而不是 404——
     # 列表里每个号都请求一次，404 会在控制台刷满错误、也干扰排查真问题。
-    if not path.exists():
+    # 但要用响应头标出「这是占位图」：前端据此回退首字母，别把透明图当成真头像渲染。
+    if not path.is_file() or path.stat().st_size < 256:  # 空文件 / 写了一半的图同样当没有
         from fastapi import Response
 
         return Response(content=_PLACEHOLDER_AVATAR, media_type="image/png",
-                        headers={"Cache-Control": "no-store"})
-    if not path.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="该号还没有头像缓存")
+                        headers={"Cache-Control": "no-store", "X-Avatar-Placeholder": "1"})
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "max-age=600"})
 
 

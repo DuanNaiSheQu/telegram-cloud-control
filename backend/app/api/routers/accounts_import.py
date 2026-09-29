@@ -20,6 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_session
 from app.config import settings
 from app.models import AccountGroup, AccountImport, Proxy, TgAccount, User
+from app.models import TaskType
+from app.core.tasks import enqueue_task
 from app.schemas import (
     AccountImportBatchOut,
     AccountImportParseResponse,
@@ -238,6 +240,33 @@ async def run_import(
         outcome.duplicate,
     )
     payload = outcome.as_dict()
+
+    # 导入后自动排一次检测：号刚建档时 client_kind 是空的，页面上显示「未对齐」，
+    # 而它只有被 Worker 真正连过一次才会写入设备身份。与其让用户盯着「未对齐」发懵、
+    # 或者自己一个个点「检测」，不如导入完立刻排队——顺带也能马上发现坏号。
+    checked = 0
+    try:
+        new_ids = [
+            row.get("account_id")
+            for row in (payload.get("results") or [])
+            if row.get("account_id") and not row.get("duplicate")
+        ]
+        for account_id in new_ids[:200]:
+            await enqueue_task(
+                session,
+                type=TaskType.account_check,
+                account_id=uuid.UUID(str(account_id)),
+                payload={"source": "import_auto_check"},
+                created_by=user.id,
+                priority=70,
+            )
+            checked += 1
+        if checked:
+            await session.commit()
+    except Exception:  # noqa: BLE001 - 排队失败不该让导入本身报错，用户可以手动点检测
+        logger.warning("导入后自动排检测失败（不影响导入结果）", exc_info=True)
+        checked = 0
+
     return AccountImportResponse(
         ok=outcome.failed == 0,
         message=f"导入完成：成功 {outcome.succeeded}，重复 {outcome.duplicate}，失败 {outcome.failed}",

@@ -302,7 +302,8 @@ class OfficialTasksMixin:
                 # 5) 在线停留：模拟「人在刷手机」，中途随机做几次无关的轻请求
                 started = asyncio.get_event_loop().time()
                 while asyncio.get_event_loop().time() - started < online_seconds:
-                    await asyncio.sleep(min(30.0, max(5.0, human_delay(rng, 5.0, 30.0))))
+                    # human_delay 的签名是 (min, max, rng)——顺序写反会把 rng 当秒数
+                    await asyncio.sleep(human_delay(5.0, 30.0, rng))
                     try:
                         await client(functions.updates.GetStateRequest())
                     except Exception:  # noqa: BLE001 - 心跳失败无所谓，继续待着

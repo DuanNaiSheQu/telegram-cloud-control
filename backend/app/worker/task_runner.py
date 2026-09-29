@@ -758,7 +758,8 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
                 ) from exc
             raise TaskFailure(f"账号检测失败：{describe_exception(exc)}", retryable=False) from exc
 
-        await persist_identity(session, account, me)
+        # 带上 client：检测顺带把该号的头像缓存刷一遍（不传的话头像只在建连那一次抓过）
+        await persist_identity(session, account, me, client_for_avatar=conn.client)
         status_value = _status_value(account.status)
         payload = dict(task.payload or {})
         health: Optional[dict] = None
@@ -1004,7 +1005,8 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             raise self._failure(exc, "修改资料失败", retryable=False) from exc
 
         me = await client.get_me()
-        await persist_identity(session, account, me)
+        # 刚改完资料（尤其换了头像）：缓存得跟着更新，否则列表里还是旧图
+        await persist_identity(session, account, me, client_for_avatar=client)
         await audit_core.write_audit(
             session,
             action="account.profile_update",
