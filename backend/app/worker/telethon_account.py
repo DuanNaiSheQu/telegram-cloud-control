@@ -362,6 +362,41 @@ def display_name_of_user(user: Any) -> str:
     return getattr(user, "username", None) or getattr(user, "phone", None) or ""
 
 
+async def cache_avatar(client: Any, account: TgAccount, *, me: Any = None) -> Optional[str]:
+    """把该号在 Telegram 上的头像下载到本地缓存（页面直接显示，不用每次现拉）。
+
+    存放在 `materials/avatars/<account_id>.jpg`；没有头像就删掉旧缓存并返回 None。
+    返回相对路径（供接口定位文件）。
+    """
+    import pathlib as _pathlib
+
+    base = _pathlib.Path(settings.materials_dir)
+    if not base.is_absolute():
+        base = _pathlib.Path.cwd() / base
+    target_dir = base / "avatars"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / f"{account.id}.jpg"
+
+    # 先判断有没有头像：photo 为空说明没设置，避免无谓下载
+    has_photo = True
+    if me is not None:
+        photo = getattr(me, "photo", None)
+        has_photo = photo is not None and getattr(photo, "photo_id", None) is not None
+    if not has_photo:
+        if target.is_file():
+            target.unlink(missing_ok=True)
+        return None
+
+    try:
+        downloaded = await client.download_profile_photo(me or "me", file=str(target))
+    except BaseException as exc:  # noqa: BLE001 - 头像下载失败不能影响连接
+        logger.debug("下载头像失败：%s", exc)
+        return None
+    if downloaded is None and not target.is_file():
+        return None
+    return str(target)
+
+
 async def persist_identity(
     session: Any,
     account: TgAccount,
@@ -370,6 +405,7 @@ async def persist_identity(
     session_string: Optional[str] = None,
     reset_authorized_at: bool = False,
     client_kind: Optional[str] = None,
+    client_for_avatar: Any = None,
 ) -> None:
     """连接成功 / 登录成功后回填身份：用户 ID、用户名、展示名、状态、号龄、对齐的客户端平台。"""
     now = datetime.now(tz=timezone.utc)
@@ -406,6 +442,11 @@ async def persist_identity(
         account.last_error = ""
     account.last_checked_at = now
     account.last_heartbeat = now
+    # 顺手把头像抓下来缓存：页面要显示真实头像，不能每次现拉
+    try:
+        await cache_avatar(client_for_avatar, account, me=user)
+    except BaseException:  # noqa: BLE001 - 头像失败不影响身份落库
+        pass
     await session.flush()
 
 
@@ -592,7 +633,11 @@ class AccountConnection:
                 account = await session.get(TgAccount, self.account_id)
                 if account is None:
                     raise AccountUnavailable("账号已被删除")
-                await persist_identity(session, account, me, client_kind=self._identity().get("lang_pack") or None)
+                await persist_identity(
+                    session, account, me,
+                    client_kind=self._identity().get("lang_pack") or None,
+                    client_for_avatar=client,
+                )
         except Exception as exc:  # noqa: BLE001 - 连接失败都在这里收口
             if client is not None:
                 await self._safe_disconnect(client)
@@ -705,7 +750,11 @@ class AccountConnection:
         async with session_scope() as session:
             account = await session.get(TgAccount, self.account_id)
             if account is not None:
-                await persist_identity(session, account, me, client_kind=self._identity().get("lang_pack") or None)
+                await persist_identity(
+                    session, account, me,
+                    client_kind=self._identity().get("lang_pack") or None,
+                    client_for_avatar=client,
+                )
         return me
 
     async def refresh_identity(self) -> bool:

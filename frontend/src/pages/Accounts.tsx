@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Avatar, Button, Checkbox, Dropdown, Form, Input, InputNumber, Modal, Select, Space, Tooltip, Typography } from 'antd';
+import { Alert, Button, Checkbox, Dropdown, Form, Input, InputNumber, Modal, Select, Space, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   CloudSyncOutlined,
@@ -37,6 +37,7 @@ import {
 import AccountDetailDrawer, { type AccountDetailHandlers } from '../features/accounts/AccountDetailDrawer';
 import { BulkActionModal, CreateAccountModal, EditAccountModal, ProfileModal } from '../features/accounts/AccountModals';
 import BulkResultModal from '../features/accounts/BulkResultModal';
+import AccountAvatar from '../features/accounts/AccountAvatar';
 import AccountImportModal from '../features/accounts/AccountImportModal';
 import { useRowSelection } from '../features/accounts/useRowSelection';
 import type { AccountOut, AccountStatus, BulkAction, BulkResultOut, CurrentTask } from '../api/types';
@@ -200,9 +201,11 @@ export default function Accounts() {
         render: (value: string, record) => (
           <Tooltip title={record.display_name ? `本号资料名称：${record.display_name}` : undefined}>
             <span className="tg-flex" style={{ gap: 'var(--tg-space-sm)', alignItems: 'center' }}>
-              <Avatar size={24} style={{ background: 'var(--tg-color-primary-bg)', color: 'var(--tg-color-primary)', flexShrink: 0 }}>
-                {(record.display_name || record.username || value || '?').trim().charAt(0).toUpperCase()}
-              </Avatar>
+              <AccountAvatar
+                accountId={record.id}
+                title={record.phone || record.display_label || value}
+                fallback={(record.display_name || record.username || value || '?').trim().charAt(0).toUpperCase()}
+              />
               <span className="tg-stack" style={{ gap: 0, minWidth: 0 }}>
                 <span className="tg-mono">{record.display_label || value}</span>
                 {record.display_name ? (

@@ -7,6 +7,27 @@
 
 ---
 
+## v0.3.59 — 2026-03-30
+
+主题：**账号显示真实头像**。
+
+### 新增
+
+- 账号列表头像从「首字母方块」换成 **Telegram 上的真实头像**：
+  - Worker 在连接成功后（`persist_identity`）顺手把头像下载到 `materials/avatars/<账号id>.jpg`，
+    没有头像的号会清掉旧缓存，不留过期图；
+  - 新接口 `GET /api/accounts/{id}/avatar` 只负责读文件（API 不持有 Telegram 会话，
+    不该自己去拉），带 `Cache-Control: max-age=600`；
+  - 前端新组件 `AccountAvatar`：带 `Authorization` 用 `fetch` 取 blob 再转 objectURL
+    （`<img src>` 带不了 token），同会话内按账号缓存；拉不到就**安静回退首字母**，不显示破图。
+
+### 验证
+
+磁盘上已生成头像缓存（64KB）；接口实测：正常号 `200 image/jpeg 64291B`，
+冻结号 `404`（还没连接过 → 前端显示首字母，属预期）。
+
+---
+
 ## v0.3.58 — 2026-03-30
 
 主题：**采集群内对话支持关键词**——按话题捞人。

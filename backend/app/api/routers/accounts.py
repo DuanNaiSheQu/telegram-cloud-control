@@ -7,10 +7,12 @@ API 自己不连 Telethon。测试也不改任何模型 / 迁移。
 from __future__ import annotations
 
 import logging
+import pathlib
 import uuid
 from datetime import timedelta
 from typing import List, Optional
 
+from fastapi.responses import FileResponse
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
@@ -18,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app import security
+from app.config import settings
 from app.api.deps import (
     assert_account_access,
     get_current_user,
@@ -782,6 +785,28 @@ async def sync_dialogs(
         {"task_id": str(task.id), "type": enum_value(task.type), "ok": True, "detail": "已入队"}
     )
     return {"ok": True, "message": "已排队同步会话，等持有租约的 Worker 执行", "task_id": task.id}
+
+
+@router.get("/{account_id}/avatar", summary="账号头像（Telegram 上的真实头像，Worker 缓存到本地）")
+async def account_avatar(
+    account_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """返回该号在 Telegram 上的头像。
+
+    头像是 Worker 在连接成功后下载并缓存的（`materials/avatars/<id>.jpg`），
+    接口只负责读文件——API 不持有 Telegram 会话，不应自己去拉。
+    没有头像或还没同步到就 404，前端回退成首字母。
+    """
+    await assert_account_access(session, user, account_id)
+    base = pathlib.Path(settings.materials_dir)
+    if not base.is_absolute():
+        base = pathlib.Path.cwd() / base
+    path = base / "avatars" / f"{account_id}.jpg"
+    if not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="该号还没有头像缓存")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "max-age=600"})
 
 
 @router.post("/{account_id}/profile", summary="修改本号名称 / 头像")
