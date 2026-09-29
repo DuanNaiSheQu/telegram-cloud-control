@@ -41,6 +41,7 @@ from app.config import settings
 from app.db import SessionFactory
 from app.models import TgAccount
 from app.security import decrypt_secret
+from app.services.verify_runner import verify_runner
 
 
 def deep_url(button: Any) -> str:
@@ -146,9 +147,12 @@ async def main() -> None:
         print(f"① {time.monotonic() - started:.1f}s 拿到链接")
 
         # 交给系统真 Chrome —— 关键：不经 CDP，Turnstile 才不会报 Widget error
-        subprocess.run(["open", "-a", "Google Chrome", url], check=False)
-        osascript('tell application "Google Chrome" to activate')
-        print(f"② {time.monotonic() - started:.1f}s 已用系统 Chrome 打开并激活")
+        # 跨平台打开真 Chrome：macOS 走 open -a，Linux 走 google-chrome + Xvfb。
+        # 关键点：全程不经 CDP，Turnstile 才不会报 Widget error。
+        if not verify_runner.open_in_real_chrome(url):
+            print("✗ 打开真 Chrome 失败，请先跑 bash scripts/install_browser.sh")
+            return
+        print(f"② {time.monotonic() - started:.1f}s 已用真 Chrome 打开")
 
         # Turnstile 非交互式，等待它自己完成并提交即可
         for attempt in range(8):

@@ -37,30 +37,10 @@ from app.models import TgAccount
 from app.security import decrypt_secret
 
 def ensure_display() -> dict:
-    """给浏览器阶段准备一块"屏幕"。
+    """把显示环境准备交给统一层（Linux 无桌面时自动 Xvfb）。"""
+    verify_runner.ensure_display()
+    return dict(os.environ)
 
-    Cap 会检测浏览器环境，纯无头模式直接被拦；所以必须跑真实窗口。
-    服务器没有桌面时用 Xvfb 造虚拟显示——Chrome 以为自己在正常显示器上，
-    实际没有任何物理输出。macOS/Windows 本身有显示，无需处理。
-    """
-    env = dict(os.environ)
-    if platform.system() != "Linux" or env.get("DISPLAY"):
-        return env
-    if shutil.which("Xvfb") is None:
-        print("   ⚠ 未装 Xvfb，浏览器阶段会失败：先跑 bash scripts/install_browser.sh", flush=True)
-        return env
-    display = ":99"
-    subprocess.Popen(
-        ["Xvfb", display, "-screen", "0", "1280x800x24"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
-    time.sleep(1.5)
-    env["DISPLAY"] = display
-    print(f"   已启动虚拟显示 {display}（无桌面环境也能跑真窗口）", flush=True)
-    return env
-
-
-logger = logging.getLogger(__name__)
 
 PEIQI_ID = 8590651516
 PEIQI_USERNAME = "PeiQiBot"
