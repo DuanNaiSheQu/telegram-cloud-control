@@ -93,6 +93,8 @@ import type {
   UserCreate,
   UserOut,
   UserUpdate,
+  KeywordHitOut,
+  KeywordWatchOut,
   UUID,
 } from './types';
 
@@ -315,6 +317,20 @@ export const groupIntelApi = {
   stats: () => api.get<GroupIntelStats>('/api/group-intel/stats'),
   /** 批量采集：对选中的号采它们已加入的群（只读，不发言） */
   collect: (payload: GroupCollectRequest) => api.post<BulkResultOut>('/api/group-intel/collect', payload),
+  // 关键词监听：规则 CRUD + 命中流水
+  keywordWatches: () => api.get<{ items: KeywordWatchOut[]; total: number }>('/api/group-intel/keyword-watches'),
+  createKeywordWatch: (payload: {
+    name?: string;
+    keywords: string[];
+    enabled?: boolean;
+    notify?: boolean;
+  }) => api.post<{ ok: boolean; id: string; message: string }>('/api/group-intel/keyword-watches', payload),
+  updateKeywordWatch: (id: string, payload: { enabled?: boolean; keywords?: string[]; name?: string }) =>
+    api.patch<{ ok: boolean; message: string }>(`/api/group-intel/keyword-watches/${id}`, payload),
+  deleteKeywordWatch: (id: string) =>
+    api.del<{ ok: boolean; message: string }>(`/api/group-intel/keyword-watches/${id}`),
+  keywordHits: (limit = 100) =>
+    api.get<{ items: KeywordHitOut[]; total: number }>('/api/group-intel/keyword-hits', { limit }),
   /** 采集群内对话：成员名单被群主隐藏时的替代方案（对话照样能读，从发言里淘成员） */
   collectMessages: (payload: {
     profile_id: string;

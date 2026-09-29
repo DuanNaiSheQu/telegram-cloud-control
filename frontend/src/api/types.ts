@@ -1339,3 +1339,28 @@ export interface GroupCollectRequest extends CampaignScopeRequest {
   with_members?: boolean;
   member_limit?: number;
 }
+
+/** 关键词监听规则 */
+export interface KeywordWatchOut {
+  id: string;
+  name: string;
+  keywords: string[];
+  tg_chat_ids: number[];
+  account_ids: string[];
+  enabled: boolean;
+  notify: boolean;
+  hit_count: number;
+  created_at?: string;
+}
+
+/** 关键词命中流水 */
+export interface KeywordHitOut {
+  id: string;
+  tg_chat_id: number;
+  tg_user_id?: number | null;
+  sender: string;
+  keyword?: string | null;
+  text?: string | null;
+  rule_name?: string | null;
+  occurred_at?: string;
+}

@@ -5,6 +5,7 @@
  * 入群/退群流水本身由 Worker 事件监听被动记录，这里只负责「看」和「手动补采」。
  */
 import { useEffect, useState } from 'react';
+import KeywordWatchPanel from '../features/group/KeywordWatchPanel';
 import {
   Alert,
   Button,
@@ -742,6 +743,7 @@ export default function GroupIntel() {
           </div>
         </div>
       </Modal>
+      <KeywordWatchPanel />
     </PageContainer>
   );
 }
