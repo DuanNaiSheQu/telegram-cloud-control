@@ -355,11 +355,24 @@ async def profile_update(
             merged.update(payload.per_account[account.id].clean())
         return merged
 
+    pools = {
+        "first_name_pool": [s.strip() for s in (payload.first_name_pool or []) if s.strip()],
+        "last_name_pool": [s.strip() for s in (payload.last_name_pool or []) if s.strip()],
+        "bio_pool": [s.strip() for s in (payload.bio_pool or []) if s.strip()],
+        "assign_mode": payload.assign_mode,
+        "username_prefix": (payload.username_prefix or "").strip() or None,
+        "username_random_digits": payload.username_random_digits,
+    }
+    if not any(v for k, v in pools.items() if k.endswith("_pool")) and not pools["username_prefix"] and not base:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="没有要改的字段：填统一资料、候选池或用户名前缀其中之一",
+        )
     return await _submit_campaign(
         action="campaign.profile_update",
         task_type=TaskType.update_profile,
         payload_scope=payload,
-        params={},
+        params={**pools},
         per_account=per,
         session=session,
         user=user,

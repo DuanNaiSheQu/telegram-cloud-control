@@ -209,12 +209,29 @@ class ProfileFields(BaseModel):
 
 
 class ProfileBulkRequest(BulkScopeRequest):
-    """统一一份资料（profile）改所有号；per_account 可按账号覆盖。"""
+    """批量改资料：三种玩法，按需组合。
 
-    profile: ProfileFields = Field(description="所有号统一改成这份资料")
+    1. **统一**：`profile` 填一份，所有号改成一样；
+    2. **按号指定**：`per_account` 按账号 id 单独覆盖（谁用哪个名字说得清）；
+    3. **池化随机**：`*_pool` 给一组候选，每个号按 `assign_mode` 取一个——
+       一批号资料完全一致是明显的批量特征，池化能让每个号长得不一样。
+    """
+
+    profile: ProfileFields = Field(default_factory=ProfileFields, description="所有号统一的资料（留空字段不改）")
     per_account: Optional[Dict[uuid.UUID, ProfileFields]] = Field(
         default=None, description="按账号覆盖（键是账号 id），只对列出的号生效"
     )
+    # ---- 池化随机 ----
+    first_name_pool: Optional[List[str]] = Field(default=None, description="名字候选池，每行一个")
+    last_name_pool: Optional[List[str]] = Field(default=None, description="姓氏候选池，每行一个")
+    bio_pool: Optional[List[str]] = Field(default=None, description="简介候选池，每行一个")
+    assign_mode: str = Field(
+        default="sequence",
+        description="池化取值方式：sequence=按账号顺序轮流取（同批不重复）；random=每个号随机取一个",
+    )
+    # ---- 用户名批量：@username 全局唯一，用「前缀 + 随机数字」更实际 ----
+    username_prefix: Optional[str] = Field(default=None, description="用户名前缀；实际写入 前缀+随机数字")
+    username_random_digits: int = Field(default=4, ge=2, le=8, description="用户名后缀随机数字位数")
 
     @field_validator("per_account")
     @classmethod

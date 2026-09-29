@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import random
 import time
 import uuid
 from dataclasses import dataclass
@@ -50,6 +51,7 @@ from app.worker.campaign_tasks import CampaignTasksMixin
 from app.worker.group_intel import GroupIntelMixin
 from app.worker.official_tasks import OfficialTasksMixin
 from app.worker.handlers import MessageData, message_data_from_telethon, persist_message
+from app.worker.humanize import pick_for_index, pick_random
 from app.worker.telethon_account import (
     AccountConnection,
     AccountUnavailable,
@@ -793,6 +795,24 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
         assert account is not None
         payload = {key: value for key, value in dict(task.payload or {}).items() if value not in (None, "")}
         if not payload:
+            raise TaskFailure("修改资料任务没有可执行字段", retryable=False)
+
+        # 池化取值：一批号资料完全一致是明显的批量特征，这里让每个号拿不同的值
+        rng = random.Random(f"{account.id}:{task.id}")
+        index = int(payload.get("account_index") or 0)
+        mode = str(payload.get("assign_mode") or "sequence")
+        for field, pool_key in (("first_name", "first_name_pool"), ("last_name", "last_name_pool"), ("bio", "bio_pool")):
+            pool = [str(item).strip() for item in (payload.get(pool_key) or []) if str(item).strip()]
+            if not pool:
+                continue
+            payload[field] = pick_for_index(pool, index) if mode == "sequence" else pick_random(pool, rng)
+        prefix = str(payload.get("username_prefix") or "").strip()
+        if prefix:
+            # @username 全局唯一：前缀 + 随机数字，避免整批撞名
+            digits = max(2, min(int(payload.get("username_random_digits") or 4), 8))
+            payload["username"] = f"{prefix}{rng.randint(10 ** (digits - 1), 10**digits - 1)}"
+
+        if not any(key in payload for key in ("first_name", "last_name", "bio", "about", "username", "photo_url")):
             raise TaskFailure("修改资料任务没有可执行字段", retryable=False)
         client = self._client(account.id)
         changed: list[str] = []

@@ -984,6 +984,15 @@ export interface ProfileFields {
 export interface ProfileBulkRequest extends CampaignScopeRequest {
   profile: ProfileFields;
   per_account?: Record<UUID, ProfileFields> | null;
+  /** 候选池：每个号按 assign_mode 取一个（写多行时前端自动填） */
+  first_name_pool?: string[] | null;
+  last_name_pool?: string[] | null;
+  bio_pool?: string[] | null;
+  /** sequence=按号顺序轮流取；random=随机取 */
+  assign_mode?: 'sequence' | 'random';
+  /** 用户名前缀（实际写入 前缀+随机数字） */
+  username_prefix?: string | null;
+  username_random_digits?: number;
 }
 
 export interface StormRequest extends CampaignScopeRequest {

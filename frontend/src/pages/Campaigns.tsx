@@ -752,33 +752,74 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="批量改资料"
-          description="一批号统一改名 / 简介 / 用户名 / 头像。留空的字段不改。"
-          buildPayload={(scope, values) => ({
-            ...scopePayload(scope),
-            profile: {
-              first_name: String(values.first_name ?? '').trim() || null,
-              last_name: String(values.last_name ?? '').trim() || null,
-              bio: String(values.bio ?? '').trim() || null,
-              username: String(values.username ?? '').trim() || null,
-              photo_url: String(values.photo_url ?? '').trim() || null,
-            },
-          })}
+          description="一批号改名 / 简介 / 用户名 / 头像。文字框里写一行=所有号统一改成它，写多行=当成候选池，每个号拿不同的值（避免一批号资料完全一样）。留空的字段不改。"
+          buildPayload={(scope, values) => {
+            // 一行 = 统一值；多行 = 候选池（按号顺序轮流取 或 随机取）
+            const nameLines = splitField(values.first_name);
+            const lastLines = splitField(values.last_name);
+            const bioLines = splitField(values.bio);
+            const one = (lines: string[]) => (lines.length === 1 ? lines[0] : null);
+            return {
+              ...scopePayload(scope),
+              profile: {
+                first_name: one(nameLines),
+                last_name: one(lastLines),
+                bio: one(bioLines),
+                username: String(values.username ?? '').trim() || null,
+                photo_url: String(values.photo_url ?? '').trim() || null,
+              },
+              first_name_pool: nameLines.length > 1 ? nameLines : null,
+              last_name_pool: lastLines.length > 1 ? lastLines : null,
+              bio_pool: bioLines.length > 1 ? bioLines : null,
+              username_prefix: String(values.username_prefix ?? '').trim() || null,
+              username_random_digits: Number(values.username_random_digits ?? 4),
+              assign_mode: String(values.assign_mode ?? 'sequence'),
+            };
+          }}
           submit={(payload) => campaignApi.profileUpdate(payload as unknown as ProfileBulkRequest)}
         >
-          <Space wrap>
-            <Form.Item label="名字" name="first_name">
-              <Input placeholder="First name" />
+          <Space wrap align="start">
+            <Form.Item label="名字（多行=候选池）" name="first_name">
+              <Input.TextArea placeholder={'David\nAlex\n小林'} autoSize={{ minRows: 2, maxRows: 6 }} style={{ width: 200 }} />
             </Form.Item>
-            <Form.Item label="姓氏" name="last_name">
-              <Input placeholder="Last name" />
+            <Form.Item label="姓氏（多行=候选池）" name="last_name">
+              <Input.TextArea placeholder={'Chen\nWang\nLi'} autoSize={{ minRows: 2, maxRows: 6 }} style={{ width: 200 }} />
             </Form.Item>
-            <Form.Item label="用户名（@ 后面部分）" name="username">
-              <Input placeholder="用户名（不含 @）" />
+            <Form.Item label="固定用户名（@ 后面部分）" name="username">
+              <Input placeholder="单个号才用，批量建议用右边的前缀" style={{ width: 240 }} />
             </Form.Item>
           </Space>
-          <Form.Item label="简介" name="bio">
-            <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+          <Form.Item label="简介（多行=候选池）" name="bio">
+            <Input.TextArea
+              placeholder={'第一句简介\n第二句简介\n第三句简介'}
+              autoSize={{ minRows: 3, maxRows: 8 }}
+            />
           </Form.Item>
+          <Space wrap align="start">
+            <Form.Item
+              label="用户名前缀（推荐）"
+              name="username_prefix"
+              tooltip="用户名全局唯一，批量时用「前缀 + 随机数字」，每个号自动生成不撞名"
+            >
+              <Input placeholder="例如 user_" style={{ width: 160 }} />
+            </Form.Item>
+            <Form.Item label="随机数字位数" name="username_random_digits" initialValue={4}>
+              <InputNumber min={2} max={8} style={{ width: 120 }} />
+            </Form.Item>
+            <Form.Item
+              label="池化取值方式"
+              name="assign_mode"
+              initialValue="sequence"
+              tooltip="按号顺序：同批号轮流取池里的值，互不重复；随机：每个号随机取一个"
+            >
+              <Segmented
+                options={[
+                  { label: '按号顺序', value: 'sequence' },
+                  { label: '随机', value: 'random' },
+                ]}
+              />
+            </Form.Item>
+          </Space>
           <Form.Item label="头像图片地址" name="photo_url">
             <Input placeholder="https://…/avatar.jpg" />
           </Form.Item>
