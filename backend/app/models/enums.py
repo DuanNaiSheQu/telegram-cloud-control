@@ -112,6 +112,7 @@ class TaskType(str, enum.Enum):
     sync_official = "sync_official"      # 同步服务端下发的官方限制参数（help.GetAppConfig）
     warmup_activity = "warmup_activity"  # 官方节奏养号：上线→翻会话→（可选）已读/打字→下线，不发消息
     appeal_spam = "appeal_spam"          # 模拟真人向 @SpamBot 申诉：/start → 看状态 → 点「这是误判」
+    collect_messages = "collect_messages"  # 采集群内对话：按时间范围扫消息，把发言者落成成员档案
     # Bot（API 执行）
     relay_to_staff = "relay_to_staff"    # 转发到员工群
     bot_reply = "bot_reply"              # 官方 Bot 自动回复
@@ -150,6 +151,7 @@ TASK_TYPE_LABELS = {
     "sync_official": "同步官方限制参数",
     "warmup_activity": "官方养号活动",
     "appeal_spam": "申诉解封",
+    "collect_messages": "采集群内对话",
     "relay_to_staff": "转发到员工群",
     "bot_reply": "Bot 自动回复",
     "reply_to_origin": "回复送回原会话",

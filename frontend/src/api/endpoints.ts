@@ -315,6 +315,16 @@ export const groupIntelApi = {
   stats: () => api.get<GroupIntelStats>('/api/group-intel/stats'),
   /** 批量采集：对选中的号采它们已加入的群（只读，不发言） */
   collect: (payload: GroupCollectRequest) => api.post<BulkResultOut>('/api/group-intel/collect', payload),
+  /** 采集群内对话：成员名单被群主隐藏时的替代方案（对话照样能读，从发言里淘成员） */
+  collectMessages: (payload: {
+    profile_id: string;
+    scope?: string;
+    account_ids?: string[];
+    days: number;
+    exclude_admins: boolean;
+    exclude_bots: boolean;
+    limit: number;
+  }) => api.post<BulkResultOut>('/api/group-intel/collect-messages', payload),
   /** 按群链接采集：粘贴链接，自动解析群 + 采群员（可选先加入、采完退出） */
   collectByLink: (payload: CollectLinkRequest) =>
     api.post<BulkResultOut>('/api/group-intel/collect-link', payload),

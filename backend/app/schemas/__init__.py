@@ -71,6 +71,7 @@ from app.schemas.campaign import (
 from app.schemas.common import OkResponse, ORMModel, Page, PageQuery
 from app.schemas.group_intel import (
     CollectLinkRequest,
+    CollectMessagesRequest,
     GroupCollectRequest,
     GroupEventListResponse,
     GroupEventOut,

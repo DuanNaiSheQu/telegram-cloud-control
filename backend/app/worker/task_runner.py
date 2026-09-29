@@ -141,6 +141,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             TaskType.persona_chat.value: self._persona_chat,
             TaskType.collect_group.value: self._collect_group,
             TaskType.collect_members.value: self._collect_members,
+            TaskType.collect_messages.value: self._collect_messages,
             TaskType.collect_link.value: self._collect_link,
             TaskType.sync_official.value: self._sync_official,
             TaskType.warmup_activity.value: self._warmup_activity,

@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session, visible_account_ids
 from app.api.routers import build_order_by, enum_value, publish_task_safely
+from app.services.account_label import account_label
 from app.api.routers.accounts_bulk import _empty, _item, _resolve_accounts, _response
 from app.config import settings
 from app.core.audit import write_audit
@@ -46,7 +47,9 @@ from app.models import (
     User,
 )
 from app.schemas import (
+    BulkAccountResult,
     BulkResultResponse,
+    CollectMessagesRequest,
     CollectLinkRequest,
     GroupCollectRequest,
     GroupEventListResponse,
@@ -210,6 +213,86 @@ async def collect_group_intel(
         message=f"已排队采集 {len(dialogs)} 个群（{len(task_ids)} 条任务），Worker 会逐个只读拉取",
         truncated=truncated,
         task_ids=task_ids,
+    )
+
+
+@router.post("/collect-messages", response_model=BulkResultResponse, summary="采集群内对话（成员名单被隐藏时的替代方案）")
+async def collect_group_messages(
+    payload: CollectMessagesRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """按时间范围扫描群里的对话，把**发过言的人**落成成员档案。
+
+    为什么需要：群主开启「隐藏成员名单」后，Telegram 不允许任何客户端拉成员列表——
+    但**群里的对话照样能读**。从谁发了言就能把活跃成员捞出来，还顺带统计发言条数，
+    比一份静态名单更能反映「谁还在」。
+
+    - `days`：只扫最近多少天（默认 7）；
+    - `exclude_admins`：跳过管理员的发言（默认否——管理员往往正是要联系的人）；
+    - `exclude_bots`：跳过机器人（默认是）；
+    - `limit`：最多扫多少条消息（默认 1000）。仍是**只读**操作，不发言、不回应。
+    """
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload)
+    if not accounts:
+        raise _empty()
+    profile = await session.get(GroupProfile, payload.profile_id)
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="群档案不存在")
+
+    items: List[BulkAccountResult] = []
+    task_ids: List[uuid.UUID] = []
+    for index, account in enumerate(accounts):
+        try:
+            task = await enqueue_task(
+                session,
+                type=TaskType.collect_messages,
+                account_id=account.id,
+                payload={
+                    "profile_id": str(profile.id),
+                    "tg_chat_id": profile.tg_chat_id,
+                    "dialog_id": str(profile.dialog_id) if profile.dialog_id else None,
+                    "days": payload.days,
+                    "exclude_admins": payload.exclude_admins,
+                    "exclude_bots": payload.exclude_bots,
+                    "limit": payload.limit,
+                    "source": "manual_collect_messages",
+                },
+                created_by=user.id,
+                priority=60,
+                # 错峰入队：多个号不要同一秒一起开扫
+                run_after=datetime.now(tz=timezone.utc) + timedelta(seconds=index * 5),
+            )
+            task_ids.append(task.id)
+            items.append(
+                BulkAccountResult(account_id=account.id, account_label=account_label(account) or "", ok=True, message="已排队扫描对话")
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("采集对话入队失败 account_id=%s: %s", account.id, exc)
+            items.append(
+                BulkAccountResult(account_id=account.id, account_label=account_label(account) or "", ok=False, message=str(exc)[:120])
+            )
+    await write_audit(
+        session,
+        action="group_intel.collect_messages",
+        user_id=user.id,
+        target_type="group_profile",
+        target_id=str(profile.id),
+        detail={"accounts": len(accounts), "days": payload.days, "exclude_admins": payload.exclude_admins},
+    )
+    await session.commit()
+    succeeded = sum(1 for item in items if item.ok)
+    return BulkResultResponse(
+        ok=succeeded > 0,
+        action="collect_messages",
+        message=f"已排队扫描最近 {payload.days} 天的对话（{succeeded} 个号）；发过言的人会落成成员档案",
+        requested=len(accounts),
+        succeeded=succeeded,
+        failed=len(items) - succeeded,
+        skipped=0,
+        truncated=truncated,
+        task_ids=task_ids,
+        items=items,
     )
 
 

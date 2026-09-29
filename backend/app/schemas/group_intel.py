@@ -137,3 +137,15 @@ class GroupIntelStats(BaseModel):
     joins_today: int = 0
     leaves_today: int = 0
     watching: bool = True
+
+
+class CollectMessagesRequest(BaseModel):
+    """采集群内对话：成员名单被群主隐藏时的替代方案（对话照样能读）。"""
+
+    profile_id: uuid.UUID = Field(description="群档案 id")
+    account_ids: Optional[List[uuid.UUID]] = Field(default=None, description="执行账号（留空按 scope）")
+    scope: str = Field(default="selected", description="selected / all / group:<分组ID>")
+    days: int = Field(default=7, ge=1, le=365, description="只扫最近多少天的消息")
+    exclude_admins: bool = Field(default=False, description="跳过管理员的发言")
+    exclude_bots: bool = Field(default=True, description="跳过机器人")
+    limit: int = Field(default=1000, ge=10, le=5000, description="最多扫多少条消息")

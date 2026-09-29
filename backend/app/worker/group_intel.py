@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Optional
 
 from telethon import functions
@@ -234,6 +234,160 @@ class GroupIntelMixin:
             "member_count": profile.member_count,
             "sampled": sampled,
             "profile_id": str(profile.id),
+        }
+
+    async def _collect_messages(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
+        """采集群内对话：按时间范围扫消息，把发言的人落成成员档案。
+
+        为什么需要它：群主可以开启「隐藏成员名单」，Telegram 就不再允许任何客户端拉成员列表——
+        但**群里的对话照样能读**。从「谁发了言」就能把活跃成员捞出来，还顺带知道最后发言时间，
+        比一份静态成员名单更有用。
+
+        payload：
+        - `profile_id` / `tg_chat_id` / `dialog_id`：目标群（与采集成员一致）；
+        - `days`：只扫最近多少天的消息（默认 7 天）；
+        - `exclude_admins`：跳过管理员的发言（默认 False，即管理员也算成员）；
+        - `exclude_bots`：跳过机器人（默认 True）；
+        - `limit`：最多扫多少条消息（默认 1000，避免大群扫太久）。
+        """
+        assert account is not None
+        payload = dict(task.payload or {})
+        profile_id = payload.get("profile_id")
+        dialog = await self._resolve_group_dialog(session, task, payload)
+        days = max(1, min(int(payload.get("days") or 7), 365))
+        limit = max(10, min(int(payload.get("limit") or 1000), 5000))
+        exclude_admins = bool(payload.get("exclude_admins", False))
+        exclude_bots = bool(payload.get("exclude_bots", True))
+        client = self._client(account.id)
+
+        from app.models import GroupProfile
+
+        profile = None
+        if profile_id:
+            profile = await session.get(GroupProfile, uuid.UUID(str(profile_id)))
+        if profile is None:
+            tg_chat_id = int(payload.get("tg_chat_id") or (dialog.tg_chat_id if dialog is not None else 0))
+            if not tg_chat_id:
+                raise TaskFailure("采集对话任务缺少 profile_id 或 tg_chat_id", retryable=False)
+            entity = await resolve_entity(client, tg_chat_id)
+            profile = await upsert_profile(
+                session,
+                account_id=account.id,
+                tg_chat_id=tg_chat_id,
+                dialog_id=dialog.id if dialog is not None else None,
+                source="profile_sync",
+                touch_collected_at=False,
+                **profile_fields_from_entity(entity),
+            )
+        else:
+            entity = await self._resolve_entity(client, dialog) if dialog is not None else await resolve_entity(client, profile.tg_chat_id)
+
+        # 不在群里就读不到对话，先把原因说清楚（与成员采集同一套探测）
+        blocked = await self._member_visibility(client, entity)
+        if blocked and "隐藏了成员名单" not in blocked:
+            raise TaskFailure(blocked, retryable=False)
+
+        # 管理员 id 集合：用于「避开管理员」。拿不到就退化为不排除（不影响主流程）
+        admin_ids: set[int] = set()
+        if exclude_admins and isinstance(entity, tl_types.Channel):
+            try:
+                admins = await client(
+                    functions.channels.GetParticipantsRequest(
+                        channel=entity,
+                        filter=tl_types.ChannelParticipantsAdmins(),
+                        offset=0,
+                        limit=100,
+                        hash=0,
+                    )
+                )
+                admin_ids = {int(user.id) for user in getattr(admins, "users", []) or []}
+            except BaseException as exc:  # noqa: BLE001 - 隐藏成员名单时管理员列表也可能拿不到
+                self.log.debug("取管理员列表失败（不排除管理员）: %s", describe_exception(exc))
+
+        cutoff = _now() - timedelta(days=days)
+        await self._report_progress(
+            session, task, stage="scanning",
+            detail=f"开始扫描最近 {days} 天的对话（最多 {limit} 条）",
+            scanned=0, found=0, total=limit,
+        )
+
+        scanned = found = skipped_admin = skipped_bot = 0
+        seen: dict[int, dict] = {}
+        try:
+            async for message in client.iter_messages(entity, limit=limit):
+                message_date = getattr(message, "date", None)
+                if message_date is not None and message_date < cutoff:
+                    break  # 已经扫到时间范围之外（从新往旧）
+                scanned += 1
+                sender = None
+                try:
+                    sender = await message.get_sender()
+                except BaseException:  # noqa: BLE001 - 单条取不到发送者不影响整批
+                    sender = None
+                if sender is None or getattr(sender, "id", None) is None:
+                    continue
+                if getattr(sender, "bot", False) and exclude_bots:
+                    skipped_bot += 1
+                    continue
+                if exclude_admins and int(sender.id) in admin_ids:
+                    skipped_admin += 1
+                    continue
+                user_id = int(sender.id)
+                if user_id in seen:
+                    seen[user_id]["messages"] += 1
+                else:
+                    username = getattr(sender, "username", None)
+                    name = (
+                        getattr(sender, "title", None)
+                        or " ".join(
+                            part
+                            for part in (getattr(sender, "first_name", None), getattr(sender, "last_name", None))
+                            if part
+                        ).strip()
+                        or (f"@{username}" if username else "")
+                        or str(user_id)
+                    )
+                    seen[user_id] = {"messages": 1, "name": name, "username": username}
+                    await upsert_member(
+                        session,
+                        profile=profile,
+                        tg_user_id=user_id,
+                        username=username,
+                        display_name=name,
+                        is_bot=bool(getattr(sender, "bot", False)),
+                        is_premium=bool(getattr(sender, "premium", False)),
+                        is_admin=user_id in admin_ids,
+                        source="from_messages",
+                        bump_message=True,
+                    )
+                    found += 1
+                if scanned % 50 == 0:
+                    await self._report_progress(
+                        session, task, stage="scanning",
+                        detail=f"已扫 {scanned} 条，识别到 {found} 个发言成员（最近一次：{seen[user_id]['name']}）",
+                        scanned=scanned, found=found, total=limit,
+                    )
+        except BaseException as exc:  # noqa: BLE001
+            await self._apply_status(session, account, exc)
+            raise self._failure(exc, "采集群内对话失败") from exc
+
+        # 把「最后发言」时间与发言条数写进备注，方便按活跃度筛人
+        active = sorted(seen.items(), key=lambda item: item[1]["messages"], reverse=True)[:20]
+        top_names = "、".join(f"{info['name']}({info['messages']})" for _, info in active[:5])
+        await self._report_progress(
+            session, task, stage="done",
+            detail=f"扫描 {scanned} 条消息，识别 {found} 个发言成员"
+                   + (f"；发言最多：{top_names}" if top_names else ""),
+            scanned=scanned, found=found, total=limit,
+        )
+        return {
+            "scanned": scanned,
+            "found": found,
+            "skipped_admin": skipped_admin,
+            "skipped_bot": skipped_bot,
+            "days": days,
+            "exclude_admins": exclude_admins,
+            "top_speakers": [{"name": info["name"], "messages": info["messages"]} for _, info in active[:10]],
         }
 
     async def _collect_members(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:

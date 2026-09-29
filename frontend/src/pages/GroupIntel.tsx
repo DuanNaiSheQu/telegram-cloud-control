@@ -23,7 +23,14 @@ import {
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { CloudDownloadOutlined, FileZipOutlined, LinkOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import {
+  CloudDownloadOutlined,
+  CommentOutlined,
+  FileZipOutlined,
+  LinkOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+} from '@ant-design/icons';
 import { Progress } from 'antd';
 import { PageContainer, StatCard, StatGrid, RelativeTime, SoftTag } from '../components';
 import { notifyError, toast } from '../utils/feedback';
@@ -51,6 +58,13 @@ export default function GroupIntel() {
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<GroupProfileOut | null>(null);
+  // 采集群内对话：成员名单被群主隐藏时，靠「谁发过言」来淘成员
+  const [msgOpen, setMsgOpen] = useState(false);
+  const [msgBusy, setMsgBusy] = useState(false);
+  const [msgDays, setMsgDays] = useState(7);
+  const [msgExcludeAdmins, setMsgExcludeAdmins] = useState(false);
+  const [msgIncludeBots, setMsgIncludeBots] = useState(false);
+  const [msgLimit, setMsgLimit] = useState(1000);
   const [memberScope, setMemberScope] = useState<'all' | 'human' | 'bot'>('all');
   const [collectOpen, setCollectOpen] = useState(false);
   const [collectBusy, setCollectBusy] = useState(false);
@@ -474,6 +488,13 @@ export default function GroupIntel() {
           <Button icon={<SearchOutlined />} onClick={() => { setPage(1); void profiles.reload(); }}>
             搜索
           </Button>
+          <Button
+            icon={<CommentOutlined />}
+            disabled={!selected}
+            onClick={() => setMsgOpen(true)}
+          >
+            {selected ? `采集对话：${selected.title || selected.tg_chat_id}` : '采集对话（先点一行选群）'}
+          </Button>
           <Typography.Text type="secondary" style={{ fontSize: 'var(--tg-font-size-sm)' }}>
             共 {profiles.data?.total ?? 0} 个群；点一行看成员与事件
           </Typography.Text>
@@ -644,6 +665,68 @@ export default function GroupIntel() {
       </Modal>
 
       <BulkResultModal open={Boolean(collectResult)} result={collectResult} onClose={() => setCollectResult(null)} />
+
+      <Modal
+        open={msgOpen}
+        title={`采集群内对话：${selected?.title || ''}`}
+        okText="开始扫描"
+        cancelText="取消"
+        confirmLoading={msgBusy}
+        onCancel={() => setMsgOpen(false)}
+        onOk={async () => {
+          if (!selected) return;
+          setMsgBusy(true);
+          try {
+            const res = await groupIntelApi.collectMessages({
+              profile_id: selected.id,
+              scope: 'all',
+              days: msgDays,
+              exclude_admins: msgExcludeAdmins,
+              exclude_bots: !msgIncludeBots,
+              limit: msgLimit,
+            });
+            setMsgOpen(false);
+            setCollectResult(res);
+            void jobs.reload();
+          } catch {
+            /* client 已统一提示 */
+          } finally {
+            setMsgBusy(false);
+          }
+        }}
+      >
+        <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
+          <Alert
+            type="info"
+            showIcon
+            message="群主隐藏「成员名单」时用这个"
+            description="成员列表拉不到，但群里的对话照样能读——按时间范围扫消息，把发过言的人落成成员档案，还带发言条数，比静态名单更能看出谁还活跃。全程只读，不发言、不回应。"
+          />
+          <div className="tg-stack" style={{ gap: 'var(--tg-space-sm)' }}>
+            <span>扫描最近</span>
+            <Segmented
+              value={msgDays}
+              onChange={(value) => setMsgDays(Number(value))}
+              options={[
+                { label: '1 天', value: 1 },
+                { label: '3 天', value: 3 },
+                { label: '7 天', value: 7 },
+                { label: '30 天', value: 30 },
+              ]}
+            />
+            <Space>
+              <span className="tg-muted">最多扫多少条</span>
+              <InputNumber min={50} max={5000} step={100} value={msgLimit} onChange={(v) => setMsgLimit(Number(v) || 1000)} />
+            </Space>
+            <Checkbox checked={msgExcludeAdmins} onChange={(e) => setMsgExcludeAdmins(e.target.checked)}>
+              跳过管理员的发言（默认不跳——管理员往往正是要联系的人）
+            </Checkbox>
+            <Checkbox checked={msgIncludeBots} onChange={(e) => setMsgIncludeBots(e.target.checked)}>
+              把机器人也算进来（默认不算）
+            </Checkbox>
+          </div>
+        </div>
+      </Modal>
     </PageContainer>
   );
 }
