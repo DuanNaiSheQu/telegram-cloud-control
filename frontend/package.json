@@ -1,7 +1,7 @@
 {
   "name": "tgcc-frontend",
   "private": true,
-  "version": "0.3.85",
+  "version": "0.3.86",
   "type": "module",
   "description": "Telegram 云控 前端控制台",
   "engines": {
@@ -19,6 +19,7 @@
     "@ant-design/icons": "^5.5.2",
     "antd": "^5.22.5",
     "dayjs": "^1.11.13",
+    "patchright": "^1.63.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0"
