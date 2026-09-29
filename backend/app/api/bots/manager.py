@@ -47,7 +47,7 @@ ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "my_chat_membe
 
 #: Telegram 常见 bad request / forbidden 的中文说明（按小写子串匹配）
 TELEGRAM_HINTS = (
-    ("chat not found", "会话不存在：chat_id 可能写错，或对方从未与 Bot 有过交互"),
+    ("chat not found", "目标找不到（chat not found）：Bot 看不见这个会话——公开群/频道要填它的 @username，私有群要先拉 Bot 进群；转发和发送同样要求目标可达"),
     ("bot was blocked by the user", "对方已经把 Bot 拉黑"),
     ("user is deactivated", "对方账号已注销"),
     ("bot was kicked", "Bot 已被移出该群"),

@@ -114,6 +114,22 @@ class CampaignTasksMixin:
             label = ACCOUNT_STATUS_LABELS.get(status_value, status_value)
             raise TaskFailure(f"账号不是正常状态（当前：{label}），不替它发送", retryable=False)
 
+    async def _note_account_status(
+        self, session: Any, account: TgAccount, exc: BaseException
+    ) -> None:
+        """循环内单条目标失败时的账号级收口。
+
+        批量动作里单条失败不中断整批，但 PeerFlood / 冻结 / 注销这类错误是**账号**的问题：
+        不写回状态的话，界面还挂着「正常」，下一个任务又拿同一个号去撞墙——
+        用户只会看到「一直在失败，检测又查不出毛病」。
+        只有能映射到账号状态的异常才动手，打错目标之类的业务错误不碰账号。
+        """
+        if isinstance(exc, asyncio.CancelledError):
+            return
+        if map_exception_to_status(exc) is None:
+            return
+        await self._apply_status(session, account, exc)
+
     async def _throttle_gate(
         self, account: TgAccount, task: Task, *, cost: Optional[int] = None, task_type: Optional[str] = None
     ) -> None:
@@ -482,6 +498,8 @@ class CampaignTasksMixin:
             except Exception as exc:  # noqa: BLE001 - 单个目标失败不中断整批
                 failed += 1
                 failures.append({"target": raw, "error": describe_exception(exc)})
+                # 号本身出问题（PeerFlood / 冻结）就地写回状态，别让界面继续显示「正常」
+                await self._note_account_status(session, account, exc)
             if index < len(targets) - 1:
                 await sleep_human(min_interval, max_interval, rng)
 
@@ -575,6 +593,7 @@ class CampaignTasksMixin:
             except Exception as exc:  # noqa: BLE001
                 failed += 1
                 failures.append({"target": str(getattr(entity, "id", "")), "error": describe_exception(exc)})
+                await self._note_account_status(session, account, exc)
             if index < len(targets) - 1:
                 await sleep_human(min_interval, max_interval, rng)
 
@@ -784,6 +803,7 @@ class CampaignTasksMixin:
                     usable += 1
             except BaseException as exc:  # noqa: BLE001 - 单个群失败继续
                 row.update({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
+                await self._note_account_status(session, account, exc)
             results.append(row)
             if (index + 1) % 5 == 0 or index == len(raw_targets) - 1:
                 await self._report_progress(
@@ -831,6 +851,7 @@ class CampaignTasksMixin:
             except Exception as exc:  # noqa: BLE001
                 failed += 1
                 results.append({"target": target, "left": False, "error": describe_exception(exc)})
+                await self._note_account_status(session, account, exc)
                 continue
             try:
                 if isinstance(entity, (tl_types.Channel, tl_types.ChannelForbidden)):
@@ -867,6 +888,7 @@ class CampaignTasksMixin:
             except Exception as exc:  # noqa: BLE001 - 单个群失败继续下一个
                 failed += 1
                 results.append({"target": target, "left": False, "error": describe_exception(exc)})
+                await self._note_account_status(session, account, exc)
             if index < len(raw_targets) - 1:
                 await sleep_human(min_interval, max_interval, rng)
         # 只有真正失败（限流 / 网络 / 权限）才报失败；「本来就不在群里」算跳过
@@ -926,6 +948,7 @@ class CampaignTasksMixin:
                 failures.append({"member": raw, "error": describe_exception(exc)})
             except Exception as exc:  # noqa: BLE001
                 failures.append({"member": raw, "error": describe_exception(exc)})
+                await self._note_account_status(session, account, exc)
         if added == 0 and failures and not already:
             raise TaskFailure(f"强拉全部失败，首错：{failures[0]['error']}", retryable=False)
         return {"added": added, "already_in_group": already, "failed": len(failures), "failures": failures[:20]}

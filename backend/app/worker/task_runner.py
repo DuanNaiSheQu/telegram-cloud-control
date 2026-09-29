@@ -417,12 +417,12 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
         """按异常映射写回账号状态（返回写了什么，没映射就返回 None）。"""
         resolved = status or map_exception_to_status(exc)
         if resolved is None:
-            account.last_error = describe_exception(exc)[:512]
+            account.last_error = friendly_error_text(exc)[:512]
             await session.flush()
             return None
         account.status = resolved
         account.status_reason = describe_exception(exc)[:255]
-        account.last_error = describe_exception(exc)[:512]
+        account.last_error = friendly_error_text(exc)[:512]
         account.last_checked_at = _now()
         await session.flush()
         if resolved is AccountStatus.dead:
@@ -625,7 +625,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             if wait:
                 # 限流是临时的：写熔断冷却（期间别的发送类任务也会被闸门挡住），只记 last_error，不动状态
                 await note_flood(account, wait)
-                account.last_error = describe_exception(exc)[:512]
+                account.last_error = friendly_error_text(exc)[:512]
                 await session.flush()
                 self.log.warning(
                     "发送被限流，稍后重试",
@@ -827,7 +827,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
                 "账号已被 Telegram 冻结：改资料/发消息等写操作不可用，"
                 "需要找 @SpamBot 申诉解冻（冻结期间只能当只读观察号）"
             )
-            account.last_error = describe_exception(exc)[:512]
+            account.last_error = friendly_error_text(exc)[:512]
             flags = dict(account.risk_flags or {})
             flags["frozen_detected_at"] = _now().isoformat()
             account.risk_flags = flags
@@ -843,7 +843,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             elif is_network_error(exc):
                 pass
             else:
-                account.last_error = describe_exception(exc)[:512]
+                account.last_error = friendly_error_text(exc)[:512]
 
     async def _deep_probe(
         self,
