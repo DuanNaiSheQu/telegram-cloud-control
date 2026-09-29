@@ -470,6 +470,28 @@ interface ActionFormProps {
   children: React.ReactNode;
 }
 
+/** 节奏预设按钮：靠 Form.useFormInstance 拿到当前表单实例，一键套用整组参数 */
+function RhythmPresets() {
+  const form = Form.useFormInstance();
+  return (
+    <div className="tg-preset-row">
+      <span className="tg-preset-label">一键套用节奏：</span>
+      {RHYTHM_PRESETS.map((preset) => (
+        <button
+          key={preset.key}
+          type="button"
+          className="tg-preset-btn"
+          title={preset.detail}
+          onClick={() => form.setFieldsValue(preset.values)}
+        >
+          <b>{preset.label}</b>
+          <span>{preset.detail}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ActionTab({ title, description, submit, buildPayload, children }: ActionFormProps) {
   const [scope, setScope] = useState<ScopeState>({ scope: 'all', limit: 200 });
   const [form] = Form.useForm();
@@ -511,6 +533,35 @@ function ActionTab({ title, description, submit, buildPayload, children }: Actio
 }
 
 // ---------------------------------------------------------------- 页面
+
+/** 发信节奏预设：把「间隔 / 时间窗 / 每日配额」成套套用，避免每次靠猜。
+ *  数值偏保守是故意的——号被封的代价远大于发慢一点。 */
+const RHYTHM_PRESETS = [
+  {
+    key: 'safe',
+    label: '保守养号',
+    detail: '新号 / 刚解封的号用这套：间隔长、白天发、每天少发',
+    values: { min_interval: 25, max_interval: 70, send_window: '10:00-22:00', daily_quota: 20 },
+  },
+  {
+    key: 'normal',
+    label: '标准推广',
+    detail: '日常批量默认值：中等间隔、全天主要时段、每号每天 50 条',
+    values: { min_interval: 8, max_interval: 25, send_window: '09:00-23:00', daily_quota: 50 },
+  },
+  {
+    key: 'fast',
+    label: '快速触达',
+    detail: '老号 / 急需铺量：间隔短、白天全时段、每号每天 120 条（风险自负）',
+    values: { min_interval: 3, max_interval: 10, send_window: '08:00-24:00', daily_quota: 120 },
+  },
+  {
+    key: 'unlimited',
+    label: '不限时段',
+    detail: '配合已有配额的号源：清掉时间窗与配额限制，交给节流自己管',
+    values: { min_interval: 3, max_interval: 8, send_window: '', daily_quota: 0 },
+  },
+];
 
 export default function Campaigns() {
   // Bot 列表：私信 / 群发的「用 Bot 发送」通道要用
@@ -558,6 +609,7 @@ export default function Campaigns() {
           </Form.Item>
           {/* 节奏与配额：什么时候发、发多快、一天发多少 */}
           <div className="tg-form-group-title">节奏与配额</div>
+          <RhythmPresets />
           <div className="tg-form-grid">
             <Form.Item label="目标间最小间隔（秒）" name="min_interval" initialValue={3}>
               <InputNumber min={1} max={60} style={{ width: '100%' }} />

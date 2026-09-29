@@ -2965,3 +2965,45 @@ body .ant-spin-container::after {
   border-radius: var(--tg-radius-md, 8px);
   background: var(--tg-color-bg-card);
 }
+
+/* 节奏预设：一键套用整组发信参数，按钮上直接写明适用场景 */
+.tg-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--tg-space-sm);
+  margin-bottom: var(--tg-space-md);
+}
+.tg-preset-label {
+  display: inline-flex;
+  align-items: center;
+  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size-sm);
+}
+.tg-preset-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  max-width: 240px;
+  padding: 8px 12px;
+  border-radius: var(--tg-radius-md, 8px);
+  border: 1px solid var(--tg-color-border);
+  background: var(--tg-color-bg-card);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
+}
+.tg-preset-btn b {
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-color-text);
+}
+.tg-preset-btn span {
+  font-size: var(--tg-font-size-xs);
+  color: var(--tg-color-text-tertiary);
+  line-height: 1.35;
+}
+.tg-preset-btn:hover {
+  border-color: var(--tg-color-primary);
+  background: var(--tg-color-primary-bg);
+}
