@@ -7,6 +7,41 @@
 
 ---
 
+## v0.3.68 — 2026-03-30
+
+主题：**群发也支持定时/定量** + **Bot 群发/转发**（后端）。
+
+### 新增
+
+1. **群发（`/campaigns/broadcast`）接入定时与定量**：复用私信那套门禁——
+   `send_window`（不在窗内顺延到窗口开始）、`daily_quota`（当日配额用完顺延到次日）。
+   之前的「不规则模式」本来就有（目标间随机间隔 `min_interval` / `max_interval`），
+   现在补上了「什么时候发、一天发多少」。
+2. **Bot 群发 / 转发**：
+   - 新任务类型 `bot_broadcast`（迁移 `e4a8c93f6b72`），由 **API 侧的 Bot 任务轮询**执行；
+   - 两种用法：直接发文字（`text`），或**转发**某条已有消息
+     （`forward_from_chat_id` + `forward_from_message_id`）；
+   - 提交端点 `POST /api/relays/bot-broadcast`（`bot_id` + `targets` + 二选一的内容）。
+   - 为什么值得有：Bot 不受账号的冻结 / 每日配额 / 设备指纹限制，适合固定文案的批量推送。
+
+### 事故与修复（如实记录）
+
+插入 `BotBroadcastRequest` 时锚点用错，**撕裂了 `relays.py` 里的 `bots_router = APIRouter(...)` 定义行**，
+导致 API 整体起不来（`NameError: bots_router`）。已从 git 取回原始定义并在 30 秒内修复，
+重启后 `/health` 返回 200、两个端点均验证通过。
+
+### 验证
+
+- Bot 群发端点：`404 Bot 不存在`（该部署还没配 Bot，属预期，说明端点与校验工作正常）；
+- 群发带 `send_window` 入队成功（3 个号）；时间窗门禁单测在上一版已验证。
+
+### 待办
+
+- Bot 群发的前端入口（目前只能走 API）——需要先有可用的 Bot Token 才能联调；
+- 该部署当前 **0 个 Bot**，Bot 相关功能需要先在「Bot 管理」里添加。
+
+---
+
 ## v0.3.67 — 2026-03-30
 
 主题：**批量私信自动化：定时 + 定量 + 无号自动补号**。

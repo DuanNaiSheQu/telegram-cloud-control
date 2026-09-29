@@ -456,6 +456,10 @@ class CampaignTasksMixin:
         self._ensure_sendable(account)
         await self._throttle_gate(account, task)
         payload = dict(task.payload or {})
+        # 群发同样支持「定时 + 定量」：与私信共用同一套门禁，
+        # 不在时间窗内 / 当日配额用完 → 顺延，而不是硬发。
+        await self._gate_send_window(task, payload)
+        await self._gate_daily_quota(session, task, account, payload)
         client = self._client(account.id)
         entity = await self._resolve_group_entity(session, task, payload, client)
         rng = self._campaign_rng(task, payload)

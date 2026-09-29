@@ -327,10 +327,64 @@ async def _handle_reply_to_origin(session: AsyncSession, task: Task) -> None:
     )
 
 
+async def _handle_bot_broadcast(session: AsyncSession, task: Task) -> None:
+    """Bot 群发/转发：用 Bot 把消息发到指定群。
+
+    两种用法（payload）：
+    - `text`：直接发这段文字；
+    - `forward_from_chat_id` + `forward_from_message_id`：把某条已有消息**转发**过去
+      （群发转发场景：原消息在某个群/频道，用 Bot 原样转到多个目标群）。
+
+    支持 `targets`（多个群）批量，以及 `send_window` / `daily_quota` 的门禁思路——
+    Bot 侧没有账号的节流与冻结概念，所以这里只做间隔，不做配额（配额是防号被限流用的）。
+    """
+    payload = dict(task.payload or {})
+    targets = [str(item).strip() for item in (payload.get("targets") or []) if str(item).strip()]
+    single = str(payload.get("target") or "").strip()
+    if single and single not in targets:
+        targets.insert(0, single)
+    if not targets:
+        raise TaskPayloadError("Bot 群发任务缺少目标（targets / target）")
+
+    text = str(payload.get("text") or "")
+    forward_chat_id = payload.get("forward_from_chat_id")
+    forward_message_id = payload.get("forward_from_message_id")
+    if not text and forward_chat_id is None:
+        raise TaskPayloadError("Bot 群发需要 text（直接发文字）或 forward_from_*（转发已有消息）")
+
+    sender_bot = await _load_bot(session, task.bot_id)
+    runtime = await manager.ensure_runtime(sender_bot)
+    if runtime is None:
+        raise TaskPayloadError("Bot 运行时不可用：Token 无法解密，请重新保存 Token")
+
+    sent = failed = 0
+    results: list[dict] = []
+    for target in targets:
+        try:
+            if forward_chat_id is not None and forward_message_id is not None:
+                await runtime.client.forward_messages(
+                    entity=target, messages=int(forward_message_id), from_peer=int(forward_chat_id)
+                )
+                via = "forward"
+            else:
+                await runtime.client.send_message(entity=target, message=text)
+                via = "text"
+            sent += 1
+            results.append({"target": target, "ok": True, "via": via})
+        except BaseException as exc:  # noqa: BLE001 - 单个群失败继续下一个
+            failed += 1
+            results.append({"target": target, "ok": False, "error": f"{type(exc).__name__}: {str(exc)[:120]}"})
+
+    task.result = {"sent": sent, "failed": failed, "total": len(targets), "results": results[:50]}
+    if sent == 0 and failed:
+        raise TaskPayloadError(f"Bot 群发全部失败，首错：{results[0].get('error')}")
+
+
 _HANDLERS = {
     TaskType.relay_to_staff.value: _handle_relay_to_staff,
     TaskType.bot_reply.value: _handle_bot_reply,
     TaskType.reply_to_origin.value: _handle_reply_to_origin,
+    TaskType.bot_broadcast.value: _handle_bot_broadcast,
 }
 
 

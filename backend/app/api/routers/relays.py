@@ -13,7 +13,7 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +37,19 @@ from app.schemas import (
 logger = logging.getLogger(__name__)
 
 bots_router = APIRouter(prefix="/bots", tags=["bots"])
+
+
+class BotBroadcastRequest(BaseModel):
+    """Bot 群发 / 转发：直接发文字，或转发某条已有消息。"""
+
+    bot_id: uuid.UUID = Field(description="用哪个 Bot 发送")
+    targets: List[str] = Field(default_factory=list, description="目标群（@username 或 chat_id）")
+    text: str = Field(default="", max_length=4096, description="直接发送的文字")
+    forward_from_chat_id: Optional[int] = Field(default=None, description="转发来源会话 id")
+    forward_from_message_id: Optional[int] = Field(default=None, description="转发来源消息 id")
+
+
+router = APIRouter(prefix="/bots", tags=["bots"])
 router = APIRouter(prefix="/relays", tags=["relays"])
 
 
@@ -584,3 +597,55 @@ async def list_relay_links(
         page=page,
         page_size=page_size,
     )
+
+@router.post("/bot-broadcast", summary="用 Bot 群发 / 转发到多个群")
+async def bot_broadcast(
+    payload: BotBroadcastRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """用 **Bot**（而不是账号）把消息发到多个群。
+
+    两种用法：
+    - 直接发文字：给 `text`；
+    - **转发**某条已有消息：给 `forward_from_chat_id` + `forward_from_message_id`
+      （原消息在某个群/频道，Bot 原样转到目标群）。
+
+    为什么用 Bot：Bot 不受「账号被冻结 / 每日配额 / 设备指纹」限制，适合固定文案的批量推送；
+    但 Bot 只能发到**它已经在里面**的群，且不能主动私聊陌生人——这两点是前提。
+    """
+    bot = await session.get(Bot, payload.bot_id)
+    if bot is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bot 不存在")
+    targets = [str(item).strip() for item in payload.targets if str(item).strip()]
+    if not targets:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="targets 不能为空")
+    if not payload.text and payload.forward_from_chat_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="需要 text（直接发文字）或 forward_from_chat_id + forward_from_message_id（转发消息）",
+        )
+    task = await enqueue_task(
+        session,
+        type=TaskType.bot_broadcast,
+        bot_id=bot.id,
+        payload={
+            "targets": targets,
+            "text": payload.text or "",
+            "forward_from_chat_id": payload.forward_from_chat_id,
+            "forward_from_message_id": payload.forward_from_message_id,
+            "source": "manual_bot_broadcast",
+        },
+        created_by=user.id,
+        priority=80,
+    )
+    await write_audit(
+        session,
+        action="relay.bot_broadcast",
+        user_id=user.id,
+        target_type="bot",
+        target_id=str(bot.id),
+        detail={"targets": len(targets), "via": "forward" if payload.forward_from_chat_id is not None else "text"},
+    )
+    await session.commit()
+    return {"ok": True, "task_id": str(task.id), "message": f"已排队：Bot 将向 {len(targets)} 个群发送"}

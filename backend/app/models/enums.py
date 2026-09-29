@@ -116,6 +116,7 @@ class TaskType(str, enum.Enum):
     # Bot（API 执行）
     relay_to_staff = "relay_to_staff"    # 转发到员工群
     bot_reply = "bot_reply"              # 官方 Bot 自动回复
+    bot_broadcast = "bot_broadcast"      # Bot 群发/转发：用 Bot 把消息发到指定群（可转发某条来源消息）
     reply_to_origin = "reply_to_origin"  # 员工群回复送回原会话（Bot 侧）
 
 
@@ -154,6 +155,7 @@ TASK_TYPE_LABELS = {
     "collect_messages": "采集群内对话",
     "relay_to_staff": "转发到员工群",
     "bot_reply": "Bot 自动回复",
+    "bot_broadcast": "Bot 群发/转发",
     "reply_to_origin": "回复送回原会话",
 }
 
