@@ -12,8 +12,8 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.8-2AABEE.svg" alt="Version"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新记录-blue.svg" alt="Changelog"></a>
+  <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/version-0.3.9-2AABEE.svg" alt="Version"></a>
+  <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/changelog-%E6%9B%B4%E6%96%B0%E8%AE%B0%E5%BD%95-blue.svg" alt="Changelog"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/commits/main"><img src="https://img.shields.io/github/last-commit/cafinxnull/telegram-cloud-control?label=last%20commit" alt="Last commit"></a>
@@ -354,7 +354,7 @@ deploy/
   alertmanager.yml     告警分流（示例 webhook，附企业微信/钉钉/Slack 改法）
   backup.sh            日备（pg_dump）+ 周备（pg_basebackup）+ 上报 pushgateway
   backup.cron          crontab 片段（每日 03:10 / 每周日 03:40）
-  postgres-backup.md   恢复与演练手册
+  恢复与演练手册      数据库备份与恢复步骤
 docs/                  架构 / 接口契约 / 运维 / 验收 / 赞助
 scripts/               create_admin / e2e_check / check_stack_config / stack_local
 Makefile               make help 看全部命令
