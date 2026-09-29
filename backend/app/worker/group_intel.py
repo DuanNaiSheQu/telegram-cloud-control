@@ -523,63 +523,63 @@ class GroupIntelMixin:
                         keyword_hits[keyword] = keyword_hits.get(keyword, 0) + 1
                         matched += 1
                     scanned += 1
-                sender = None
-                try:
-                    sender = await message.get_sender()
-                except BaseException:  # noqa: BLE001 - 单条取不到发送者不影响整批
                     sender = None
-                if sender is None or getattr(sender, "id", None) is None:
-                    continue
-                if getattr(sender, "bot", False) and exclude_bots:
-                    skipped_bot += 1
-                    continue
-                if exclude_admins and int(sender.id) in admin_ids:
-                    skipped_admin += 1
-                    continue
-                user_id = int(sender.id)
-                if user_id in seen:
-                    seen[user_id]["messages"] += 1
-                    if keyword:
-                        seen[user_id]["keywords"].add(keyword)
-                else:
-                    username = getattr(sender, "username", None)
-                    name = (
-                        getattr(sender, "title", None)
-                        or " ".join(
-                            part
-                            for part in (getattr(sender, "first_name", None), getattr(sender, "last_name", None))
-                            if part
-                        ).strip()
-                        or (f"@{username}" if username else "")
-                        or str(user_id)
-                    )
-                    seen[user_id] = {"messages": 1, "name": name, "username": username, "keywords": set()}
-                    if keyword:
-                        seen[user_id]["keywords"].add(keyword)
-                    await upsert_member(
-                        session,
-                        profile=profile,
-                        tg_user_id=user_id,
-                        username=username,
-                        display_name=name,
-                        is_bot=bool(getattr(sender, "bot", False)),
-                        is_premium=bool(getattr(sender, "premium", False)),
-                        is_admin=user_id in admin_ids,
-                        source="from_messages",
-                        bump_message=True,
-                        raw={
-                            "matched_keywords": sorted(seen[user_id]["keywords"]),
-                            "last_matched_text": (message.message or "")[:300],
-                            "last_matched_at": message_date.isoformat() if message_date else None,
-                        },
-                    )
-                    found += 1
-                if scanned % 50 == 0:
-                    await self._report_progress(
-                        session, task, stage="scanning",
-                        detail=f"已扫 {scanned} 条，识别到 {found} 个发言成员（最近一次：{seen[user_id]['name']}）",
-                        scanned=scanned, found=found, total=limit,
-                    )
+                    try:
+                        sender = await message.get_sender()
+                    except BaseException:  # noqa: BLE001 - 单条取不到发送者不影响整批
+                        sender = None
+                    if sender is None or getattr(sender, "id", None) is None:
+                        continue
+                    if getattr(sender, "bot", False) and exclude_bots:
+                        skipped_bot += 1
+                        continue
+                    if exclude_admins and int(sender.id) in admin_ids:
+                        skipped_admin += 1
+                        continue
+                    user_id = int(sender.id)
+                    if user_id in seen:
+                        seen[user_id]["messages"] += 1
+                        if keyword:
+                            seen[user_id]["keywords"].add(keyword)
+                    else:
+                        username = getattr(sender, "username", None)
+                        name = (
+                            getattr(sender, "title", None)
+                            or " ".join(
+                                part
+                                for part in (getattr(sender, "first_name", None), getattr(sender, "last_name", None))
+                                if part
+                            ).strip()
+                            or (f"@{username}" if username else "")
+                            or str(user_id)
+                        )
+                        seen[user_id] = {"messages": 1, "name": name, "username": username, "keywords": set()}
+                        if keyword:
+                            seen[user_id]["keywords"].add(keyword)
+                        await upsert_member(
+                            session,
+                            profile=profile,
+                            tg_user_id=user_id,
+                            username=username,
+                            display_name=name,
+                            is_bot=bool(getattr(sender, "bot", False)),
+                            is_premium=bool(getattr(sender, "premium", False)),
+                            is_admin=user_id in admin_ids,
+                            source="from_messages",
+                            bump_message=True,
+                            raw={
+                                "matched_keywords": sorted(seen[user_id]["keywords"]),
+                                "last_matched_text": (message.message or "")[:300],
+                                "last_matched_at": message_date.isoformat() if message_date else None,
+                            },
+                        )
+                        found += 1
+                    if scanned % 50 == 0:
+                        await self._report_progress(
+                            session, task, stage="scanning",
+                            detail=f"已扫 {scanned} 条，识别到 {found} 个发言成员（最近一次：{seen[user_id]['name']}）",
+                            scanned=scanned, found=found, total=limit,
+                        )
         except BaseException as exc:  # noqa: BLE001
             await self._apply_status(session, account, exc)
             raise self._failure(exc, "采集群内对话失败") from exc
@@ -587,6 +587,19 @@ class GroupIntelMixin:
         # 把「最后发言」时间与发言条数写进备注，方便按活跃度筛人
         active = sorted(seen.items(), key=lambda item: item[1]["messages"], reverse=True)[:20]
         top_names = "、".join(f"{info['name']}({info['messages']})" for _, info in active[:5])
+        # 扫到 0 条多半不是「群里没消息」，而是这个号读不到历史：它不在群里、
+        # 群不让看历史、或号被 Telegram 限制。把原因说清楚，别让人以为系统坏了。
+        empty_hint = ""
+        if scanned == 0:
+            # 扫不到就当场查一次「我在不在这个群」，把原因写死：
+            # 光回一句「0 条」等于没说，用户只能对着截图干瞪眼
+            try:
+                from telethon.tl.functions.channels import GetParticipantRequest
+
+                await client(GetParticipantRequest(channel=entity, participant="me"))
+                empty_hint = "；账号在群里，但读不到历史消息——群不允许看历史，或该号被 Telegram 限制了可见范围"
+            except BaseException:  # noqa: BLE001 - 探测本身失败就退回笼统提示
+                empty_hint = "；账号不在这个群里（或已被踢出），非成员读不到历史消息"
         await self._report_progress(
             session, task, stage="done",
             detail=(
@@ -594,7 +607,8 @@ class GroupIntelMixin:
                 if keywords
                 else f"扫描 {scanned} 条消息，识别 {found} 个发言成员"
             )
-                   + (f"；发言最多：{top_names}" if top_names else ""),
+            + (f"；发言最多：{top_names}" if top_names else "")
+            + empty_hint,
             scanned=scanned, found=found, total=limit,
         )
         return {

@@ -6,6 +6,7 @@ from app.models.account import AccountAssignment, AccountGroup, AccountImport, P
 from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.bot import Bot
+from app.models.campaign_schedule import CampaignSchedule
 from app.models.dialog import Dialog
 from app.models.enums import (
     ACCOUNT_STATUS_LABELS,
@@ -52,6 +53,7 @@ from app.models.user import User
 
 __all__ = [
     "Base",
+    "CampaignSchedule",
     "User",
     "UserRole",
     "TgAccount",

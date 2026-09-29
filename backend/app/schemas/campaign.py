@@ -462,3 +462,66 @@ class ScreenGroupsRequest(BulkScopeRequest):
         if not self.targets:
             raise ValueError("targets 不能为空")
         return self
+
+
+# ---------------------------------------------------------------- 定时计划
+
+#: 允许做成定时的动作（都是「一批号各发一条」这类可以反复跑的）
+SCHEDULE_ACTIONS = ("bulk_pm", "group_broadcast", "material_send")
+
+SCHEDULE_ACTION_LABELS = {
+    "bulk_pm": "批量私信",
+    "group_broadcast": "群发",
+    "material_send": "素材群发",
+}
+
+
+class ScheduleCreateRequest(BaseModel):
+    """建一条定时计划。
+
+    `payload` 就是对应动作的原始请求体（与 `/api/campaigns/group-broadcast` 等入参一致），
+    到点时调度器原样交给那个端点的提交逻辑，不另写一套展开规则。
+    """
+
+    action: str = Field(default="group_broadcast", description="bulk_pm / group_broadcast / material_send")
+    name: str = Field(default="", max_length=64, description="计划名；留空则按动作和目标自动拼")
+    interval_minutes: int = Field(default=30, ge=1, le=1440, description="每隔多少分钟跑一次")
+    send_window: str = Field(default="", max_length=64, description="发送时间窗，如 09:00-22:00；空 = 不限")
+    start_in_minutes: int = Field(default=0, ge=0, le=1440, description="多久后跑第一次；0 = 立刻")
+    enabled: bool = Field(default=True, description="建好就启用")
+    payload: Dict[str, Any] = Field(default_factory=dict, description="对应动作的请求体")
+
+    @field_validator("action")
+    @classmethod
+    def _check_action(cls, value: str) -> str:
+        action = (value or "").strip()
+        if action not in SCHEDULE_ACTIONS:
+            raise ValueError(f"不支持定时的动作：{value}（可选：{'、'.join(SCHEDULE_ACTIONS)}）")
+        return action
+
+
+class ScheduleUpdateRequest(BaseModel):
+    """改计划：只动节奏与开关。改内容（目标 / 文案）请删了重建，避免半新半旧。"""
+
+    name: Optional[str] = Field(default=None, max_length=64)
+    interval_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
+    send_window: Optional[str] = Field(default=None, max_length=64)
+    enabled: Optional[bool] = None
+
+
+class ScheduleOut(ORMModel):
+    id: uuid.UUID
+    name: str
+    action: str
+    action_label: str = ""
+    #: 从 payload 里提炼的一行人话（给列表直接显示，不用前端自己解析）
+    target_summary: str = ""
+    interval_minutes: int
+    send_window: str = ""
+    enabled: bool
+    next_run_at: datetime
+    last_run_at: Optional[datetime] = None
+    run_count: int = 0
+    last_error: str = ""
+    created_by_name: str = ""
+    created_at: datetime

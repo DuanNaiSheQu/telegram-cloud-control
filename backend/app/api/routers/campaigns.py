@@ -32,6 +32,7 @@ from app.core.tasks import cancel_task, enqueue_task
 from app.models import (
     TASK_STATUS_LABELS,
     TASK_TYPE_LABELS,
+    CampaignSchedule,
     Material,
     Task,
     TaskStatus,
@@ -57,7 +58,13 @@ from app.schemas import (
     ProfileBulkRequest,
     StormRequest,
 )
-from app.schemas.campaign import GenerateTextsRequest
+from app.schemas.campaign import (
+    SCHEDULE_ACTION_LABELS,
+    GenerateTextsRequest,
+    ScheduleCreateRequest,
+    ScheduleOut,
+    ScheduleUpdateRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -742,3 +749,167 @@ async def generate_texts(
     if not texts:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI 没有返回可用文本，请稍后重试或换个主题")
     return {"texts": texts}
+
+
+# ---------------------------------------------------------------- 定时计划
+#
+# 「到点自动跑一批」：计划只存参数与节奏，到点交给对应端点的提交逻辑展开成任务，
+# 所以校验、账号范围、错峰入队只有一份实现（调度器见 services/campaign_scheduler.py）。
+
+
+def _schedule_target_summary(action: str, payload: dict) -> str:
+    """列表里那一行人话：目标是谁、多少个。"""
+    if action == "group_broadcast":
+        return str(payload.get("target_group") or "（没有目标群）")
+    targets = [str(item) for item in (payload.get("targets") or []) if str(item).strip()]
+    if not targets:
+        return "（没有目标）"
+    return targets[0] + (f" 等 {len(targets)} 个" if len(targets) > 1 else "")
+
+
+def _validate_schedule_payload(action: str, raw: dict) -> None:
+    """建计划时先用对应请求类校验一遍：填错当场报，别等到点才发现。"""
+    builders = {
+        "bulk_pm": BulkPmRequest,
+        "group_broadcast": GroupBroadcastRequest,
+        "material_send": MaterialSendRequest,
+    }
+    builder = builders.get(action)
+    if builder is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"不支持定时的动作：{action}")
+    try:
+        builder(**(raw or {}))
+    except Exception as exc:  # noqa: BLE001 - pydantic 的报错直接透给用户
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"计划参数不合法：{exc}"
+        ) from exc
+
+
+def _schedule_out(row: CampaignSchedule, names: dict) -> ScheduleOut:
+    payload = dict(row.payload or {})
+    action = str(row.action)
+    return ScheduleOut(
+        id=row.id,
+        name=row.name
+        or f"{SCHEDULE_ACTION_LABELS.get(action, action)} · {_schedule_target_summary(action, payload)}",
+        action=action,
+        action_label=SCHEDULE_ACTION_LABELS.get(action, action),
+        target_summary=_schedule_target_summary(action, payload),
+        interval_minutes=row.interval_minutes,
+        send_window=row.send_window,
+        enabled=row.enabled,
+        next_run_at=row.next_run_at,
+        last_run_at=row.last_run_at,
+        run_count=row.run_count,
+        last_error=row.last_error,
+        created_by_name=names.get(row.created_by, ""),
+        created_at=row.created_at,
+    )
+
+
+@router.get("/schedules", response_model=List[ScheduleOut], summary="定时计划列表")
+async def list_schedules(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> List[ScheduleOut]:
+    """页面下方「正在定时」那一块：按启用优先、下次执行时间排序。"""
+    rows = list(
+        await session.scalars(
+            select(CampaignSchedule).order_by(
+                CampaignSchedule.enabled.desc(), CampaignSchedule.next_run_at
+            )
+        )
+    )
+    names = {row.id: row.username for row in await session.scalars(select(User))}
+    return [_schedule_out(row, names) for row in rows]
+
+
+@router.post("/schedules", response_model=ScheduleOut, summary="新建定时计划")
+async def create_schedule(
+    payload: ScheduleCreateRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ScheduleOut:
+    _validate_schedule_payload(payload.action, payload.payload)
+    row = CampaignSchedule(
+        name=payload.name.strip(),
+        action=payload.action,
+        payload=payload.payload,
+        interval_minutes=payload.interval_minutes,
+        send_window=payload.send_window.strip(),
+        enabled=payload.enabled,
+        next_run_at=_now() + timedelta(minutes=payload.start_in_minutes),
+        created_by=user.id,
+    )
+    session.add(row)
+    await write_audit(
+        session,
+        action="campaign.schedule_create",
+        user_id=user.id,
+        target_type="campaign_schedule",
+        target_id=str(row.id),
+        detail={"action": payload.action, "interval_minutes": payload.interval_minutes},
+    )
+    await session.commit()
+    await session.refresh(row)
+    return _schedule_out(row, {user.id: user.username})
+
+
+@router.patch("/schedules/{schedule_id}", response_model=ScheduleOut, summary="改定时计划（节奏 / 启停）")
+async def update_schedule(
+    schedule_id: uuid.UUID,
+    payload: ScheduleUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ScheduleOut:
+    row = await session.get(CampaignSchedule, schedule_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="计划不存在")
+    data = payload.model_dump(exclude_unset=True)
+    for key, value in data.items():
+        setattr(row, key, value)
+    # 重新启用时把下次执行拉到将来：否则一开开关就补跑一轮，看起来像「刚开就发」
+    if data.get("enabled") is True and row.next_run_at <= _now():
+        row.next_run_at = _now() + timedelta(minutes=max(1, int(row.interval_minutes or 30)))
+    await session.commit()
+    await session.refresh(row)
+    return _schedule_out(row, {})
+
+
+@router.delete("/schedules/{schedule_id}", summary="删除定时计划")
+async def delete_schedule(
+    schedule_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    row = await session.get(CampaignSchedule, schedule_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="计划不存在")
+    await write_audit(
+        session,
+        action="campaign.schedule_delete",
+        user_id=user.id,
+        target_type="campaign_schedule",
+        target_id=str(row.id),
+        detail={"action": row.action},
+    )
+    await session.delete(row)
+    await session.commit()
+    return {"ok": True, "message": "计划已删除"}
+
+
+@router.post("/schedules/{schedule_id}/run-now", response_model=ScheduleOut, summary="立即执行一次（不影响后续节奏）")
+async def run_schedule_now(
+    schedule_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ScheduleOut:
+    """手动催一次：跑完按间隔顺延，跟自动跑完全同一条路径。"""
+    from app.services import campaign_scheduler  # 延迟导入：服务层反过来要用本模块
+
+    row = await session.get(CampaignSchedule, schedule_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="计划不存在")
+    await campaign_scheduler.fire_schedule(session, row)
+    await session.refresh(row)
+    return _schedule_out(row, {user.id: user.username})

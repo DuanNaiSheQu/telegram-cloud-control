@@ -55,6 +55,7 @@ from app.logging_conf import setup_logging
 from app.models import Bot, User, UserRole
 from app.redis_client import close_redis, get_redis
 from app.services.ai import ai_service
+from app.services import campaign_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +140,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     background: List[asyncio.Task] = [
         asyncio.create_task(bot_tasks.poll_loop(), name="bot-task-poll"),
+        asyncio.create_task(campaign_scheduler.schedule_loop(), name="campaign-schedule"),
         asyncio.create_task(metrics.refresh_loop(), name="metrics-refresh"),
         asyncio.create_task(sampler.sample_loop(), name="metrics-sampler"),
         asyncio.create_task(register_bot_webhooks(), name="bot-webhook-register"),

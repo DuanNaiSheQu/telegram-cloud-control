@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import GroupEvent, GroupMember, GroupProfile
@@ -65,8 +66,22 @@ async def upsert_profile(
     )
     if profile is None:
         profile = GroupProfile(account_id=account_id, tg_chat_id=tg_chat_id)
-        session.add(profile)
-        await session.flush()
+        try:
+            # 用 SAVEPOINT 包住这一插：并发采集（profile_sync / participant_sync 同时跑）会双双
+            # 查到空、再一起插，后到的撞唯一约束。只回滚这个点位，别把外层事务一起打挂——
+            # 一旦打挂，后面所有写入都会 PendingRollbackError。
+            async with session.begin_nested():
+                session.add(profile)
+        except IntegrityError:
+            # 别人刚建了这行：回读它，继续走下面的字段更新
+            profile = await session.scalar(
+                select(GroupProfile).where(
+                    GroupProfile.tg_chat_id == tg_chat_id,
+                    GroupProfile.account_id == account_id if account_id else GroupProfile.account_id.is_(None),
+                )
+            )
+            if profile is None:
+                raise
 
     if title:
         profile.title = title[:255]
@@ -162,8 +177,20 @@ async def upsert_member(
             tg_chat_id=profile.tg_chat_id,
             tg_user_id=int(tg_user_id),
         )
-        session.add(member)
-        await session.flush()
+        try:
+            async with session.begin_nested():
+                session.add(member)
+        except IntegrityError:
+            # 并发采集同一成员：别人刚建了这行，回读它继续更新字段
+            member = await session.scalar(
+                select(GroupMember).where(
+                    GroupMember.tg_chat_id == profile.tg_chat_id,
+                    GroupMember.tg_user_id == int(tg_user_id),
+                )
+            )
+            if member is None:
+                raise
+            created = False
 
     if username:
         member.username = username[:64]
@@ -230,8 +257,13 @@ async def record_event(
         source=source,
         raw=raw or {},
     )
-    session.add(event)
-    await session.flush()
+    try:
+        # SAVEPOINT 保护：并发采集同一事件时别人可能刚插过——撞了去重约束就按
+        # 「已经记过」处理，别把外层事务一起打挂
+        async with session.begin_nested():
+            session.add(event)
+    except IntegrityError:
+        return None
     logger.info(
         "群事件入库",
         extra={

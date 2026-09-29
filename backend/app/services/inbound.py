@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Tuple
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import events
@@ -59,9 +60,26 @@ async def upsert_dialog(
             peer_display=peer_display or title or str(tg_chat_id),
             member_count=member_count,
         )
-        session.add(dialog)
-        await session.flush()
-        return dialog
+        try:
+            # SAVEPOINT 保护：同一个群的第一批消息并发到达时，两边都会查到空、再一起插，
+            # 后到的撞 uq_dialogs_account_chat。只回滚这个点位，别把外层事务打挂
+            # （打挂之后整批消息入库都会 PendingRollbackError）。
+            async with session.begin_nested():
+                session.add(dialog)
+        except IntegrityError:
+            # 别人刚建了这条会话：回读它，继续走下面的字段更新
+            dialog = await session.scalar(
+                select(Dialog).where(
+                    Dialog.channel == channel,
+                    Dialog.account_id == account_id if account_id else Dialog.account_id.is_(None),
+                    Dialog.bot_id == bot_id if bot_id else Dialog.bot_id.is_(None),
+                    Dialog.tg_chat_id == tg_chat_id,
+                )
+            )
+            if dialog is None:
+                raise
+        else:
+            return dialog
 
     # 只在有新值时更新，避免把已有标题覆盖成空
     if title:

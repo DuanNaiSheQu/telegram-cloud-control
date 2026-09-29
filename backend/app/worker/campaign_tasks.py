@@ -652,6 +652,13 @@ class CampaignTasksMixin:
         results: list[dict] = []
         for index, target in enumerate(raw_targets):
             try:
+                # 开工前先报一句：加群本身就要等 20–60 秒的群间间隔，审核制群还要再等验证，
+                # 不报的话页面上就是「执行中」干等好几分钟，看着像卡死
+                await self._report_progress(
+                    session, task, stage="joining",
+                    detail=f"正在处理 {index + 1}/{len(raw_targets)}：{target}",
+                    joined=joined, total=len(raw_targets),
+                )
                 invite_hash = _invite_hash_of(target)
                 if invite_hash:
                     await client(functions.messages.ImportChatInviteRequest(hash=invite_hash))

@@ -83,6 +83,24 @@ def classify(url: str, text: str) -> str:
     return ""
 
 
+
+def _is_telegram_link(url: str) -> bool:
+    """t.me / telegram.me / tg:// 是 Telegram 深链，不是网页。
+
+    验证流程里拿到深链 = 该轮没有网页验证要过（验证按钮通常就是这个形式），
+    直接交给 open_in_real_chrome 会被深链防御拒开，返回 False 被误报成「缺 Chrome」。
+    """
+    lowered = (url or "").strip().lower()
+    return (
+        lowered.startswith("tg://")
+        or lowered.startswith("https://t.me/")
+        or lowered.startswith("http://t.me/")
+        or lowered.startswith("https://telegram.me/")
+        or lowered.startswith("http://telegram.me/")
+        or lowered.startswith("t.me/")
+    )
+
+
 class GroupVerifier:
     """加群后的验证处理器。用 Worker 手上的 client，不新增连接。"""
 
@@ -192,8 +210,19 @@ class GroupVerifier:
                 if not target:
                     continue
 
+                # 深链（t.me/xxx、tg://）不是网页：能拿到它说明这一轮没有网页验证环节，
+                # open_in_real_chrome 会主动拒开（那是为了修「浏览器反复弹要打开 Telegram 吗」）。
+                # 之前这种情况被笼统报成「缺 Chrome 或 Xvfb」，把排查方向带偏到环境问题上。
+                if _is_telegram_link(target):
+                    result["passed"] = True
+                    result["verified"] = True
+                    result["elapsed"] = round(time.monotonic() - started, 1)
+                    result["note"] = "该目标没有网页验证环节（拿到的是 Telegram 深链，已跳过浏览器）"
+                    logger.info("目标是深链、无网页验证，跳过浏览器阶段：%s", target[:80])
+                    break
+
                 if not verify_runner.open_in_real_chrome(target):
-                    result["error"] = "打开真 Chrome 失败（缺 Chrome 或 Xvfb）"
+                    result["error"] = "打开真 Chrome 失败（Chrome 缺失或无法启动）"
                     break
 
                 # 等页面自己完成验证，再确认能否发言
