@@ -44,6 +44,17 @@ from app.security import decrypt_secret
 from app.services.verify_runner import verify_runner
 
 
+def is_telegram_link(url: str) -> bool:
+    """Telegram 深链不是网页 —— 交给浏览器只会弹「要打开 Telegram 吗」。"""
+    lowered = (url or "").lower()
+    return (
+        lowered.startswith("tg://")
+        or lowered.startswith("https://t.me/")
+        or lowered.startswith("https://telegram.me/")
+        or lowered.startswith("t.me/")
+    )
+
+
 def deep_url(button: Any) -> str:
     """webview 按钮的 url 藏在 btn.button.type.url 这一层。"""
     for obj in (button, getattr(button, "button", None)):
@@ -160,10 +171,29 @@ async def main() -> None:
             pass
 
         url = await verify_link(client, bot, previous)
+
+        # 第一段拿到的常常是 Telegram 深链（t.me/Bot?start=xxx）——它不是网页，
+        # 得先发给机器人把私聊验证触发出来，等它回真正的网页验证地址。
+        if is_telegram_link(url):
+            payload = url.split("start=")[-1].split("&")[0]
+            print(f"① {time.monotonic() - started:.1f}s 拿到深链，发 /start 触发私聊验证")
+            try:
+                await client.send_message(bot, f"/start {payload}")
+            except BaseException as exc:  # noqa: BLE001
+                print(f"   触发失败：{type(exc).__name__}")
+            for _ in range(12):
+                await asyncio.sleep(1.5)
+                candidate = await verify_link(client, bot, previous | {url})
+                if candidate and not is_telegram_link(candidate):
+                    url = candidate
+                    break
+            else:
+                print("   ✗ 机器人没回网页验证地址")
+                return
         if not url:
             print(f"✗ 没拿到新的验证链接（{time.monotonic() - started:.1f}s）")
             return
-        print(f"① {time.monotonic() - started:.1f}s 拿到链接")
+        print(f"① {time.monotonic() - started:.1f}s 拿到网页验证地址")
 
         # 交给系统真 Chrome —— 关键：不经 CDP，Turnstile 才不会报 Widget error
         # 跨平台打开真 Chrome：macOS 走 open -a，Linux 走 google-chrome + Xvfb。

@@ -139,6 +139,15 @@ class VerifyRunner:
         这是整个方案的关键：Turnstile 能识别 Playwright 的 CDP 通道，
         但对系统直接启动的 Chrome 完全正常。
         """
+        # Telegram 深链（t.me/xxx、telegram.me/xxx、tg://）不是网页：
+        # 丢给浏览器只会弹出「要打开 Telegram 吗」的系统对话框。这类链接要用 telethon
+        # 发 /start 去触发，调用方应先做区分。
+        lowered = url.lower()
+        if any(lowered.startswith(p) for p in ("tg://",)) or "//t.me/" in lowered or "//telegram.me/" in lowered \
+                or lowered.startswith("https://t.me/") or lowered.startswith("https://telegram.me/"):
+            logger.warning("拒绝打开 Telegram 深链（应改用 telethon 发 /start）：%s", url[:80])
+            return False
+
         chrome = self.chrome_path()
         if not chrome:
             logger.warning("找不到 Chrome，请先跑 bash scripts/install_browser.sh")
