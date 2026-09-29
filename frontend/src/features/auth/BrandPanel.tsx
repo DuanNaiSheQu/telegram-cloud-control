@@ -70,36 +70,33 @@ export default function BrandPanel() {
       </div>
 
 
-      {/* 赞助商与开源入口：登录页是每个部署者都会看到的第一屏，
-          放这里能让赞助商获得稳定的曝光，也方便访客找到源码仓库 */}
+      {/* 赞助商与开源入口：横排一行 —— 之前纵向堆叠，卡片很宽却只占左半边、右边一大块空白。
+          现在左侧赞助商、右侧链接，两端对齐 */}
       <div className="login-brand-sponsors">
-        <div className="login-brand-sponsors-label">
-          <StarFilled className="login-brand-sponsors-icon" />
-          赞助商
-        </div>
-        <div className="login-brand-sponsors-row">
+        <div className="login-brand-sponsors-main">
+          <span className="login-brand-sponsors-label">
+            <StarFilled className="login-brand-sponsors-icon" />
+            赞助商
+          </span>
           <a href="https://cafinx.com" target="_blank" rel="noreferrer" title="CAFINX 虚拟卡 · 跨境收付">
-            <img src="/sponsors/cafinx-white.png" alt="CAFINX 虚拟卡" className="login-brand-sponsor-logo is-wide" />
+            <img src="/sponsors/cafinx-white.png" alt="CAFINX 虚拟卡" className="login-brand-sponsor-logo" />
           </a>
           <a href="https://cafinxsim.com" target="_blank" rel="noreferrer" title="CAFINXSIM · 全球 eSIM 流量卡">
-            <img src="/sponsors/cafinxsim-white.png" alt="CAFINXSIM" className="login-brand-sponsor-logo is-wide" />
+            <img src="/sponsors/cafinxsim-white.png" alt="CAFINXSIM" className="login-brand-sponsor-logo" />
           </a>
         </div>
         <div className="login-brand-links">
           <a href="https://github.com/DuanNaiSheQu/telegram-cloud-control" target="_blank" rel="noreferrer">
-            <GithubOutlined /> 源码仓库
+            <GithubOutlined /> 源码
           </a>
-          <span className="login-brand-links-sep">·</span>
           <a href="https://t.me/TGCloudcontrol" target="_blank" rel="noreferrer">
             <SendOutlined /> 交流群
           </a>
-          <span className="login-brand-links-sep">·</span>
           <a href="https://github.com/sponsors/DuanNaiSheQu" target="_blank" rel="noreferrer">
             <HeartFilled /> 赞助
           </a>
         </div>
       </div>
-
       <div className="login-brand-foot">
         <span className="login-brand-status">
           <span className="login-brand-status-dot" aria-hidden />
