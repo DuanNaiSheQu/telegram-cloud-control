@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" width="120" alt="Telegram 云控">
+<img src="docs/assets/logo.svg?v=2" width="120" alt="Telegram 云控">
 
 <h1>Telegram 云控</h1>
 
@@ -52,8 +52,8 @@
     <td align="center" width="50%">
       <a href="https://cafinx.com">
         <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinx-white.png">
-          <img src="docs/assets/sponsor/cafinx.png" width="76" alt="CAFINX 虚拟卡">
+          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinx-white.png?v=2">
+          <img src="docs/assets/sponsor/cafinx.png?v=2" width="76" alt="CAFINX 虚拟卡">
         </picture>
       </a><br>
       <b><a href="https://cafinx.com">CAFINX 虚拟卡</a></b><br>
@@ -62,8 +62,8 @@
     <td align="center" width="50%">
       <a href="https://cafinxsim.com">
         <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinxsim-white.png">
-          <img src="docs/assets/sponsor/cafinxsim.png" width="196" alt="CAFINXSIM">
+          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinxsim-white.png?v=2">
+          <img src="docs/assets/sponsor/cafinxsim.png?v=2" width="196" alt="CAFINXSIM">
         </picture>
       </a><br>
       <b><a href="https://cafinxsim.com">CAFINXSIM</a></b><br>
@@ -233,45 +233,45 @@
 <table>
   <tr>
     <td width="50%"><b>工作台</b>：在线/异常/失败任务、在线趋势、Worker 心跳、队列积压、通知流<br>
-      <img src="frontend/screenshots/uicore-dashboard-dark-1440.png" alt="工作台"></td>
+      <img src="frontend/screenshots/uicore-dashboard-dark-1440.png?v=2" alt="工作台"></td>
     <td width="50%"><b>会话收件箱</b>：会话列表 + 消息流 + AI 草稿 + 实时推送<br>
-      <img src="frontend/screenshots/uiinbox-dialogs-chat-dark.png" alt="会话收件箱"></td>
+      <img src="frontend/screenshots/uiinbox-dialogs-chat-dark.png?v=2" alt="会话收件箱"></td>
   </tr>
   <tr>
     <td><b>账号管理</b>：全列 + 全量筛选 + 批量操作 + 详情抽屉<br>
-      <img src="frontend/screenshots/uicore-accounts-dark-1440.png" alt="账号管理"></td>
+      <img src="frontend/screenshots/uicore-accounts-dark-1440.png?v=2" alt="账号管理"></td>
     <td><b>任务中心</b>：状态汇总、失败原因、批量重试、详情时间线<br>
-      <img src="frontend/screenshots/uiinbox-tasks-dark.png" alt="任务中心"></td>
+      <img src="frontend/screenshots/uiinbox-tasks-dark.png?v=2" alt="任务中心"></td>
   </tr>
   <tr>
     <td><b>Bot 转发</b>：规则 + 已转发记录 + 测试消息<br>
-      <img src="frontend/screenshots/uiops-relay-dark.png" alt="Bot 转发"></td>
+      <img src="frontend/screenshots/uiops-relay-dark.png?v=2" alt="Bot 转发"></td>
     <td><b>Bot 管理</b>：Token 掩码、Webhook 状态、自动回复资料<br>
-      <img src="frontend/screenshots/uiops-bots-dark.png" alt="Bot 管理"></td>
+      <img src="frontend/screenshots/uiops-bots-dark.png?v=2" alt="Bot 管理"></td>
   </tr>
   <tr>
     <td><b>账号检测</b>：勾选/全部/按分组检测，结果写回<br>
-      <img src="frontend/screenshots/uicore-detection-results-dark-1440.png" alt="账号检测"></td>
+      <img src="frontend/screenshots/uicore-detection-results-dark-1440.png?v=2" alt="账号检测"></td>
     <td><b>成员分配</b>：成员、角色、账号选择器与归属反查<br>
-      <img src="frontend/screenshots/uiops-assignments-dark.png" alt="成员分配"></td>
+      <img src="frontend/screenshots/uiops-assignments-dark.png?v=2" alt="成员分配"></td>
   </tr>
   <tr>
     <td><b>触达中心</b>：批量私信 / 群发 / 素材群发 / 加群退群 / 强拉 / 改资料 / 吵群 / 拟人<br>
-      <img src="frontend/screenshots/uicore-campaigns-dark-1440.png" alt="触达中心"></td>
+      <img src="frontend/screenshots/uicore-campaigns-dark-1440.png?v=2" alt="触达中心"></td>
     <td><b>群情报</b>：入群即采、按链接采集群员、逐条进度与一键打包<br>
-      <img src="frontend/screenshots/uicore-group-intel-dark-1440.png" alt="群情报"></td>
+      <img src="frontend/screenshots/uicore-group-intel-dark-1440.png?v=2" alt="群情报"></td>
   </tr>
   <tr>
     <td><b>操作记录</b>：谁在什么时间对哪个号做了什么<br>
-      <img src="frontend/screenshots/uiinbox-audit-dark.png" alt="操作记录"></td>
+      <img src="frontend/screenshots/uiinbox-audit-dark.png?v=2" alt="操作记录"></td>
     <td><b>浅色主题</b>：同一套 token 换皮<br>
-      <img src="frontend/screenshots/02-shell-light-1440.png" alt="浅色主题"></td>
+      <img src="frontend/screenshots/02-shell-light-1440.png?v=2" alt="浅色主题"></td>
   </tr>
   <tr>
     <td><b>登录页</b>：品牌叙事 + 环境标识 + 记住用户名<br>
-      <img src="frontend/screenshots/uiops-login-dark.png" alt="登录页"></td>
+      <img src="frontend/screenshots/uiops-login-dark.png?v=2" alt="登录页"></td>
     <td><b>账号管理（浅色）</b>：深浅双主题同一套组件<br>
-      <img src="frontend/screenshots/uicore-accounts-light-1440.png" alt="账号管理浅色"></td>
+      <img src="frontend/screenshots/uicore-accounts-light-1440.png?v=2" alt="账号管理浅色"></td>
   </tr>
 </table>
 
