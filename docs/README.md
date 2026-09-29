@@ -72,3 +72,4 @@
 - 截图统一由 `cd frontend && npm run screenshots` 生成（深色）/ `-- --theme light`（浅色），
   素材放在 `frontend/screenshots/`。
 - 每篇文档顶部有一行导航，指回本索引与相邻文档。
+- [竞品功能分析（彩虹群发 / 云端漫步对标）](COMPETITOR_ANALYSIS.md)
