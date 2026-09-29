@@ -506,11 +506,36 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
                     peer_display=dialog.peer_display,
                     member_count=dialog.member_count,
                 )
+                # 发送者名字兜底：群聊里要能看出「这句话是谁说的」。
+                # get_messages() 不一定把 sender 实体一起带回来，这里按需现取一次。
+                if not data.sender_name and data.sender_tg_id:
+                    try:
+                        sender = await msg.get_sender()
+                        if sender is not None:
+                            data.sender_name = (
+                                getattr(sender, "title", None)
+                                or " ".join(
+                                    part
+                                    for part in (getattr(sender, "first_name", None), getattr(sender, "last_name", None))
+                                    if part
+                                ).strip()
+                                or getattr(sender, "username", None)
+                                or ""
+                            )
+                    except Exception:  # noqa: BLE001 - 取不到就留空，不影响入库
+                        pass
                 async with session.begin_nested():
                     # 补历史不算未读：这些是老消息，不该点亮未读角标
                     dialog_row, row, is_new = await persist_message(
                         session, account_id=account.id, data=data, count_unread=False
                     )
+                    if not is_new:
+                        # 老消息之前入库时可能没记下发送者（修复前同步的），这次同步顺手补上，
+                        # 不然群聊历史里那些消息永远显示成「对方」
+                        if not row.sender_name and data.sender_name:
+                            row.sender_name = data.sender_name
+                        if row.sender_tg_id is None and data.sender_tg_id:
+                            row.sender_tg_id = data.sender_tg_id
                     if is_new:
                         await publish_message(self.worker.redis, dialog_row, row)
                 if is_new:

@@ -157,7 +157,7 @@ export function MessageList({
               .join(' ')}
           >
             {!outgoing ? (
-              <div className="im-avatar" title={message.sender_name || '对方'}>
+              <div className="im-avatar" title={message.sender_name || '（Telegram 未提供发送者）'}>
                 {senderInitial(message.sender_name)}
               </div>
             ) : null}
@@ -166,7 +166,7 @@ export function MessageList({
                 {outgoing ? (
                   <span>我</span>
                 ) : (
-                  <span>{message.sender_name || '对方'}</span>
+                  <span>{message.sender_name || '（发送者未知）'}</span>
                 )}
                 {message.sender_tg_id && !outgoing ? <span>ID {message.sender_tg_id}</span> : null}
               </div>

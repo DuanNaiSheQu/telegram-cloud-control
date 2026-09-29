@@ -172,7 +172,10 @@ def message_data_from_telethon(
         direction=MessageDirection.outgoing if outgoing else MessageDirection.incoming,
         status=MessageStatus.sent if outgoing else MessageStatus.received,
         sender_tg_id=getattr(message, "sender_id", None),
-        sender_name=sender_name or "",
+        # 发送者显示名：显式传入的优先；为空时从消息对象自己榨一次——
+        # 实时事件走 event.sender，历史同步 / 实体未缓存时这里能兜住，
+        # 否则群聊里别人发的消息在页面上只会显示「对方」，看不出是谁说的。
+        sender_name=sender_name or _sender_name_from_message(message),
         reply_to_tg_message_id=getattr(message, "reply_to_msg_id", None),
         has_media=media_type is not None and media_type != "service",
         media_type=media_type,
