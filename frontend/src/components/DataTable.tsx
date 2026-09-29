@@ -327,7 +327,7 @@ export function DataTable<T extends object>({
               <Dropdown
                 trigger={['click']}
                 placement="bottomRight"
-                dropdownRender={() => (
+                popupRender={() => (
                   <div
                     style={{
                       minWidth: 200,

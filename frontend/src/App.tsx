@@ -70,7 +70,9 @@ function ThemedApp() {
     <ConfigProvider locale={zhCN} theme={antdTheme}>
       <AntdApp>
         <FeedbackBridge />
-        <BrowserRouter>
+        {/* future 标志：提前采用 v7 行为，消掉两个弃用警告
+            （v7_startTransition 用 startTransition 包装状态更新；v7_relativeSplatPath 统一相对路径解析） */}
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ErrorBoundary>
             <AuthProvider>
               <Routes>

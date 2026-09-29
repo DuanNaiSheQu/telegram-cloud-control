@@ -3324,3 +3324,15 @@ body .ant-spin-container::after {
 .tg-template-del:hover { color: #d4380d !important; }
 .tg-template-save { display: inline-flex; align-items: center; gap: 6px; }
 .tg-template-msg { font-size: 12px; color: var(--tg-color-primary); }
+
+/* 账号范围的「最多处理 N 个号」：用并列元素代替已弃用的 addonBefore/After */
+.tg-scope-limit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tg-scope-limit-label {
+  font-size: 12.5px;
+  color: var(--tg-color-text-secondary);
+  white-space: nowrap;
+}

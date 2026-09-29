@@ -108,7 +108,7 @@ export function DetailDrawer({
       }
       extra={extra}
       footer={footer}
-      destroyOnClose
+      destroyOnHidden
       className={className}
     >
       {error ? (

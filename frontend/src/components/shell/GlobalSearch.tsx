@@ -177,7 +177,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       footer={null}
       closable={false}
       width={640}
-      destroyOnClose
+      destroyOnHidden
       className="tg-search-modal"
       styles={{ body: { paddingTop: 'var(--tg-space-md)' } }}
     >

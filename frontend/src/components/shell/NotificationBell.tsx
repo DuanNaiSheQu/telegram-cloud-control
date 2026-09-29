@@ -121,7 +121,7 @@ export function NotificationBell({
   );
 
   return (
-    <Popover content={content} trigger="click" placement="bottomRight" arrow={false} overlayInnerStyle={{ padding: 'var(--tg-space-lg)' }}>
+    <Popover content={content} trigger="click" placement="bottomRight" arrow={false} styles={{ body: { padding: 'var(--tg-space-lg)' } }}>
       <Tooltip title="通知">
         <button type="button" className="app-icon-button" aria-label={`通知${unread ? `（${unread} 条未读）` : ''}`}>
           <Badge count={unread} size="small" offset={[2, -2]}>

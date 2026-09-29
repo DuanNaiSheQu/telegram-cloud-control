@@ -126,14 +126,19 @@ function ScopeFields({ value, onChange }: { value: ScopeState; onChange: (next: 
           options={(groups.data ?? []).map((group) => ({ label: group.name, value: group.id }))}
         />
       ) : null}
-      <InputNumber
-        min={1}
-        max={500}
-        value={value.limit}
-        onChange={(limit) => onChange({ ...value, limit: limit ?? 200 })}
-        addonBefore="最多处理"
-        addonAfter="个号"
-      />
+      <span className="tg-scope-limit">
+        <span className="tg-scope-limit-label">最多处理</span>
+        {/* 原本用 InputNumber 的 addonBefore/addonAfter 做前后缀，antd 已弃用；
+            改成并列的普通元素，语义一样、也不会有弃用警告 */}
+        <InputNumber
+          min={1}
+          max={500}
+          value={value.limit}
+          onChange={(limit) => onChange({ ...value, limit: limit ?? 200 })}
+          style={{ width: 110 }}
+        />
+        <span className="tg-scope-limit-label">个号</span>
+      </span>
     </Space>
   );
 }
@@ -1027,7 +1032,7 @@ export default function Campaigns() {
             initialValue={150}
             tooltip="等验证机器人发来验证消息的最长时间。验证链接寿命很短（NuoMi 60 秒、佩奇 300 秒），设太长没有意义"
           >
-            <InputNumber min={30} max={600} step={30} style={{ width: 160 }} addonAfter="秒" />
+            <InputNumber min={30} max={600} step={30} style={{ width: 160 }} />
           </Form.Item>
         </ActionTab>
       ),
