@@ -152,3 +152,29 @@ class GroupEvent(Base, TimestampMixin):
         # 同一个人同一时刻的同一类事件只记一次（Telegram 会补推更新）
         UniqueConstraint("tg_chat_id", "tg_user_id", "event_type", "occurred_at", name="uq_group_events_dedupe"),
     )
+
+
+class KeywordWatch(Base, TimestampMixin):
+    """关键词监听规则：群里有人聊到这些词就记下来并告警。
+
+    为什么需要：私信/群发是「我找别人」，监听是「别人找我」——有人问「怎么开卡」时第一时间知道，
+    比事后翻聊天记录有用得多。规则命中写进 `group_events`（event_type="keyword"），不另建流水表。
+    """
+
+    __tablename__ = "keyword_watches"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    name: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    # 关键词列表：命中任意一个即算命中（OR）
+    keywords: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # 生效范围：留空 = 所有已同步会话；填了就只看这些（tg_chat_id 列表）
+    tg_chat_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # 用哪些号监听：留空 = 所有在线的号
+    account_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    # 是否推送通知（页面铃铛）
+    notify: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    hit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )

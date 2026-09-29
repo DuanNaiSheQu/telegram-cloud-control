@@ -163,3 +163,25 @@ class InspectGroupsRequest(BaseModel):
     account_id: Optional[uuid.UUID] = Field(default=None, description="用哪个号体检（留空自动挑一个可用的）")
     min_interval: float = Field(default=2.0, ge=0.5, le=30, description="每条之间最小间隔（秒）")
     max_interval: float = Field(default=6.0, ge=0.5, le=60, description="最大间隔（秒）")
+
+
+class KeywordWatchRequest(BaseModel):
+    """新建关键词监听规则。"""
+
+    name: str = Field(default="", max_length=64, description="规则名（留空自动取前几个词）")
+    keywords: List[str] = Field(default_factory=list, description="关键词，命中任意一个即记录")
+    tg_chat_ids: List[int] = Field(default_factory=list, description="只监听这些群；留空 = 全部")
+    account_ids: List[uuid.UUID] = Field(default_factory=list, description="只用这些号监听；留空 = 全部在线号")
+    enabled: bool = Field(default=True, description="是否启用")
+    notify: bool = Field(default=True, description="命中时推通知")
+
+
+class KeywordWatchUpdate(BaseModel):
+    """改规则：只传要改的字段。"""
+
+    name: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    tg_chat_ids: Optional[List[int]] = None
+    account_ids: Optional[List[uuid.UUID]] = None
+    enabled: Optional[bool] = None
+    notify: Optional[bool] = None

@@ -17,6 +17,9 @@ from telethon.tl import types as tl_types
 
 from app.db import session_scope
 from app.models import Dialog, DialogChannel, DialogKind, Message, MessageDirection, MessageStatus
+from app.services.keyword_watch import load_rules as keyword_load_rules
+from app.services.keyword_watch import scan as keyword_scan
+from app.services.keyword_watch import record_hit as record_keyword_hit
 from app.services.inbound import ingest_message, publish_message
 from app.services.relay import enqueue_relays
 
@@ -214,6 +217,28 @@ async def persist_message(
     )
 
 
+#: 关键词规则缓存：消息来了直接用内存里的规则匹配，每 60 秒回库刷一次。
+#: 改动最多滞后一分钟生效，换来的是「每条消息零 DB 查询」。
+_KEYWORD_CACHE: dict[str, Any] = {"at": 0.0, "rules": []}
+_KEYWORD_TTL = 60.0
+
+
+async def _keyword_rules(session: Any) -> list[dict]:
+    import time
+
+    now = time.monotonic()
+    if now - float(_KEYWORD_CACHE.get("at") or 0) < _KEYWORD_TTL:
+        return list(_KEYWORD_CACHE.get("rules") or [])
+    try:
+        rules = await keyword_load_rules(session)
+    except Exception:  # noqa: BLE001 - 读规则失败不该影响消息入库
+        logger.debug("读取关键词规则失败，沿用上一份缓存")
+        return list(_KEYWORD_CACHE.get("rules") or [])
+    _KEYWORD_CACHE["at"] = now
+    _KEYWORD_CACHE["rules"] = rules
+    return rules
+
+
 async def handle_telethon_message(
     *,
     worker_id: str,
@@ -250,6 +275,39 @@ async def handle_telethon_message(
                         "tasks": len(tasks),
                     },
                 )
+        # 关键词监听：有人聊到规则里的词就记一条事件（与入退群流水同一时间线）
+        try:
+            rules = await _keyword_rules(session)
+            if rules:
+                hits = keyword_scan(
+                    rules,
+                    tg_chat_id=dialog.tg_chat_id,
+                    account_id=str(account_id),
+                    text=row.body or "",
+                )
+                for rule, keyword in hits:
+                    await record_keyword_hit(
+                        session,
+                        account_id=account_id,
+                        tg_chat_id=dialog.tg_chat_id,
+                        tg_user_id=row.sender_tg_id,
+                        user_display=row.sender_name or "",
+                        keyword=keyword,
+                        text=row.body or "",
+                        rule_id=rule.get("id"),
+                        rule_name=rule.get("name") or "",
+                    )
+                    if rule.get("notify"):
+                        await publish_keyword_notice(
+                            redis,
+                            rule_name=rule.get("name") or "",
+                            keyword=keyword,
+                            chat_title=dialog.title or "",
+                            sender=row.sender_name or "",
+                            text=(row.body or "")[:200],
+                        )
+        except Exception:  # noqa: BLE001 - 监听失败不能影响消息入库
+            logger.debug("关键词监听处理失败", exc_info=True)
         logger.info(
             "新消息已入库",
             extra={

@@ -33,6 +33,7 @@ from app.config import settings
 from app.core.audit import write_audit
 from app.core.tasks import enqueue_task
 from app.models import (
+    KeywordWatch,
     GROUP_EVENT_LABELS,
     Lease,
     AccountStatus,
@@ -63,6 +64,8 @@ from app.schemas import (
     GroupMemberOut,
     GroupProfileListResponse,
     GroupProfileOut,
+    KeywordWatchRequest,
+    KeywordWatchUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -709,6 +712,144 @@ async def list_events(
         page_size=page_size,
         counts={key: int(value or 0) for key, value in count_rows.all()},
     )
+
+
+# ---------------- 关键词监听 ----------------
+
+@router.get("/keyword-watches", summary="关键词监听规则列表")
+async def list_keyword_watches(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    rows = list((await session.scalars(select(KeywordWatch).order_by(KeywordWatch.created_at.desc()))).all())
+    return {
+        "items": [
+            {
+                "id": str(row.id),
+                "name": row.name or "",
+                "keywords": list(row.keywords or []),
+                "tg_chat_ids": list(row.tg_chat_ids or []),
+                "account_ids": [str(x) for x in (row.account_ids or [])],
+                "enabled": bool(row.enabled),
+                "notify": bool(row.notify),
+                "hit_count": int(row.hit_count or 0),
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ],
+        "total": len(rows),
+    }
+
+
+@router.post("/keyword-watches", summary="新建关键词监听规则")
+async def create_keyword_watch(
+    payload: KeywordWatchRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """建一条监听规则：有人在群里聊到这些词就记一条命中（写进入退群同一条时间线）。
+
+    关键词之间是 **OR**（命中任意一个即算）；范围留空 = 不限。
+    """
+    keywords = [str(k).strip() for k in payload.keywords if str(k).strip()]
+    if not keywords:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="keywords 不能为空")
+    row = KeywordWatch(
+        name=payload.name or "、".join(keywords[:3]),
+        keywords=keywords[:50],
+        tg_chat_ids=[int(x) for x in payload.tg_chat_ids],
+        account_ids=[uuid.UUID(str(x)) for x in payload.account_ids],
+        enabled=payload.enabled,
+        notify=payload.notify,
+        created_by=user.id,
+    )
+    session.add(row)
+    await session.flush()
+    await write_audit(
+        session,
+        action="keyword_watch.create",
+        user_id=user.id,
+        target_type="keyword_watch",
+        target_id=str(row.id),
+        detail={"keywords": keywords[:10]},
+    )
+    await session.commit()
+    return {"ok": True, "id": str(row.id), "message": f"已开始监听：{'、'.join(keywords[:5])}"}
+
+
+@router.patch("/keyword-watches/{watch_id}", summary="改关键词监听规则（启用/停用、改词）")
+async def update_keyword_watch(
+    watch_id: uuid.UUID,
+    payload: KeywordWatchUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    row = await session.get(KeywordWatch, watch_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="规则不存在")
+    if payload.name is not None:
+        row.name = payload.name
+    if payload.keywords is not None:
+        row.keywords = [str(k).strip() for k in payload.keywords if str(k).strip()][:50]
+    if payload.tg_chat_ids is not None:
+        row.tg_chat_ids = [int(x) for x in payload.tg_chat_ids]
+    if payload.account_ids is not None:
+        row.account_ids = [uuid.UUID(str(x)) for x in payload.account_ids]
+    if payload.enabled is not None:
+        row.enabled = payload.enabled
+    if payload.notify is not None:
+        row.notify = payload.notify
+    await session.commit()
+    return {"ok": True, "message": "已更新（Worker 最多 60 秒后按新规则匹配）"}
+
+
+@router.delete("/keyword-watches/{watch_id}", summary="删除关键词监听规则")
+async def delete_keyword_watch(
+    watch_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    row = await session.get(KeywordWatch, watch_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="规则不存在")
+    await session.delete(row)
+    await session.commit()
+    return {"ok": True, "message": "规则已删除（已记录的历史命中保留）"}
+
+
+@router.get("/keyword-hits", summary="关键词命中记录")
+async def list_keyword_hits(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> dict:
+    """命中流水（最近 N 条）：谁在哪个群说了什么。"""
+    rows = list(
+        (
+            await session.scalars(
+                select(GroupEvent)
+                .where(GroupEvent.event_type == "keyword")
+                .order_by(GroupEvent.occurred_at.desc())
+                .limit(limit)
+            )
+        ).all()
+    )
+    return {
+        "items": [
+            {
+                "id": str(row.id),
+                "tg_chat_id": row.tg_chat_id,
+                "tg_user_id": row.tg_user_id,
+                "sender": row.user_display,
+                "keyword": (row.raw or {}).get("keyword"),
+                "text": (row.raw or {}).get("text"),
+                "rule_name": (row.raw or {}).get("rule_name"),
+                "occurred_at": row.occurred_at,
+            }
+            for row in rows
+        ],
+        "total": len(rows),
+    }
 
 
 @router.get("/stats", response_model=GroupIntelStats, summary="群情报概览")
