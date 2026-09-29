@@ -16,7 +16,12 @@
   <tr>
     <td align="center" width="50%">
       <br>
-      <a href="https://cafinx.com"><img src="assets/sponsor/cafinx.png" width="104" alt="CAFINX 虚拟卡"></a>
+      <a href="https://cafinx.com">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="assets/sponsor/cafinx-white.png">
+          <img src="assets/sponsor/cafinx.png" width="104" alt="CAFINX 虚拟卡">
+        </picture>
+      </a>
       <br><br>
       <h3><a href="https://cafinx.com">CAFINX 虚拟卡</a></h3>
       <p><sub><b>跨境收付虚拟卡</b></sub></p>

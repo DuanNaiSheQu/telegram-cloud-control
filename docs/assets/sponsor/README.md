@@ -20,7 +20,8 @@
 
 | 文件 | 用途 | 来源 |
 |---|---|---|
-| `cafinx.png`（256×256） | CAFINX 虚拟卡标识，用于 README 与 SPONSOR.md | <https://cafinx.com> 站点图标 |
+| `cafinx.png`（256×256） | CAFINX 虚拟卡标识（浅色底用，黑色笔画） | <https://cafinx.com> 站点图标 |
+| `cafinx-white.png`（256×256） | CAFINX 虚拟卡标识（深色底用，白色笔画 + 透明底） | 由 `cafinx.png` 生成：黑色笔画转白、白底转透明，保留抗锯齿 |
 | `cafinxsim.png`（320×123） | CAFINXSIM 横向字标（浅色底） | 品牌素材 `logo.png` |
 | `cafinxsim-white.png`（320×123） | CAFINXSIM 横向字标（深色底，README 用 `<picture>` 自动切换） | 品牌素材 `logo-white.png` |
 | `cafinxsim-mark.png`（256×256） | CAFINXSIM 图形标记（方位置用） | 品牌素材 `logo-mark.png` |
