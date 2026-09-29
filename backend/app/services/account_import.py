@@ -543,15 +543,64 @@ async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAc
             for path in all_files:
                 if hexlike.match(path.parent.name or ""):
                     roots.add(path.parent.parent)
+
+        # 兜底（关键）：不再靠文件名猜，**直接问 opentele 这个目录能不能当 tdata 加载**。
+        # 真实的 tdata 结构五花八门（多账号 / 单账号 / 换了密钥文件名 / 包了一层手机号目录），
+        # 但只要能加载成功就是有效的——这比任何命名规则都可靠。
         if not roots:
-            listing = "\n".join(str(path.relative_to(extract_root)) for path in all_files[:30])
-            hint = listing or "（压缩包里没有任何文件，或只有 macOS 的 __MACOSX 伴生文件）"
+            candidates = sorted({path.parent for path in all_files} | {extract_root})
+            for candidate in candidates:
+                try:
+                    probe = TDesktop(str(candidate))
+                    if probe.isLoaded():
+                        roots.add(candidate)
+                except BaseException:  # noqa: BLE001 - 单个目录探测失败继续下一个
+                    continue
+        if not roots:
+            # 智能识别：包里没有 tdata，但有 `.session` 文件——说明运营传上来的是
+            # **会话文件包**（Telethon / Pyrogram 导出的 `<手机号>.session` + 同名 .json），
+            # 却选在了「tdata 目录」页签。以前只会冷冷地报「没找到 tdata」，
+            # 现在直接按 .session 解析，顺带在标识里说明是怎么认出来的。
+            session_members = [
+                path for path in all_files if path.name.lower().endswith(".session")
+            ]
+            if session_members:
+                auto: list[ParsedAccount] = []
+                auto_errors: list[str] = []
+                for path in session_members[:200]:
+                    try:
+                        item = parse_session_file(path.read_bytes(), path.name)
+                        item.source = "session_file"
+                        # 标识用文件名去掉扩展名（通常就是手机号），比带 .session 后缀清楚
+                        stem = path.name.rsplit(".", 1)[0]
+                        if stem:
+                            item.label = stem
+                            if not item.phone and stem.lstrip("+").isdigit() and 8 <= len(stem.lstrip("+")) <= 15:
+                                item.phone = stem if stem.startswith("+") else f"+{stem}"
+                        item.remark = "从 tdata 包中自动识别为 .session 导入"
+                        auto.append(item)
+                    except BaseException as exc:  # noqa: BLE001 - 单个文件失败不影响其它
+                        auto_errors.append(f"{path.name}：{type(exc).__name__}: {str(exc)[:120]}")
+                if auto:
+                    return auto
+                raise ImportError_(
+                    "这个包里是 .session 会话文件，但一个都没解析成功：\n"
+                    + "\n".join(auto_errors[:10])
+                    + "\n\n请改用「.session 文件（Telethon / Pyrogram）」页签上传，那里会逐个文件给出原因。"
+                )
+
+            # 诊断信息要够用：列出目录结构与文件（最多 40 条），
+            # 这样一眼能看出「打包多了/少了一层」，或者根本不是 tdata。
+            dirs = sorted({str(path.parent.relative_to(extract_root)) for path in all_files})
+            dir_note = "、".join(item or "." for item in dirs[:10]) or "（没有子目录）"
+            listing = "\n".join(str(path.relative_to(extract_root)) for path in all_files[:40])
             raise ImportError_(
-                "zip 里没找到 tdata 内容。压缩包里实际是这些（最多列 30 条）：\n"
-                f"{hint}\n\n"
-                "tdata 目录里应当有 key_datas（或 key_data），以及 D877F783D5D3EF8C 这类十六进制命名的目录。"
-                "正确做法：打开 Telegram Desktop 的 tdata 目录 → 全选里面的**内容** → 压缩成 zip 上传；"
-                "多个号就按「每个号一个子目录」打包。"
+                "zip 里没找到 tdata 内容（已尝试按结构与加载探测，都无法识别）。\n"
+                f"包内目录：{dir_note}\n"
+                f"包内文件（最多 40 条）：\n{listing or '（没有文件）'}\n\n"
+                "tdata 目录里应当有 key_datas（或 key_data），以及 D877F783D5D3EF8C 这类十六进制目录。"
+                "正确做法：进入 Telegram Desktop 的 tdata 目录 → 全选里面的**内容**（不是外层文件夹）"
+                "→ 压缩成 zip 上传。"
             )
         roots = sorted(roots)
 
