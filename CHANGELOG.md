@@ -69,6 +69,22 @@
 
 ---
 
+## v0.3.73 — 2026-03-30
+
+主题：**README 挂上 Telegram 交流群**。
+
+### 变更
+
+- 徽章区新增 **Telegram 交流群**徽章（`https://t.me/TGCloudcontrol`），导航行也加了「交流群」入口。
+- 顺带说明：README 上 `release / stars / issues / last commit` 四个徽章显示 `repo not found`，
+  **原因是仓库当前为私有**（shields.io 读不到数据），**公开后会自动恢复正常**，不需要改 URL。
+
+### 验证
+
+本地确认 README 徽章与导航两处链接均已写入。
+
+---
+
 ## v0.3.72 — 2026-03-30
 
 主题：**营销面板重排：从「一列平铺」到「分组 + 网格」**。
