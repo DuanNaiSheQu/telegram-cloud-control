@@ -2928,9 +2928,19 @@ body .ant-spin-container::after {
   letter-spacing: 0.2px;
 }
 /* 表单区收敛宽度：宽屏下不要让输入框拉到 2000px，那种"散"的观感比挤更难用 */
+/* 营销动作表单：铺满宽度，字段用自适应网格排两/三列，别把表单挤在左半边。
+   （不用整表单 grid：分组标题和它的字段会被拆到不同列，读起来是断的。） */
 .tg-action-form {
-  max-width: 1180px;
+  max-width: none;
 }
+.tg-action-form .tg-form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  justify-content: stretch;
+}
+.tg-form-group-title {
+  margin-top: var(--tg-space-sm);
+}
+
 .tg-form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 230px));
