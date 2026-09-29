@@ -1,3 +1,47 @@
+## v0.3.99 — 2026-04-02
+
+主题：**修掉「参数被压成竖排」的排版问题**（吵群页最明显）。
+
+### 现象
+
+吵群页右侧四个参数（每个号发几轮 / 最小间隔 / 最大间隔 / 回复概率）竖着堆叠，
+右边空出一大片；目标群那栏也偏窄。
+
+### 根因
+
+那四个字段在源码里包在 **** 中。 是「一行容器」，本身是整体；
+而 12 列栅格把它当成一个普通字段，只给了 3 列宽 —— 于是内部  只能不断换行，
+表现就是竖排堆叠。
+
+### 修复
+
+ 独占整行（），
+并给 Space 内的字段补卡片样式（白底 / 边框 / 圆角）、 设最小宽度。
+
+实测：（占满整行）、File 1 does not exist
+
+tops [-help] [-dont] [-semiverbose] [-verbose] [-nocontext] [-nofileinfo]
+     (-scriptfile script_name)                                      |    
+     (find <search_pattern>                                              
+         [where (<symbol>...) isOneOf {(<match>...)...}] ...)       |    
+     (replace <search_pattern> with <replacement_pattern> | same         
+         [where (<symbol>...) isOneOf {(<match>...)...}]...              
+         [within (<symbol>) {...}]...                                    
+         [error <message>]                                               
+         [warning <message>])                                       |    
+     (replacemethod <selector> with <new_selector>                       
+         { [replace <symbol> with <symbol_replacement>]... }             
+         [where (<symbol>...) isOneOf {(<match> ...)...}]...             
+         [within (<symbol>) {...}]...                                    
+         [error <message>]                                               
+         [warning <message>])                                            
+     [-classfile classfile]                                              
+     [filename ...]                                                      （四个参数同一行）、每个 204px。
+
+**该修复对所有页面生效** —— 凡是用  横排参数的地方都会一起正常。
+
+---
+
 ## v0.3.98 — 2026-04-02
 
 主题：**修掉「浏览器反复弹出要打开 Telegram」的问题**。

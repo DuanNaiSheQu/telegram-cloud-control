@@ -3092,6 +3092,15 @@ body .ant-spin-container::after {
 /* 开关 / 复选框：窄块 */
 .tg-form-body > .ant-form-item:has(.ant-switch),
 .tg-form-body > .ant-form-item:has(.ant-checkbox) { grid-column: span 2; }
+/* Space 是「一行容器」——页面用它把若干参数横排（如吵群页的四个数字）。
+   它必须独占整行：被塞进 3 列宽的话，内部元素只能换行，表现就是竖排堆叠。 */
+.tg-form-body > .ant-space,
+.tg-form-body > .ant-space-item { align-items: flex-start; }
+.tg-form-body > .ant-space { grid-column: 1 / -1; }
+.tg-form-body > .ant-space .ant-form-item { margin-bottom: 0; padding: 10px 12px 12px;
+  background: var(--tg-v-field-bg); border: 1px solid var(--tg-v-field-border); border-radius: 10px; }
+.tg-form-body > .ant-space .ant-input-number { width: 100%; min-width: 96px; }
+
 /* 整行占位元素：分组标题、分组网格、区块，以及任何「横向排列的按钮组 / 卡片组」。
    后者如果被塞进单列（span 3）会被压成竖排，节拍预设就是这么废掉的。 */
 .tg-form-body > .tg-form-group-title,

@@ -703,7 +703,9 @@ export default function Accounts() {
               menu={{
                 items: bulkMenuItems,
                 onClick: ({ key }) => {
-                  if (key === 'probe') setProbeOpen(true);
+                  // bulk_delete 有专属的强确认弹窗（要手输 DELETE），不能走 BulkActionModal
+                  if (key === 'bulk_delete') setBulkDeleteOpen(true);
+                  else if (key === 'probe') setProbeOpen(true);
                   else if (key === 'throttle') setThrottleOpen(true);
                   else setBulkAction(key as BulkAction);
                 },
@@ -809,7 +811,10 @@ export default function Accounts() {
         okButtonProps={{ danger: true, disabled: deletePhrase !== 'DELETE' }}
         cancelText="取消"
         confirmLoading={bulkDeleting}
-        onCancel={() => setBulkDeleteOpen(false)}
+        onCancel={() => {
+          setBulkDeleteOpen(false);
+          setDeletePhrase('');
+        }}
         onOk={async () => {
           setBulkDeleting(true);
           try {
@@ -819,6 +824,7 @@ export default function Accounts() {
               { silent: true },
             );
             setBulkDeleteOpen(false);
+            setDeletePhrase('');
             setBulkResult(res as never);
             selection.clear?.();
             reloadAll();
