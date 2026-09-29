@@ -18,9 +18,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
+import os
 import pathlib
+import platform
+import shutil
 import subprocess
+import time
 from typing import Any
 
 from sqlalchemy import select
@@ -31,6 +34,30 @@ from app.config import settings
 from app.db import SessionFactory
 from app.models import TgAccount
 from app.security import decrypt_secret
+
+def ensure_display() -> dict:
+    """给浏览器阶段准备一块"屏幕"。
+
+    Cap 会检测浏览器环境，纯无头模式直接被拦；所以必须跑真实窗口。
+    服务器没有桌面时用 Xvfb 造虚拟显示——Chrome 以为自己在正常显示器上，
+    实际没有任何物理输出。macOS/Windows 本身有显示，无需处理。
+    """
+    env = dict(os.environ)
+    if platform.system() != "Linux" or env.get("DISPLAY"):
+        return env
+    if shutil.which("Xvfb") is None:
+        print("   ⚠ 未装 Xvfb，浏览器阶段会失败：先跑 bash scripts/install_browser.sh", flush=True)
+        return env
+    display = ":99"
+    subprocess.Popen(
+        ["Xvfb", display, "-screen", "0", "1280x800x24"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    time.sleep(1.5)
+    env["DISPLAY"] = display
+    print(f"   已启动虚拟显示 {display}（无桌面环境也能跑真窗口）", flush=True)
+    return env
+
 
 PEIQI_ID = 8590651516
 PEIQI_USERNAME = "PeiQiBot"
@@ -199,8 +226,12 @@ async def main() -> None:
 
     # ---------- ⑦ 浏览器阶段（屏幕外运行，全程自动点击） ----------
     print("⑦ 交给浏览器完成 Cap 与提交 …", flush=True)
+    browser_env = ensure_display()
     command = ["node", str(NODE_SCRIPT), URL_FILE] + (["--visible"] if args.visible else [])
-    completed = subprocess.run(command, cwd=str(ROOT / "frontend"), capture_output=True, text=True, timeout=240)
+    completed = subprocess.run(
+        command, cwd=str(ROOT / "frontend"), capture_output=True, text=True,
+        timeout=240, env=browser_env,
+    )
     for line in (completed.stdout or "").splitlines():
         print("   " + line, flush=True)
     if completed.returncode != 0:

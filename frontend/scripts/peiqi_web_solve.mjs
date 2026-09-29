@@ -23,18 +23,39 @@ const url = fs.readFileSync(urlFile, 'utf8').trim();
 // 无头模式：完全不出现任何窗口。用系统真 Chrome + 新无头内核，
 // 指纹比打包的 Chromium 干净，Cap 的 instrumentation 才有机会通过。
 // 无头模式实测会被 Cap 的 instrumentation 拦掉（captcha 根本不跑），
-// 所以这里走「真实窗口 + 立即最小化」：窗口对象存在（指纹完整），但你屏幕上看不到。
-const browser = await chromium.launch({
-  channel: 'chrome',
-  headless: false,
-  args: [
-    '--window-position=-32000,-32000',
-    '--window-size=1000,760',
-    '--disable-blink-features=AutomationControlled',
-    '--no-first-run',
-    '--no-default-browser-check',
-  ],
-});
+// 所以必须跑「真实窗口」：
+//   - 有桌面（macOS/Windows）：窗口挪走 + CDP 最小化，你看不到它；
+//   - 无桌面服务器（Linux）：由上层脚本起 Xvfb 造虚拟显示，Chrome 照样有屏幕。
+// 浏览器优先级：系统真 Chrome（指纹最好）→ Playwright 自带 Chromium（兜底）。
+let browser = null;
+let browserLabel = '';
+const launchArgs = [
+  // 不用屏幕外坐标：那会让 Chrome 挂起渲染进程（页面会被关掉）。
+  // 藏窗口统一交给下面的 CDP 最小化。
+  '--window-size=1000,760',
+  '--disable-blink-features=AutomationControlled',
+  '--no-first-run',
+  '--no-default-browser-check',
+  ...(visible ? ['--window-position=0,0'] : []),
+];
+for (const channel of ['chrome', null]) {
+  try {
+    browser = await chromium.launch({
+      ...(channel ? { channel } : {}),
+      headless: false,
+      args: launchArgs,
+    });
+    browserLabel = channel ? '系统 Chrome' : 'Playwright Chromium（兜底）';
+    break;
+  } catch (error) {
+    // 装不上系统 Chrome 就退到自带内核，不在这里失败
+  }
+}
+if (!browser) {
+  console.error('没有可用的浏览器内核，请先跑 bash scripts/install_browser.sh');
+  process.exit(2);
+}
+console.log('[浏览器]', browserLabel);
 
 const ctx = await browser.newContext({
   locale: 'zh-CN',
