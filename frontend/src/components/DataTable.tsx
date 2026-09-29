@@ -201,6 +201,19 @@ export function DataTable<T extends object>({
     [visibleColumns, sortableColumns, sortField, sortOrder],
   );
 
+  // 传进来的 scrollX 若小于列宽之和，antd 会把列压扁，右侧固定列（操作）就会跟相邻列叠在一起。
+  // 这里按「列宽之和」兜底：列宽调整后也不会再错位，省得每个页面手算。
+  const columnsWidth = useMemo(
+    () =>
+      processedColumns.reduce((sum, column) => {
+        const width = (column as { width?: number | string }).width;
+        return typeof width === 'number' ? sum + width : sum;
+      }, 0),
+    [processedColumns],
+  );
+  const effectiveScrollX =
+    typeof scrollX === 'number' && columnsWidth > scrollX ? columnsWidth : scrollX;
+
   const handleChange: TableProps<T>['onChange'] = (pagination, _filters, sorter) => {
     const single = Array.isArray(sorter) ? sorter[0] : sorter;
     if (onSortChange) {
@@ -256,7 +269,7 @@ export function DataTable<T extends object>({
         size={size ?? DENSITY_TO_SIZE[density]}
         bordered={bordered}
         sticky={sticky}
-        scroll={scrollX ? { x: scrollX } : undefined}
+        scroll={effectiveScrollX ? { x: effectiveScrollX } : undefined}
         onChange={handleChange}
         rowClassName={rowClassName}
         onRow={onRow}

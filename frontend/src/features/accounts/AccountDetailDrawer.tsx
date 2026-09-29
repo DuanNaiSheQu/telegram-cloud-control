@@ -4,6 +4,7 @@
  * 分区：基本信息 / 状态与租约 / 统计 / 最近会话 / 最近消息 / 最近任务 / 最近审计；
  * 底部操作条由页面传入 handler（返回 Promise 时抽屉自动重新加载概览）。
  */
+import { useState } from 'react';
 import { Button, Space, Tooltip } from 'antd';
 import {
   CloudSyncOutlined,
@@ -42,6 +43,33 @@ interface Props {
   accountId: string | null;
   handlers: AccountDetailHandlers;
   onClose: () => void;
+}
+
+/** 可折叠分区：点标题展开/收起。
+ *
+ *  详情里五个分区平铺下来很长，翻到「最近审计」要滚好几屏；
+ *  而「最近消息」这类内容多数时候只是扫一眼，不需要常驻占位。
+ *  默认只把审计折叠起来（它最长、最不常看），其余保持展开不改变原有习惯。
+ */
+function CollapsibleSection({
+  title,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="tg-detail-section">
+      <button type="button" className="tg-detail-section-title tg-collapsible" onClick={() => setOpen((prev: boolean) => !prev)}>
+        <span className="tg-collapse-caret">{open ? '▾' : '▸'}</span>
+        <span>{title}</span>
+      </button>
+      {open ? children : null}
+    </section>
+  );
 }
 
 function StatCell({ label, value, tone }: { label: string; value: number; tone: string }) {
@@ -199,8 +227,7 @@ export default function AccountDetailDrawer({ accountId, handlers, onClose }: Pr
     >
       {overview ? (
         <div className="tg-stack" style={{ gap: 'var(--tg-space-xl)' }}>
-          <section className="tg-detail-section">
-            <div className="tg-detail-section-title">统计</div>
+          <CollapsibleSection title="统计" defaultOpen={true}>
             <div
               style={{
                 display: 'grid',
@@ -226,10 +253,9 @@ export default function AccountDetailDrawer({ accountId, handlers, onClose }: Pr
               <span>任务：待执行 {overview.task_stats.pending} · 执行中 {overview.task_stats.running} · 已完成 {overview.task_stats.completed}</span>
               <span>等待确认 {overview.task_stats.pending_confirmation} · 已取消 {overview.task_stats.cancelled}</span>
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <section className="tg-detail-section">
-            <div className="tg-detail-section-title">最近会话</div>
+          <CollapsibleSection title="最近会话" defaultOpen={true}>
             {overview.recent_dialogs.length ? (
               <div className="tg-stack" style={{ gap: 'var(--tg-space-sm)' }}>
                 {overview.recent_dialogs.map((dialog) => (
@@ -255,10 +281,9 @@ export default function AccountDetailDrawer({ accountId, handlers, onClose }: Pr
             ) : (
               <div className="tg-muted">还没有同步到会话。</div>
             )}
-          </section>
+          </CollapsibleSection>
 
-          <section className="tg-detail-section">
-            <div className="tg-detail-section-title">最近消息</div>
+          <CollapsibleSection title="最近消息" defaultOpen={true}>
             {overview.recent_messages.length ? (
               <div className="tg-stack" style={{ gap: 'var(--tg-space-sm)' }}>
                 {overview.recent_messages.map((message) => (
@@ -291,10 +316,9 @@ export default function AccountDetailDrawer({ accountId, handlers, onClose }: Pr
             ) : (
               <div className="tg-muted">最近没有消息。</div>
             )}
-          </section>
+          </CollapsibleSection>
 
-          <section className="tg-detail-section">
-            <div className="tg-detail-section-title">最近任务</div>
+          <CollapsibleSection title="最近任务" defaultOpen={true}>
             {overview.recent_tasks.length ? (
               <div className="tg-stack" style={{ gap: 'var(--tg-space-sm)' }}>
                 {overview.recent_tasks.map((task) => (
@@ -322,10 +346,9 @@ export default function AccountDetailDrawer({ accountId, handlers, onClose }: Pr
             ) : (
               <div className="tg-muted">最近没有任务。</div>
             )}
-          </section>
+          </CollapsibleSection>
 
-          <section className="tg-detail-section">
-            <div className="tg-detail-section-title">最近审计</div>
+          <CollapsibleSection title="最近审计" defaultOpen={false}>
             {overview.recent_audit.length ? (
               <div className="tg-stack" style={{ gap: 'var(--tg-space-sm)' }}>
                 {overview.recent_audit.map((entry) => (
@@ -353,7 +376,7 @@ export default function AccountDetailDrawer({ accountId, handlers, onClose }: Pr
             ) : (
               <div className="tg-muted">最近没有操作记录。</div>
             )}
-          </section>
+          </CollapsibleSection>
         </div>
       ) : null}
     </DetailDrawer>

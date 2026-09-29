@@ -2,7 +2,7 @@
  * 任务详情抽屉：基本信息 + 时间线 + payload / result / error（格式化 JSON 可复制）。
  * 打开时用 taskApi.get 拉最新一条，footer 提供重试 / 取消。
  */
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Button, Space, Typography } from 'antd';
 import { RedoOutlined, StopOutlined } from '@ant-design/icons';
 import {
@@ -14,7 +14,7 @@ import {
   type DetailSection,
 } from '../../components';
 import { taskApi } from '../../api/endpoints';
-import { useAsyncData } from '../../hooks/useAsyncData';
+import { useAsyncData, useInterval } from '../../hooks/useAsyncData';
 import { formatTime } from '../../utils/format';
 import type { TaskOut } from '../../api/types';
 import { JsonBlock } from './JsonBlock';
@@ -25,6 +25,16 @@ interface TaskDetailDrawerProps {
   onRetry: (task: TaskOut) => void;
   onCancel: (task: TaskOut) => void;
 }
+
+/** 没有日志时按状态给一句人话——留白会让人以为功能坏了 */
+const EMPTY_LOG_HINT: Record<string, string> = {
+  pending: '排队中：等 Worker 认领这个号之后开始执行，日志会写在这里',
+  running: '执行中：正在跑，日志马上出来（抽屉开着会自动刷新）',
+  failed: '已失败，但没有留下执行日志——可以点下面的「重试」重新排队',
+  completed: '已完成，但没有产生日志条目（该任务类型可能不上报步骤）',
+  cancelled: '已取消',
+  pending_confirmation: '等待确认后才开始执行，日志会在执行时写入',
+};
 
 export function TaskDetailDrawer({ taskId, onClose, onRetry, onCancel }: TaskDetailDrawerProps) {
   const detail = useAsyncData<TaskOut>(() => taskApi.get(taskId as string), [taskId], {
@@ -42,6 +52,18 @@ export function TaskDetailDrawer({ taskId, onClose, onRetry, onCancel }: TaskDet
 
   const task = detail.data;
 
+  // 任务还在排队 / 执行中时定时拉最新：日志是逐步追加的，抽屉开着就能实时看到
+  useInterval(() => {
+    if (!taskId) return;
+    if (task?.status === 'pending' || task?.status === 'running') void detail.reload();
+  }, 5000);
+
+  // 执行日志：与列表页展开的那份同源（result.logs）
+  const logs = useMemo(() => {
+    const raw = (task?.result as Record<string, unknown> | null)?.logs;
+    return Array.isArray(raw) ? (raw as { at: string; stage: string; detail: string }[]) : [];
+  }, [task]);
+
   const canRetry = task?.status === 'failed' || task?.status === 'pending_confirmation';
   const canCancel =
     task?.status === 'pending' ||
@@ -50,6 +72,36 @@ export function TaskDetailDrawer({ taskId, onClose, onRetry, onCancel }: TaskDet
 
   const sections: DetailSection[] = task
     ? [
+        {
+          title: '执行日志',
+          content: logs.length ? (
+            <div className="tg-stack" style={{ gap: 'var(--tg-space-sm)' }}>
+              {logs.map((entry, index) => (
+                <div
+                  key={`${entry.at}-${index}`}
+                  style={{ display: 'flex', gap: 'var(--tg-space-md)', alignItems: 'baseline' }}
+                >
+                  <span
+                    style={{
+                      flex: 'none',
+                      color: 'var(--tg-color-text-tertiary)',
+                      fontSize: 'var(--tg-font-size-xs)',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {formatTime(entry.at)}
+                  </span>
+                  <span style={{ flex: 'none', color: 'var(--tg-color-text-secondary)' }}>{entry.stage}</span>
+                  <span style={{ color: 'var(--tg-color-text-primary)' }}>{entry.detail}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Typography.Text type="secondary">
+              {EMPTY_LOG_HINT[task.status] ?? '这个任务还没有日志。'}
+            </Typography.Text>
+          ),
+        },
         {
           title: '基本信息',
           items: [

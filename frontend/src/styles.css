@@ -3352,3 +3352,25 @@ body .ant-spin-container::after {
   color: var(--tg-color-text-secondary);
 }
 .tg-task-logs-error { color: #d4380d !important; }
+
+/* 详情分区标题做成可点击的折叠开关 */
+.tg-collapsible {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.tg-collapsible:hover { color: var(--tg-color-primary); }
+.tg-collapse-caret {
+  font-size: 10px;
+  color: var(--tg-color-text-secondary);
+  width: 10px;
+  flex-shrink: 0;
+}

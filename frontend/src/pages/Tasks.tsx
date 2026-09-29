@@ -100,11 +100,9 @@ export default function Tasks() {
 
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  // 展开行控制：「日志」按钮和行首的展开箭头共用这一份状态，
-  // 之前只能点那个不起眼的小箭头才能看到日志，很多人根本不知道有这功能
+  // 展开行只由行首那个箭头控制；「日志」按钮走右侧详情抽屉（TaskDetailDrawer），
+  // 抽屉里能看完整的执行日志 + payload / result，比展开一行宽敞得多
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
-  const toggleExpanded = (id: string) =>
-    setExpandedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const [batchRetrying, setBatchRetrying] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -370,6 +368,9 @@ export default function Tasks() {
         key: 'worker_id',
         dataIndex: 'worker_id',
         width: 130,
+        // 形如 主机名-pid（duannaideMac-mini.local-7640），一行放不下——
+        // 截断加悬停提示，别让它换行把行高撑起来
+        ellipsis: { showTitle: true },
         render: (value: string | null) =>
           value ? (
             <Typography.Text code style={{ fontSize: 'var(--tg-font-size-sm)' }}>
@@ -394,9 +395,9 @@ export default function Tasks() {
           return (
             <Space size={0}>
               <Tooltip
-                title={logCount ? `展开看执行日志（${logCount} 条，执行中会实时追加）` : '还没有日志——任务开始执行后这里会实时刷新'}
+                title={logCount ? `打开日志抽屉（${logCount} 条，执行中会实时追加）` : '打开任务抽屉——开始执行后日志会实时刷新'}
               >
-                <Button type="text" size="small" onClick={() => toggleExpanded(record.id)}>
+                <Button type="text" size="small" onClick={() => setDetailId(record.id)}>
                   日志{logCount ? ` ${logCount}` : ''}
                 </Button>
               </Tooltip>
@@ -719,7 +720,9 @@ export default function Tasks() {
         sortOrder={q.order}
         onSortChange={q.setSort}
         columnSettingsKey="tasks"
-        scrollX={1500}
+        // 这个值必须 >= 所有列宽之和（42+150+130+120+150+320+100+150+150+150+130+230 = 1822）；
+        // 给小了表格会把列压扁，右侧固定的「操作」列就和 Worker 列叠在一起
+        scrollX={1822}
         expandable={expandable}
         onExport={handleExport}
         toolbar={
