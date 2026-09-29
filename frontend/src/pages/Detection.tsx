@@ -85,6 +85,22 @@ export default function Detection() {
     void runCheck({ account_ids: failedRows.map((row) => row.account_id), scope: 'selected' }, `重试 ${failedRows.length} 个失败项`);
   };
 
+  // 封号 / 停用 / 失效的号不该挂在检测页占位置——默认只列还能检测的号，
+  // 需要时用开关把它们调出来（检测本身对失效号没意义：它连不上）。
+  const [showDead, setShowDead] = useState(false);
+  const visibleAccounts = useMemo(() => {
+    const items = accounts.data?.items ?? [];
+    if (showDead) return items;
+    return items.filter((item) => item.status !== 'disabled' && item.status !== 'dead' && item.status !== 'invalid');
+  }, [accounts.data, showDead]);
+  const hiddenCount = (accounts.data?.items?.length ?? 0) - visibleAccounts.length;
+
+  const deadToggle = (
+    <Checkbox checked={showDead} onChange={(e) => setShowDead(e.target.checked)}>
+      显示已停用 / 失效的号{hiddenCount > 0 ? `（已隐藏 ${hiddenCount} 个）` : ''}
+    </Checkbox>
+  );
+
   const pageIds = useMemo(() => (accounts.data?.items ?? []).map((item) => item.id), [accounts.data]);
 
   const accountColumns: ColumnsType<AccountOut> = [
@@ -219,6 +235,7 @@ export default function Detection() {
       description="检测会写一条账号检测任务，Worker 读到后回写状态；结果为「连得上 / 要验证码 / 会话失效」。"
       actions={
         <Space wrap>
+        {deadToggle}
           <Button
             icon={<SafetyCertificateOutlined />}
             disabled={!selection.count}
@@ -280,7 +297,7 @@ export default function Detection() {
       <DataTable<AccountOut>
         rowKey="id"
         columns={accountColumns}
-        dataSource={accounts.data?.items ?? []}
+        dataSource={visibleAccounts}
         loading={accounts.loading}
         error={accounts.error}
         onRetry={() => void accounts.reload()}
