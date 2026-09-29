@@ -287,16 +287,55 @@ class CampaignTasksMixin:
 
         `material` 非空时发的是素材（图片/视频/文档），文本作为配文（caption）一起发——
         这样「批量私信 / 群发」也能带图带文件，不必非走单独的素材群发入口。
+
+        内容形态（都在 payload 里开关，互斥按优先级：转发 > 名片 > 素材 > 纯文本）：
+        - `parse_mode`：`md`/`html` 让文字支持**加粗/斜体/引用/代码块**（对手叫「广告文字格式」）；
+        - `forward_from_chat_id` + `forward_from_message_id`：转发某条消息，
+          配 `drop_author` 可**隐藏原来源**；
+        - `contact_phone` 等：发**名片**（vCard）。
         """
-        if material is not None and getattr(material, "kind", None) != MaterialKind.text:
+        payload = dict(task.payload or {})
+        # 内容形态：富文本解析模式（Telegram 原生 Markdown/HTML）
+        parse_mode = str(payload.get("parse_mode") or "").strip() or None
+        if parse_mode not in ("md", "markdown", "html"):
+            parse_mode = None
+
+        # 转发模式：把某个群/频道里的某条消息原样转过来，可选隐藏原来源
+        forward_chat = payload.get("forward_from_chat_id")
+        forward_message = payload.get("forward_from_message_id")
+        if forward_chat is not None and forward_message is not None:
+            sent = await client.forward_messages(
+                entity,
+                messages=int(forward_message),
+                from_peer=int(forward_chat),
+                # 彩虹那类工具叫「隐藏转发频道」：转发后不显示原频道署名
+                drop_author=bool(payload.get("drop_author", False)),
+            )
+            text = text or f"[转发 {forward_chat}#{forward_message}]"
+        elif payload.get("contact_phone"):
+            # 名片：把联系人信息作为 vCard 发出去（加好友/引荐场景）
+            contact = functions.messages.InputMediaContact(
+                phone_number=str(payload["contact_phone"]),
+                first_name=str(payload.get("contact_first_name") or ""),
+                last_name=str(payload.get("contact_last_name") or ""),
+                vcard="",
+            )
+            sent = await client(
+                functions.messages.SendMediaRequest(
+                    peer=entity, media=contact, message=text or "", random_id=utils.get_random_long()
+                )
+            )
+        elif material is not None and getattr(material, "kind", None) != MaterialKind.text:
             path = self._material_path(material)
             kwargs: dict[str, Any] = {"caption": text or None}
             if material.kind == MaterialKind.document:
                 kwargs["force_document"] = True
+            if material.kind == MaterialKind.photo and parse_mode:
+                kwargs["parse_mode"] = parse_mode
             sent = await client.send_file(entity, path, reply_to=reply_to, **kwargs)
             text = text or f"[{MATERIAL_KIND_LABELS.get(material.kind.value, material.kind.value)}]"
         else:
-            sent = await client.send_message(entity, text, reply_to=reply_to)
+            sent = await client.send_message(entity, text, reply_to=reply_to, parse_mode=parse_mode)
         await self._record_campaign_sent(session, task, account, entity, text, sent)
         # 每发出一条就记一个额度：吵群/拟人这类高频动作会很快撞到当日上限
         await self._throttle_record(account, task, cost=1)

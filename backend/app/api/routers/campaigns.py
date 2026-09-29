@@ -288,6 +288,14 @@ async def bulk_pm(
         "max_interval": payload.max_interval,
         # 可选附带素材：文本作为配文一起发
         "material_id": str(payload.material_id) if payload.material_id else None,
+        # 内容形态：富文本 / 转发（可隐藏来源）/ 名片
+        "parse_mode": payload.parse_mode,
+        "forward_from_chat_id": payload.forward_from_chat_id,
+        "forward_from_message_id": payload.forward_from_message_id,
+        "drop_author": payload.drop_author,
+        "contact_phone": payload.contact_phone,
+        "contact_first_name": payload.contact_first_name,
+        "contact_last_name": payload.contact_last_name,
     }
     await _ensure_material(session, payload.material_id)
     round_robin = payload.dispatch == "round_robin"
@@ -322,6 +330,10 @@ async def group_broadcast(
         "text": payload.text,
         "naturalize": payload.naturalize,
         "material_id": str(payload.material_id) if payload.material_id else None,
+        "parse_mode": payload.parse_mode,
+        "forward_from_chat_id": payload.forward_from_chat_id,
+        "forward_from_message_id": payload.forward_from_message_id,
+        "drop_author": payload.drop_author,
     }
     return await _submit_campaign(
         action="campaign.group_broadcast",

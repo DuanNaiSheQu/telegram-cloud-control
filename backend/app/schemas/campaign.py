@@ -95,6 +95,18 @@ class BulkPmRequest(BulkScopeRequest, _TextPoolMixin):
     auto_supply: bool = Field(
         default=False, description="选中的号不足时，自动从可用的号里补足（补号只挑状态正常的）"
     )
+    # ---- 内容形态：富文本 / 转发（可隐藏来源）/ 名片 ----
+    parse_mode: str = Field(
+        default="",
+        pattern=r"^$|^(md|markdown|html)$",
+        description="富文本解析：md 支持**加粗**、*斜体*、> 引用、`代码`；html 支持 <b> 等；留空=纯文本",
+    )
+    forward_from_chat_id: Optional[int] = Field(default=None, description="转发来源会话 id（与消息 id 成对使用）")
+    forward_from_message_id: Optional[int] = Field(default=None, description="转发来源消息 id")
+    drop_author: bool = Field(default=False, description="转发时隐藏原来源（对手叫「隐藏转发频道」）")
+    contact_phone: str = Field(default="", max_length=32, description="发名片：手机号")
+    contact_first_name: str = Field(default="", max_length=64, description="发名片：名")
+    contact_last_name: str = Field(default="", max_length=64, description="发名片：姓")
     # ---- 多通道：账号私信 / Bot 私信 ----
     via_bot: bool = Field(
         default=False,
@@ -121,6 +133,19 @@ class GroupBroadcastRequest(BulkScopeRequest, _TextPoolMixin):
         description="可选：附带素材（图片/视频/文档），文本会作为配文一起发；不填则只发文本",
     )
 
+
+    # ---- 内容形态：富文本 / 转发（可隐藏来源）/ 名片 ----
+    parse_mode: str = Field(
+        default="",
+        pattern=r"^$|^(md|markdown|html)$",
+        description="富文本解析：md 支持**加粗**、*斜体*、> 引用、`代码`；html 支持 <b> 等；留空=纯文本",
+    )
+    forward_from_chat_id: Optional[int] = Field(default=None, description="转发来源会话 id（与消息 id 成对使用）")
+    forward_from_message_id: Optional[int] = Field(default=None, description="转发来源消息 id")
+    drop_author: bool = Field(default=False, description="转发时隐藏原来源（对手叫「隐藏转发频道」）")
+    contact_phone: str = Field(default="", max_length=32, description="发名片：手机号")
+    contact_first_name: str = Field(default="", max_length=64, description="发名片：名")
+    contact_last_name: str = Field(default="", max_length=64, description="发名片：姓")
 
 class MaterialSendRequest(BulkScopeRequest):
     material_id: uuid.UUID = Field(description="素材库里的素材")
