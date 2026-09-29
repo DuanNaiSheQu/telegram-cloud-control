@@ -592,6 +592,8 @@ export interface DashboardOut {
   tasks_failed: number;
   tasks_overdue: number;
   tasks_stuck: number;
+  /** Worker 是否能连 Telegram；false = 没配 TELEGRAM_API_ID/HASH，任务不会执行 */
+  telegram_ready: boolean;
   workers: WorkerStatus[];
   recent_failures: FailedTaskOut[];
   generated_at?: ISODateTime | null;

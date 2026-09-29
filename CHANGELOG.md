@@ -7,6 +7,26 @@
 
 ---
 
+## v0.3.28 — 2026-03-30
+
+主题：**界面上直接告诉你为什么任务不执行**（缺 Telegram API 凭据）。
+
+### 新增
+
+- 工作台顶部新增醒目提示：当 `TELEGRAM_API_ID / TELEGRAM_API_HASH` 没配置时，明确说明
+  「Worker 空转中，不会连接 Telegram，任务也不会执行」，并给出三步申请指引
+  （my.telegram.org → 登录 → API development tools → 创建应用 → 把 api_id / api_hash 填进
+  `backend/.env` → 重启），附常见提醒（一套凭据可多用、号多建议分套、别用网上公开的 api_id）。
+- 后端 `/api/dashboard` 增加 `telegram_ready` 字段（`false` 表示缺凭据），前端据此判断显示。
+
+### 说明
+
+这不是本系统的限制：任何第三方 Telegram 客户端（包括所有云控面板）都必须使用自己申请的
+api_id / api_hash 才能连接 MTProto，申请免费。没配时 Worker 只认领租约与发心跳，
+账号不会上线、任务停在队列里——这是预期的空转行为。
+
+---
+
 ## v0.3.27 — 2026-03-30
 
 主题：**tdata 导入的账号标识可读**——不再是一串 `tdata#0`。

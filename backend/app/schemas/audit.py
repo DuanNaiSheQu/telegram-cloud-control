@@ -68,6 +68,8 @@ class DashboardOut(BaseModel):
     tasks_failed: int = 0
     tasks_overdue: int = 0
     tasks_stuck: int = 0
+    # Worker 是否能连 Telegram：没配 TELEGRAM_API_ID/HASH 时为空转状态
+    telegram_ready: bool = True
     workers: List[WorkerStatus] = []
     recent_failures: List[FailedTaskOut] = []
     generated_at: Optional[datetime] = None

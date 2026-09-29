@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.api.deps import get_current_user, get_session, visible_account_ids
 from app.api.routers import account_label, enum_value, task_out, utcnow
 from app.core import events
@@ -54,7 +55,11 @@ async def dashboard(
     """一次性给出页面四块（账号 / 会话 / 任务 / Worker）需要的数字，避免前端连发十几个请求。"""
     ids = await visible_account_ids(session, user)
     now = utcnow()
-    out = DashboardOut(generated_at=now)
+    out = DashboardOut(
+        generated_at=now,
+        # 没配 Telegram 凭据时 Worker 只认领租约不连 Telegram，页面需要明确提示
+        telegram_ready=bool(settings.telegram_api_id and settings.telegram_api_hash),
+    )
 
     # ---------- 账号 ----------
     account_scope = [TgAccount.id.in_(ids)] if ids is not None else []

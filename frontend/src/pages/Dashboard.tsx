@@ -221,6 +221,36 @@ export default function Dashboard() {
       }
       actions={
         <Space>
+
+      {data && data.telegram_ready === false ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="未配置 Telegram API 凭据，Worker 空转中：不会连接 Telegram，任务也不会执行"
+          description={
+            <span className="tg-stack" style={{ gap: 'var(--tg-space-xs)' }}>
+              <span>
+                这不是本系统的限制，而是 Telegram 的机制：任何第三方客户端（包括本系统、各类云控面板）都必须用自己申请的
+                <code> api_id / api_hash </code>才能连接。申请免费，几分钟就好：
+              </span>
+              <span>
+                1. 打开 <a href="https://my.telegram.org" target="_blank" rel="noreferrer">my.telegram.org</a> →
+                用你的手机号登录（收到的验证码填进去）；
+              </span>
+              <span>2. 进 <b>API development tools</b> → 随便填个应用名（App title / Short name）→ 创建；</span>
+              <span>
+                3. 把页面上的 <code>api_id</code>（数字）与 <code>api_hash</code>（32 位字符串）填进
+                <code> backend/.env </code>，然后 <code>make stack-down && make stack-up</code> 重启。
+              </span>
+              <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
+                提示：一套凭据可以给多个号用；号多时建议分几套，避免一套被限流牵连全部账号。
+                不要用网上公开的 api_id，那会被封。
+              </span>
+            </span>
+          }
+          style={{ marginBottom: 'var(--tg-layout-page-gap)' }}
+        />
+      ) : null}
           <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-sm)' }}>
             自动刷新（15 秒） <Switch size="small" checked={autoRefresh} onChange={setAutoRefresh} />
           </span>
