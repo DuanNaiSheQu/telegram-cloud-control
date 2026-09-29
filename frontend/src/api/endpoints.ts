@@ -161,6 +161,9 @@ export const accountApi = {
  * 明确不做批量私信 / 群发 / 加群 / 改资料（见 规划.md「不做这些」）。
  */
 export const accountBulkApiExtra = {
+  /** 申诉解封：模拟真人给官方 @SpamBot 发 /start 并点击「这是误判」（24 小时内不重复） */
+  appeal: (payload: BulkWarmupRequest & { with_warmup?: boolean }) =>
+    api.post<BulkResultOut>('/api/accounts/bulk/appeal', payload),
   /** 官方机制养号：上线/翻会话/下线，不发消息；可选同步官方限制参数 */
   warmup: (payload: BulkWarmupRequest) => api.post<BulkResultOut>('/api/accounts/bulk/warmup', payload),
   /** 深度验活：连得上 + 会话有效 + 读写权限，复算健康分 */

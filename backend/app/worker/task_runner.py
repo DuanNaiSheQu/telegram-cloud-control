@@ -139,6 +139,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             TaskType.collect_link.value: self._collect_link,
             TaskType.sync_official.value: self._sync_official,
             TaskType.warmup_activity.value: self._warmup_activity,
+            TaskType.appeal_spam.value: self._appeal_spam,
         }
 
     # ---------------- 执行入口 ----------------

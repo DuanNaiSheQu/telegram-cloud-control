@@ -80,6 +80,10 @@ export default function Accounts() {
   const [bulkResult, setBulkResult] = useState<BulkResultOut | null>(null);
   // 账号矩阵入口：导入向导、深度验活、节流设置
   const [importOpen, setImportOpen] = useState(false);
+  // 申诉解封：模拟真人向官方 @SpamBot 走一遍流程（24 小时内不重复）
+  const [appealOpen, setAppealOpen] = useState(false);
+  const [appealBusy, setAppealBusy] = useState(false);
+  const [appealWarmup, setAppealWarmup] = useState(true);
   const [warmupOpen, setWarmupOpen] = useState(false);
   const [warmupBusy, setWarmupBusy] = useState(false);
   const [warmupForm] = Form.useForm();
@@ -354,6 +358,29 @@ export default function Accounts() {
     ),
   };
 
+  // 申诉解封：给 @SpamBot 发 /start → 看判定 → 点「这是误判」，可选顺带养号
+  const runAppeal = async () => {
+    if (!selection.count) {
+      toast.warning('先在列表里勾选要申诉的账号');
+      return;
+    }
+    setAppealBusy(true);
+    try {
+      const res = await accountBulkApiExtra.appeal({
+        scope: 'selected',
+        account_ids: selection.selectedIds,
+        with_warmup: appealWarmup,
+      });
+      setAppealOpen(false);
+      setBulkResult(res);
+      reloadAll();
+    } catch {
+      /* client 已统一提示 */
+    } finally {
+      setAppealBusy(false);
+    }
+  };
+
   // 官方机制养号：上线/翻会话/下线，不发消息
   const runWarmup = async () => {
     if (!selection.count) {
@@ -491,6 +518,7 @@ export default function Accounts() {
   const columns: ColumnsType<AccountOut> = [selectColumn, clientColumn, apiColumn, healthColumn, ...baseColumns];
 
   const bulkMenuItems = [
+    { key: 'appeal', label: '申诉解封（@SpamBot）' },
     { key: 'warmup', label: '官方养号（上线/翻会话）' },
     { key: 'probe', label: '深度验活（健康分）' },
     { key: 'throttle', label: '设置发送节流（防封）' },
@@ -748,6 +776,28 @@ export default function Accounts() {
           reloadAll();
         }}
       />
+
+      <Modal
+        open={appealOpen}
+        title="申诉解封（模拟真人走官方流程）"
+        okText="发起申诉"
+        cancelText="取消"
+        confirmLoading={appealBusy}
+        onCancel={() => setAppealOpen(false)}
+        onOk={() => void runAppeal()}
+      >
+        <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
+          <Alert
+            type="info"
+            showIcon
+            message={`将对选中的 ${selection.count} 个号发起申诉`}
+            description="流程和真人一样：打开官方 @SpamBot → 发 /start → 读它的判定 → 有「这是误判」按钮就点一下 → 记录结果。同一账号 24 小时内只申诉一次（反复打扰官方反而更难解），结论会写回账号状态。"
+          />
+          <Checkbox checked={appealWarmup} onChange={(event) => setAppealWarmup(event.target.checked)}>
+            申诉后顺带跑一轮官方养号（真人被限制后也是照常刷消息，更像正常用户）
+          </Checkbox>
+        </div>
+      </Modal>
 
       <Modal
         open={warmupOpen}

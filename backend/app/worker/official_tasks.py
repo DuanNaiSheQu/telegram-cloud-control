@@ -23,7 +23,7 @@ from typing import Any, Optional
 
 from telethon import functions
 
-from app.models import Task, TgAccount
+from app.models import AccountStatus, Task, TgAccount
 from app.services.official import extract_dc_options, extract_official_limits
 from app.worker.humanize import human_delay
 from app.worker.telethon_account import TaskFailure, describe_exception, flood_wait_seconds
@@ -35,8 +35,143 @@ def _now() -> datetime:
     return datetime.now(tz=timezone.utc)
 
 
+#: Telegram 官方申诉入口（所有被限制的账号都是找它）
+SPAMBOT_USERNAME = "SpamBot"
+#: 同一账号两次申诉的最小间隔：频繁打扰 SpamBot 只会适得其反
+APPEAL_COOLDOWN_HOURS = 24
+#: 点按钮时的关键词：SpamBot 的按钮文案随语言变化，这里中英都认
+APPEAL_BUTTON_KEYWORDS = (
+    "mistake",
+    "error",
+    "not sure",
+    "wrong",
+    "误",
+    "错",
+    "不对",
+    "没有",
+    "违规",
+    "appeal",
+    "submit",
+)
+
+
 class OfficialTasksMixin:
-    """官方机制相关的两个任务。"""
+    """官方机制相关的任务。"""
+
+    async def _appeal_spam(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
+        """模拟真人向 @SpamBot 申诉解封。
+
+        真人被限制时的操作就是这个流程：打开 SpamBot → 发 /start → 看它怎么说 →
+        有「This is a mistake」按钮就点一下 → 等结果。这里把它自动化，并且：
+        - **同一账号 24 小时只申诉一次**（反复骚扰官方反而更难解）；
+        - 只做正常会话动作，不发任何骚扰内容；
+        - 结束把结论写回账号（无限制 → 恢复正常；已提交申诉 → 记状态与风险标记）。
+        """
+        assert account is not None
+        client = self._client(account.id)
+
+        # 0) 限频：看上次申诉时间
+        flags = dict(account.risk_flags or {})
+        last_at = flags.get("last_appeal_at")
+        if last_at:
+            try:
+                since = (_now() - datetime.fromisoformat(str(last_at))).total_seconds() / 3600
+                if since < APPEAL_COOLDOWN_HOURS:
+                    raise TaskFailure(
+                        f"该号 {since:.1f} 小时前刚申诉过，{APPEAL_COOLDOWN_HOURS} 小时内不重复申诉"
+                        "（频繁打扰 SpamBot 会适得其反）",
+                        retryable=False,
+                    )
+            except ValueError:
+                pass
+
+        # 1) 找到官方申诉入口
+        try:
+            resolved = await client(functions.contacts.ResolveUsernameRequest(username=SPAMBOT_USERNAME))
+        except BaseException as exc:  # noqa: BLE001
+            raise TaskFailure(f"找不到 @{SPAMBOT_USERNAME}：{describe_exception(exc)}", retryable=True, requeue_after=120) from exc
+        if not resolved.users:
+            raise TaskFailure(f"@{SPAMBOT_USERNAME} 解析失败，稍后重试", retryable=True, requeue_after=120)
+        peer = resolved.users[0]
+
+        outcome: dict[str, Any] = {"spambot": SPAMBOT_USERNAME}
+        try:
+            # 2) 发 /start（真人第一步也是这个）
+            await client.send_message(peer, "/start")
+            outcome["sent"] = "/start"
+            await asyncio.sleep(random.uniform(4.0, 9.0))  # 像真人一样等它回
+
+            # 3) 读它怎么说
+            messages = await client.get_messages(peer, limit=5)
+            if not messages:
+                raise TaskFailure("SpamBot 没有回复，稍后重试", retryable=True, requeue_after=300)
+            latest = messages[0]
+            text = (latest.message or "").strip()
+            outcome["reply"] = text[:600]
+            lowered = text.lower()
+
+            no_limit_markers = ("no limits", "free as a bird", "not limited", "no restriction")
+            if any(marker in lowered for marker in no_limit_markers):
+                outcome["verdict"] = "no_limits"
+                account.status = AccountStatus.healthy
+                account.status_reason = ""
+                account.last_error = ""
+            else:
+                # 4) 有「这是误判」按钮就点它
+                clicked_text = ""
+                buttons = getattr(latest, "buttons", None) or []
+                for row in buttons:
+                    for button in row:
+                        label = (getattr(button, "text", "") or "").strip()
+                        if any(key in label.lower() for key in APPEAL_BUTTON_KEYWORDS):
+                            try:
+                                await button.click()
+                                clicked_text = label
+                                break
+                            except BaseException as exc:  # noqa: BLE001 - 单个按钮失败继续找下一个
+                                self.log.warning("点击申诉按钮失败：%s", describe_exception(exc))
+                    if clicked_text:
+                        break
+
+                if clicked_text:
+                    outcome["clicked"] = clicked_text
+                    await asyncio.sleep(random.uniform(3.0, 7.0))
+                    after = await client.get_messages(peer, limit=3)
+                    if after:
+                        outcome["after"] = (after[0].message or "")[:600]
+                    outcome["verdict"] = "appealed"
+                    account.status_reason = f"已向 @{SPAMBOT_USERNAME} 提交申诉（按钮：{clicked_text}），等待结果"
+                else:
+                    outcome["verdict"] = "limited_no_button"
+                    # 把它的原话留下，便于人工判断下一步
+                    account.status_reason = f"SpamBot 判定有限制，但没找到申诉按钮：{text[:180]}"
+
+            flags = dict(account.risk_flags or {})
+            flags["last_appeal_at"] = _now().isoformat()
+            flags["last_appeal_verdict"] = outcome.get("verdict")
+            if "reply" in outcome:
+                flags["last_spambot_reply"] = outcome["reply"][:300]
+            account.risk_flags = flags
+            account.last_checked_at = _now()
+            await session.flush()
+        except TaskFailure:
+            raise
+        except BaseException as exc:  # noqa: BLE001
+            await self._apply_status(session, account, exc)
+            raise self._failure(exc, "申诉解封失败") from exc
+
+        self.log.info(
+            "申诉流程完成",
+            extra={
+                "worker_id": self.worker.worker_id,
+                "account_id": str(account.id),
+                "task_id": str(task.id),
+                "verdict": outcome.get("verdict"),
+                "clicked": bool(outcome.get("clicked")),
+            },
+        )
+        return outcome
+
 
     async def _sync_official(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """同步服务端下发的官方限制参数（并顺带记录 DC / 连接配置）。"""

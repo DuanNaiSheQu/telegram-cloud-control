@@ -100,6 +100,14 @@ class BulkWarmupRequest(BulkScopeRequest):
     sync_limits: bool = Field(default=True, description="同时排队一条官方参数同步任务")
 
 
+class BulkAppealRequest(BulkScopeRequest):
+    """申诉解封：模拟真人向官方 @SpamBot 走一遍申诉流程。"""
+
+    with_warmup: bool = Field(
+        default=True, description="申诉后顺带排一轮官方养号（真人被限制后也是照常刷消息）"
+    )
+
+
 class AccountMatrixState(BaseModel):
     """账号页展示用：健康分、风险标记与节流快照。"""
 

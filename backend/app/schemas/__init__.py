@@ -89,6 +89,7 @@ from app.schemas.matrix import (
     BulkProbeRequest,
     BulkThrottleRequest,
     BulkWarmupRequest,
+    BulkAppealRequest,
     ImportItemPreview,
 )
 from app.schemas.dialog import (

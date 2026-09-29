@@ -48,6 +48,7 @@ from app.models import (
 )
 from app.schemas import (
     BulkAccountResult,
+    BulkAppealRequest,
     BulkWarmupRequest,
     BulkProbeRequest,
     BulkThrottleRequest,
@@ -812,6 +813,92 @@ async def bulk_warmup(
             f"已排队 {len(items)} 个号的养号活动"
             + ("（含官方参数同步）" if payload.sync_limits else "")
             + "；活动期间只上线与翻会话，不发任何消息"
+        ),
+        truncated=truncated,
+        task_ids=task_ids,
+    )
+
+# ---------------- 申诉解封（模拟真人走官方流程） ----------------
+
+@router.post("/appeal", response_model=BulkResultResponse, summary="申诉解封（模拟真人给 @SpamBot 发 /start 并点击申诉）")
+async def bulk_appeal(
+    payload: BulkAppealRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """对被限制/冻结的号排队「申诉解封」：模拟真人操作官方 @SpamBot。
+
+    流程就是真人会做的：打开 SpamBot → 发 `/start` → 看它判定 → 有「这是误判」按钮就点一下 → 记录结果。
+    几个安全边界：
+
+    - **同一账号 24 小时只申诉一次**（反复打扰官方反而更难解）；
+    - 只做正常会话动作，不发送任何内容给对方之外的任何人；
+    - 结论写回账号：无限制 → 恢复正常；已提交 → 记下按钮与等待状态。
+    """
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload)
+    if not accounts:
+        raise _empty()
+
+    items: List[BulkAccountResult] = []
+    task_ids: List[uuid.UUID] = []
+    for account in accounts:
+        # 24 小时内申诉过就跳过，省得白排一条注定失败的任务
+        flags = dict(account.risk_flags or {})
+        last_at = flags.get("last_appeal_at")
+        if last_at:
+            try:
+                hours = (datetime.now(tz=timezone.utc) - datetime.fromisoformat(str(last_at))).total_seconds() / 3600
+                if hours < 24:
+                    items.append(_item(account, ok=False, message=f"{hours:.1f} 小时前刚申诉过，24 小时内不重复"))
+                    continue
+            except ValueError:
+                pass
+        try:
+            task = await enqueue_task(
+                session,
+                type=TaskType.appeal_spam,
+                account_id=account.id,
+                payload={"source": "bulk_appeal"},
+                created_by=user.id,
+                priority=55,
+            )
+            task_ids.append(task.id)
+            note = "申诉解封"
+            if payload.with_warmup:
+                warm = await enqueue_task(
+                    session,
+                    type=TaskType.warmup_activity,
+                    account_id=account.id,
+                    payload={"rounds": 1, "source": "bulk_appeal"},
+                    created_by=user.id,
+                    priority=60,
+                )
+                task_ids.append(warm.id)
+                note += " + 养号一轮"
+            items.append(_item(account, message=note))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("申诉入队失败 account_id=%s: %s", account.id, exc)
+            items.append(_item(account, ok=False, message=f"入队失败：{exc}"))
+
+    await write_audit(
+        session,
+        action="account.bulk_appeal",
+        user_id=user.id,
+        target_type="account_batch",
+        target_id=scope,
+        detail={"count": len(items), "with_warmup": payload.with_warmup, "truncated": truncated},
+    )
+    await session.commit()
+    await publish_task_safely(
+        {"task_id": None, "type": TaskType.appeal_spam.value, "ok": True, "detail": f"申诉解封排队 {len(task_ids)} 条任务"}
+    )
+    return _response(
+        "appeal",
+        accounts,
+        items,
+        message=(
+            f"已排队 {len(items)} 个号的申诉流程（模拟真人给 @SpamBot 发 /start 并点击申诉）"
+            + ("；每个号顺带养号一轮" if payload.with_warmup else "")
         ),
         truncated=truncated,
         task_ids=task_ids,
