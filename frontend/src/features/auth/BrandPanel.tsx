@@ -79,10 +79,10 @@ export default function BrandPanel() {
         </div>
         <div className="login-brand-sponsors-row">
           <a href="https://cafinx.com" target="_blank" rel="noreferrer" title="CAFINX 虚拟卡 · 跨境收付">
-            <img src="/sponsors/cafinx.png" alt="CAFINX 虚拟卡" className="login-brand-sponsor-logo is-wide" />
+            <img src="/sponsors/cafinx-white.png" alt="CAFINX 虚拟卡" className="login-brand-sponsor-logo is-wide" />
           </a>
           <a href="https://cafinxsim.com" target="_blank" rel="noreferrer" title="CAFINXSIM · 全球 eSIM 流量卡">
-            <img src="/sponsors/cafinxsim.png" alt="CAFINXSIM" className="login-brand-sponsor-logo is-wide" />
+            <img src="/sponsors/cafinxsim-white.png" alt="CAFINXSIM" className="login-brand-sponsor-logo is-wide" />
           </a>
         </div>
         <div className="login-brand-links">
