@@ -161,7 +161,10 @@ function buildHeaders(body: unknown, accept = 'application/json'): Record<string
   const headers: Record<string, string> = { Accept: accept };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  // FormData（文件上传）必须让浏览器自己设 Content-Type（要带 boundary），
+  // 手写 application/json 会让后端收不到文件
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json';
   return headers;
 }
 
@@ -218,7 +221,17 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     try {
       response = await fetchWithTimeout(
         url,
-        { method, headers: buildHeaders(body), body: body === undefined ? undefined : JSON.stringify(body) },
+        {
+          method,
+          headers: buildHeaders(body),
+          // FormData 原样交给 fetch（浏览器负责编码与 boundary），其它对象才 JSON 序列化
+          body:
+            body === undefined
+              ? undefined
+              : typeof FormData !== 'undefined' && body instanceof FormData
+                ? (body as FormData)
+                : JSON.stringify(body),
+        },
         timeoutMs,
         signal,
       );

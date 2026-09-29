@@ -7,6 +7,27 @@
 
 ---
 
+## v0.3.23 — 2026-03-30
+
+主题：**修文件上传**——上传的 zip / .session 根本没送到后端。
+
+### 修复
+
+- **上传类接口收不到文件**：前端的请求封装对所有 body 一律设 `Content-Type: application/json`
+  并 `JSON.stringify`，FormData 被序列化成 `{}` 发出去，文件直接就没了。
+  表现是点了「预览解析结果」得到「没有可导入的内容」——看起来像文件格式不对，其实是文件没上传。
+  现在封装会识别 FormData：不设 `Content-Type`（交给浏览器带 boundary）、body 原样传给 fetch。
+  受影响的是**账号批量导入**的两个接口（`/accounts/import/parse`、`/accounts/import`），
+  也就是 tdata / .session / StringSession 文件这三条通道全都受牵连。
+
+### 验证
+
+用浏览器端到端跑通（Playwright 模拟真实上传）：选 tdata 页签 → 上传一个测试 zip → 点预览，
+页面回执从「没有可导入的内容」变成「解析出 1 条：可导入 0 条，1 条有问题」——
+说明文件确实到了后端并被解析；无 pageerror。后端侧也单独用 multipart 验证过一次。
+
+---
+
 ## v0.3.22 — 2026-03-30
 
 主题：**修依赖约束冲突**。
