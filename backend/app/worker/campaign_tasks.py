@@ -22,6 +22,8 @@ from telethon.errors import (
     InviteHashInvalidError,
     UserAlreadyParticipantError,
     UserNotMutualContactError,
+    UserNotParticipantError,
+    ChannelPrivateError,
 )
 from telethon.tl import types as tl_types
 
@@ -580,14 +582,18 @@ class CampaignTasksMixin:
         rng = self._campaign_rng(task, payload)
         min_interval = self._interval_of(payload, "min_interval", 5.0)
         max_interval = self._interval_of(payload, "max_interval", 20.0)
-        left = failed = 0
+        left = failed = skipped = 0
         results: list[dict] = []
         for index, target in enumerate(raw_targets):
             try:
                 entity = await resolve_entity(client, target)
             except ValueError:  # noqa: BLE001 - 找不到的群单独记，不拖垮整批
-                failed += 1
-                results.append({"target": target, "left": False, "error": "找不到该群（可能已不在群里）"})
+                # 解析不到这个群，常见原因就是「本来就不在里面」——退群目标其实已达成，
+                # 记成跳过而不是失败，否则整批任务会顶着一个没意义的错误收尾
+                skipped += 1
+                results.append(
+                    {"target": target, "left": False, "skipped": True, "detail": "本来就不在该群（无需退出）"}
+                )
                 continue
             except Exception as exc:  # noqa: BLE001
                 failed += 1
@@ -608,14 +614,39 @@ class CampaignTasksMixin:
                         )
                 left += 1
                 results.append({"target": target, "left": True, "tg_chat_id": getattr(entity, "id", None)})
+            except UserNotParticipantError:
+                # Telegram 明确回答「你就不是这个群的成员」——这就是退群想要的结果
+                skipped += 1
+                results.append(
+                    {"target": target, "left": False, "skipped": True, "detail": "本来就不在该群（无需退出）"}
+                )
+            except (ChannelPrivateError, ChatAdminRequiredError) as exc:
+                # 群不可访问：多数情况是已经不在里面或已被移出，同样按跳过处理
+                skipped += 1
+                results.append(
+                    {
+                        "target": target,
+                        "left": False,
+                        "skipped": True,
+                        "detail": f"该群已无法访问（多半本来就不在）：{describe_exception(exc)}",
+                    }
+                )
             except Exception as exc:  # noqa: BLE001 - 单个群失败继续下一个
                 failed += 1
                 results.append({"target": target, "left": False, "error": describe_exception(exc)})
             if index < len(raw_targets) - 1:
                 await sleep_human(min_interval, max_interval, rng)
+        # 只有真正失败（限流 / 网络 / 权限）才报失败；「本来就不在群里」算跳过
         if left == 0 and failed and len(raw_targets) == failed:
             raise TaskFailure(f"退群全部失败，首错：{results[0].get('error')}", retryable=False)
-        return {"left": left, "failed": failed, "total": len(raw_targets), "results": results[:50]}
+        return {
+            "left": left,
+            "skipped": skipped,
+            "failed": failed,
+            "total": len(raw_targets),
+            "summary": f"退出 {left} 个，{skipped} 个本来就不在群里，失败 {failed} 个",
+            "results": results[:50],
+        }
 
     async def _force_add_member(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """强拉进群：把 members 拉进 group（执行号须为该群管理员）。"""
