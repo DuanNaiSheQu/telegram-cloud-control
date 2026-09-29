@@ -76,7 +76,11 @@ const KIND_COLORS: Record<MaterialKind, string> = {
   document: 'orange',
 };
 
-/** 账号范围选择器：all / group:<id>；limit 默认 200 */
+/** 账号范围选择器：all / group:<id>；limit 默认 200
+ *
+ * 注意：提交时后端只保留「能承接营销动作」的号 —— 冻结 / 失效 / 停用的号会被自动滤掉
+ *（它们写操作必被 Telegram 拒绝），所以勾了 10 个可能只排出 9 条任务。
+ */
 function ScopeFields({ value, onChange }: { value: ScopeState; onChange: (next: ScopeState) => void }) {
   const groups = useAsyncData(() => groupApi.list(), [], { immediate: false });
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -489,6 +493,9 @@ function ActionTab({ title, description, submit, buildPayload, children }: Actio
       <Form form={form} layout="vertical" onFinish={(values) => void onFinish(values)}>
         {children}
         <Form.Item label="账号范围">
+        <Typography.Text type="secondary" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
+          冻结 / 失效 / 停用的号会自动跳过（它们发不出去消息）；检测 / 申诉解封 / 官方养号不受此限制。
+        </Typography.Text>
           <ScopeFields value={scope} onChange={setScope} />
         </Form.Item>
         <Space>

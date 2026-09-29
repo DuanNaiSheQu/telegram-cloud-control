@@ -106,7 +106,7 @@ async def _submit_campaign(
     priority: int = 80,
 ) -> BulkResultResponse:
     """公共提交流程：解析账号范围 → 生成 batch_id → 每号一条任务（错峰入队）→ 审计 + 回执。"""
-    accounts, scope, truncated = await _resolve_accounts(session, user, payload_scope)
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload_scope, usable_only=True)
     if not accounts:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

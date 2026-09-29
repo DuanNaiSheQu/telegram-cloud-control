@@ -35,6 +35,8 @@ from app.api.routers import build_order_by, enum_value, publish_task_safely
 from app.api.routers.accounts import _check_one
 from app.core.audit import write_audit
 from app.core.tasks import enqueue_task
+from app.services.account_availability import split_marketing_usable
+from app.services.account_label import account_label as display_label
 from app.models import (
     AccountAssignment,
     AccountGroup,
@@ -70,11 +72,14 @@ router = APIRouter(prefix="/accounts/bulk", tags=["accounts"])
 # ---------------- 公共工具 ----------------
 
 async def _resolve_accounts(
-    session: AsyncSession, user: User, payload: BulkScopeRequest
+    session: AsyncSession, user: User, payload: BulkScopeRequest, *, usable_only: bool = False
 ) -> Tuple[List[TgAccount], str, bool]:
     """把「点名账号 / all / group:<id>」解析成账号行。
 
     返回 (账号行, 范围标签, 是否被 limit 截断)。越权 403、不存在 404、没匹配到 400。
+
+    `usable_only=True` 时只返回能承接**营销动作**的号（冻结 / 失效 / 停用会被滤掉）——
+    这些号写操作必被 Telegram 拒绝，派任务给它们只是白占队列。
     """
     ids = await visible_account_ids(session, user)
     conditions = []
@@ -94,8 +99,14 @@ async def _resolve_accounts(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"账号不存在：{', '.join(str(item) for item in missing)}",
             )
-        if len(rows) > payload.limit:
-            return rows[: payload.limit], f"selected({len(rows)})", True
+        rows = rows[: payload.limit]
+        if usable_only:
+            rows, _blocked = split_marketing_usable(rows)
+            if not rows:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="选中的账号当前都不能用于营销动作（冻结 / 失效 / 停用）。",
+                )
         return rows, f"selected({len(rows)})", False
 
     if scope == "all":
@@ -132,13 +143,24 @@ async def _resolve_accounts(
         ).all()
     )
     truncated = len(rows) > payload.limit
-    return rows[: payload.limit], scope, truncated
+    rows = rows[: payload.limit]
+    if usable_only:
+        # 冻结 / 失效 / 停用的号写操作必被拒，别派营销任务给它们（省队列、少挨限流）
+        rows, _blocked = split_marketing_usable(rows)
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="选中的账号当前都不能用于营销动作（冻结 / 失效 / 停用）。"
+                "冻结的号可以先跑「申诉解封」，或在账号管理里换一台可用的号。",
+            )
+    return rows, scope, truncated
 
 
 def _item(account: TgAccount, ok: bool = True, message: str = "", **extra) -> BulkAccountResult:
     return BulkAccountResult(
         account_id=account.id,
-        account_label=account.phone_masked or str(account.id)[:8],
+        # 与列表页同口径：明文手机号 > @用户名 > ID:{tg_user_id}
+        account_label=display_label(account) or account.phone_masked or str(account.id)[:8],
         ok=ok,
         message=message,
         **extra,
