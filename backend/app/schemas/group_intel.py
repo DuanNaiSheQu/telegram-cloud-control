@@ -185,3 +185,30 @@ class KeywordWatchUpdate(BaseModel):
     account_ids: Optional[List[uuid.UUID]] = None
     enabled: Optional[bool] = None
     notify: Optional[bool] = None
+
+
+class ReplyRuleRequest(BaseModel):
+    """新建自动回复规则。"""
+
+    name: str = Field(default="", max_length=64)
+    keywords: List[str] = Field(default_factory=list)
+    reply_text: str = Field(default="", max_length=4000, description="命中后自动回复的内容")
+    match_mode: str = Field(default="contains", pattern="^(contains|exact|regex)$")
+    scope: str = Field(default="private", pattern="^(private|group|both)$", description="private 仅私信 / group 仅群 / both 都回")
+    account_ids: List[uuid.UUID] = Field(default_factory=list, description="只用这些号自动回；留空 = 全部")
+    enabled: bool = True
+    priority: int = Field(default=100, ge=1, le=999, description="数字小的先匹配")
+    cooldown_seconds: int = Field(default=300, ge=0, le=86400, description="同一会话多久内只回一次")
+
+
+class ReplyRuleUpdate(BaseModel):
+    """改规则：只传要改的字段。"""
+
+    name: Optional[str] = None
+    keywords: Optional[List[str]] = None
+    reply_text: Optional[str] = None
+    match_mode: Optional[str] = None
+    scope: Optional[str] = None
+    enabled: Optional[bool] = None
+    priority: Optional[int] = None
+    cooldown_seconds: Optional[int] = None

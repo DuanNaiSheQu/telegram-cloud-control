@@ -17,6 +17,10 @@ from telethon.tl import types as tl_types
 
 from app.db import session_scope
 from app.models import Dialog, DialogChannel, DialogKind, Message, MessageDirection, MessageStatus
+from app.services.reply_rules import bump_hit as bump_reply_hit
+from app.services.reply_rules import cooling_down
+from app.services.reply_rules import load_reply_rules as reply_load_rules
+from app.services.reply_rules import pick_rule as pick_reply_rule
 from app.services.keyword_watch import load_rules as keyword_load_rules
 from app.services.keyword_watch import scan as keyword_scan
 from app.services.keyword_watch import record_hit as record_keyword_hit
@@ -239,6 +243,26 @@ async def _keyword_rules(session: Any) -> list[dict]:
     return rules
 
 
+#: 自动回复规则缓存（与监听规则同一个思路：每条消息零 DB 查询，60 秒回库刷新）
+_REPLY_CACHE: dict[str, Any] = {"at": 0.0, "rules": []}
+
+
+async def _reply_rules(session: Any) -> list[dict]:
+    import time as _time
+
+    now = _time.monotonic()
+    if now - float(_REPLY_CACHE.get("at") or 0) < _KEYWORD_TTL:
+        return list(_REPLY_CACHE.get("rules") or [])
+    try:
+        rules = await reply_load_rules(session)
+    except Exception:  # noqa: BLE001
+        logger.debug("读取回复规则失败，沿用上一份缓存")
+        return list(_REPLY_CACHE.get("rules") or [])
+    _REPLY_CACHE["at"] = now
+    _REPLY_CACHE["rules"] = rules
+    return rules
+
+
 async def handle_telethon_message(
     *,
     worker_id: str,
@@ -275,6 +299,51 @@ async def handle_telethon_message(
                         "tasks": len(tasks),
                     },
                 )
+        # 账号自动回复：命中规则就回一句（默认没有规则 = 不回；带冷却，避免连发几条就回几条）
+        if row.direction == MessageDirection.incoming:
+            try:
+                reply_rules = await _reply_rules(session)
+                if reply_rules:
+                    scope = "group" if str(getattr(dialog.kind, "value", dialog.kind)) == "group" else "private"
+                    rule = pick_reply_rule(
+                        reply_rules, text=row.body or "", scope=scope, account_id=str(account_id)
+                    )
+                    if rule and not cooling_down(
+                        str(rule.get("id")), str(dialog.id), int(rule.get("cooldown_seconds") or 0)
+                    ):
+                        client = getattr(message, "client", None)
+                        text_out = str(rule.get("reply_text") or "")
+                        if client is not None and text_out:
+                            sent = await client.send_message(dialog.tg_chat_id, text_out)
+                            # 落库：让自动回复也出现在会话记录里，不然页面上看不到自己回过什么
+                            await persist_message(
+                                session,
+                                account_id=account_id,
+                                data=MessageData(
+                                    tg_chat_id=dialog.tg_chat_id,
+                                    kind=dialog.kind,
+                                    title=dialog.title,
+                                    username=dialog.username,
+                                    peer_display=dialog.peer_display,
+                                    body=text_out,
+                                    tg_message_id=getattr(sent, "id", None),
+                                    direction=MessageDirection.outgoing,
+                                    status=MessageStatus.sent,
+                                    sender_name="自动回复",
+                                    raw={"source": "auto_reply", "rule": rule.get("name")},
+                                ),
+                            )
+                            await bump_reply_hit(session, str(rule.get("id")))
+                            logger.info(
+                                "自动回复已发出",
+                                extra={
+                                    "worker_id": worker_id,
+                                    "account_id": str(account_id),
+                                    "rule": rule.get("name"),
+                                },
+                            )
+            except Exception:  # noqa: BLE001 - 自动回复失败不能影响消息入库
+                logger.debug("自动回复处理失败", exc_info=True)
         # 关键词监听：有人聊到规则里的词就记一条事件（与入退群流水同一时间线）
         try:
             rules = await _keyword_rules(session)

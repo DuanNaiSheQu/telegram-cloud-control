@@ -35,6 +35,7 @@ from app.models.group_intel import (
     GroupMember,
     GroupProfile,
     KeywordWatch,
+    ReplyRule,
 )
 from app.models.message import Message
 from app.models.material import MATERIAL_KIND_LABELS, Material, MaterialKind

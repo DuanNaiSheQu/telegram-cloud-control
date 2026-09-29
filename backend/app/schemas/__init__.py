@@ -83,6 +83,8 @@ from app.schemas.group_intel import (
     GroupProfileOut,
     KeywordWatchRequest,
     KeywordWatchUpdate,
+    ReplyRuleRequest,
+    ReplyRuleUpdate,
 )
 from app.schemas.matrix import (
     AccountImportBatchOut,

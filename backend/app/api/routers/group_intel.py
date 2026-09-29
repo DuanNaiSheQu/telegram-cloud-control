@@ -34,6 +34,7 @@ from app.core.audit import write_audit
 from app.core.tasks import enqueue_task
 from app.models import (
     KeywordWatch,
+    ReplyRule,
     GROUP_EVENT_LABELS,
     Lease,
     AccountStatus,
@@ -66,6 +67,8 @@ from app.schemas import (
     GroupProfileOut,
     KeywordWatchRequest,
     KeywordWatchUpdate,
+    ReplyRuleRequest,
+    ReplyRuleUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -850,6 +853,116 @@ async def list_keyword_hits(
         ],
         "total": len(rows),
     }
+
+
+# ---------------- 账号自动回复规则 ----------------
+
+@router.get("/reply-rules", summary="自动回复规则列表")
+async def list_reply_rules(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    rows = list((await session.scalars(select(ReplyRule).order_by(ReplyRule.priority, ReplyRule.created_at.desc()))).all())
+    return {
+        "items": [
+            {
+                "id": str(row.id),
+                "name": row.name or "",
+                "keywords": list(row.keywords or []),
+                "reply_text": row.reply_text or "",
+                "match_mode": row.match_mode,
+                "scope": row.scope,
+                "enabled": bool(row.enabled),
+                "priority": int(row.priority or 100),
+                "cooldown_seconds": int(row.cooldown_seconds or 0),
+                "hit_count": int(row.hit_count or 0),
+            }
+            for row in rows
+        ],
+        "total": len(rows),
+    }
+
+
+@router.post("/reply-rules", summary="新建自动回复规则（命中会自动发消息）")
+async def create_reply_rule(
+    payload: ReplyRuleRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """建规则：命中关键词就**自动发消息**（不是只记录）。
+
+    所以有两道闸：`cooldown_seconds`（同一会话隔多久才再回一次）与账号自身的
+    节流/每日配额（自动回复也计入该号的发送额度，不会绕过防封机制）。
+    """
+    keywords = [str(k).strip() for k in payload.keywords if str(k).strip()]
+    if not keywords:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="keywords 不能为空")
+    if not payload.reply_text.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="回复内容不能为空")
+    row = ReplyRule(
+        name=payload.name or "、".join(keywords[:3]),
+        keywords=keywords[:50],
+        reply_text=payload.reply_text[:4000],
+        match_mode=payload.match_mode,
+        scope=payload.scope,
+        account_ids=[uuid.UUID(str(x)) for x in payload.account_ids],
+        enabled=payload.enabled,
+        priority=payload.priority,
+        cooldown_seconds=payload.cooldown_seconds,
+        created_by=user.id,
+    )
+    session.add(row)
+    await session.flush()
+    await write_audit(
+        session,
+        action="reply_rule.create",
+        user_id=user.id,
+        target_type="reply_rule",
+        target_id=str(row.id),
+        detail={"keywords": keywords[:10], "scope": payload.scope},
+    )
+    await session.commit()
+    return {"ok": True, "id": str(row.id), "message": f"已启用自动回复（{'、'.join(keywords[:3])}）"}
+
+
+@router.patch("/reply-rules/{rule_id}", summary="改自动回复规则")
+async def update_reply_rule(
+    rule_id: uuid.UUID,
+    payload: ReplyRuleUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    row = await session.get(ReplyRule, rule_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="规则不存在")
+    for field in ("name", "reply_text", "match_mode", "scope"):
+        value = getattr(payload, field, None)
+        if value is not None:
+            setattr(row, field, value)
+    if payload.keywords is not None:
+        row.keywords = [str(k).strip() for k in payload.keywords if str(k).strip()][:50]
+    if payload.enabled is not None:
+        row.enabled = payload.enabled
+    if payload.priority is not None:
+        row.priority = payload.priority
+    if payload.cooldown_seconds is not None:
+        row.cooldown_seconds = payload.cooldown_seconds
+    await session.commit()
+    return {"ok": True, "message": "已更新（Worker 最多 60 秒后按新规则执行）"}
+
+
+@router.delete("/reply-rules/{rule_id}", summary="删除自动回复规则")
+async def delete_reply_rule(
+    rule_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    row = await session.get(ReplyRule, rule_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="规则不存在")
+    await session.delete(row)
+    await session.commit()
+    return {"ok": True, "message": "规则已删除（已发出的回复留在会话记录里）"}
 
 
 @router.get("/stats", response_model=GroupIntelStats, summary="群情报概览")

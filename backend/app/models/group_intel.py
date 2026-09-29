@@ -178,3 +178,32 @@ class KeywordWatch(Base, TimestampMixin):
     created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+
+
+class ReplyRule(Base, TimestampMixin):
+    """账号自动回复规则：收到消息命中关键词就自动回一句。
+
+    与「关键词监听」的区别：监听只记录（给人看），回复规则会**真的发消息**——
+    所以它带冷却时间（同一会话 N 秒内只回一次），避免刷屏或被判定成机器人；
+    发出去的每条同样走账号的节流与每日配额，不会绕过防封机制。
+    """
+
+    __tablename__ = "reply_rules"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    name: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    keywords: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    reply_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # 匹配方式：contains 包含 / exact 完全相等 / regex 正则
+    match_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="contains")
+    # 生效范围：private 仅私信 / group 仅群聊 / both 都回
+    scope: Mapped[str] = mapped_column(String(16), nullable=False, default="private")
+    account_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    # 同一会话的冷却秒数（0 = 不限制，但不建议）
+    cooldown_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
+    hit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
