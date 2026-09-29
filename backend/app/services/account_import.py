@@ -369,7 +369,15 @@ TDATA_HINT = (
 
 
 async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAccount]:
-    """把 tdata 目录（zip 打包）转成 Telethon 会话。依赖缺失时抛出带指引的错误。"""
+    """把上传的 zip 里的 tdata 转成 Telethon 会话。
+
+    支持两种打包方式（都常见）：
+    1. **单个 tdata**：zip 里直接是 `key_datas` / `D877F783D5D3EF8C` 等文件（可能多包一层目录）；
+    2. **每号一个 tdata**：zip 里是 `<批次名>/<账号目录>/key_datas` 这样的结构——
+       常见于批量导出，一个包里有多个号。这种会逐个目录转换，一个目录产出一个账号。
+
+    识别方式：解压后保留目录结构，凡含 `key_*` 文件的目录都当成一个 tdata 根。
+    """
     # 包名与导入名不一致：PyPI 上是 opentele2，导入既有 opentele2.* 也有 opentele.* 的情况
     UseCurrentSession = None
     TDesktop = None
@@ -390,81 +398,105 @@ async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAc
 
     workdir = pathlib.Path(tempfile.mkdtemp(prefix="tgcc-tdata-"))
     try:
-        archive = workdir / "upload.zip"
-        archive.write_bytes(blob)
-        extract_dir = workdir / "tdata"
-        extract_dir.mkdir()
-        with zipfile.ZipFile(archive) as zf:
-            # tdata 的 zip 可能多包一层目录，统一压平到 extract_dir
-            for member in zf.namelist():
-                target = extract_dir / pathlib.PurePosixPath(member).name
-                if member.endswith("/"):
-                    continue
-                with zf.open(member) as src, open(target, "wb") as dst:
-                    shutil.copyfileobj(src, dst)
-
+        extract_root = workdir / "raw"
+        extract_root.mkdir()
         try:
-            tdesk = TDesktop(str(extract_dir))
-        except ImportError_:
-            raise
-        except BaseException as exc:  # noqa: BLE001 - opentele2 的异常继承自 BaseException（不是 Exception），
-            # 用 except Exception 抓不到，异常会直接逃逸成 500
+            with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+                # 保留目录结构（多号打包靠它区分），同时防 zip slip
+                for member in zf.infolist():
+                    if member.is_dir():
+                        continue
+                    parts = [
+                        part
+                        for part in pathlib.PurePosixPath(member.filename.replace("\\", "/")).parts
+                        if part not in ("", ".", "..")
+                    ]
+                    if not parts:
+                        continue
+                    target = extract_root.joinpath(*parts)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with zf.open(member) as src, open(target, "wb") as dst:
+                        shutil.copyfileobj(src, dst)
+        except zipfile.BadZipFile as exc:
+            raise ImportError_("这不是一个有效的 zip 文件（tdata 请打包成 zip 后上传）") from exc
+
+        # tdata 根：含 key_* 文件的目录（多号打包时每个子目录一个）
+        roots = sorted({path.parent for path in extract_root.rglob("key_*") if path.is_file()})
+        if not roots:
             raise ImportError_(
-                f"tdata 加载失败（{type(exc).__name__}）：确认 zip 里是 Telegram Desktop 的 tdata 目录内容"
-                "（含 key_datas 与 D877F783D5D3EF8C 这类文件），且本地密码锁已关闭；"
-                f"详情：{exc}"
-            ) from exc
-        if not tdesk.isLoaded():
-            raise ImportError_("tdata 加载失败：确认 zip 里是 Telegram Desktop 的 tdata 目录内容（key_datas 与 D877F783D5D3EF8C 之类）")
-
-        accounts: list[ParsedAccount] = []
-        # 一个 tdata 可能含多个账号：opentele 的 accounts 列表逐个转
-        raw_accounts = list(getattr(tdesk, "accounts", []) or [None])
-        for index, account in enumerate(raw_accounts):
-            session_path = workdir / f"converted-{index}.session"
-            try:
-                if account is not None:
-                    try:
-                        client = await tdesk.ToTelethon(
-                            account=account, session=str(session_path), flag=UseCurrentSession
-                        )
-                    except TypeError:
-                        # 老版本 opentele 的 ToTelethon 不接 account 参数：退回单账号转换
-                        client = await tdesk.ToTelethon(session=str(session_path), flag=UseCurrentSession)
-                else:
-                    client = await tdesk.ToTelethon(session=str(session_path), flag=UseCurrentSession)
-            except BaseException as exc:  # noqa: BLE001 - opentele 的异常基类是 BaseException
-                accounts.append(
-                    ParsedAccount(
-                        source="tdata",
-                        label=f"{pathlib.Path(filename).name}#{index}",
-                        extra={"error": f"转换失败：{type(exc).__name__}: {exc}"},
-                    )
-                )
-                continue
-
-            session_str = None
-            try:
-                session_obj = getattr(client, "session", None)
-                if hasattr(session_obj, "save"):
-                    session_str = session_obj.save()
-            except Exception:  # noqa: BLE001
-                session_str = None
-            if not session_str and session_path.exists():
-                session_str = parse_session_file(session_path.read_bytes(), session_path.name).session
-
-            accounts.append(
-                ParsedAccount(
-                    source="tdata",
-                    label=f"{pathlib.Path(filename).name}#{index}",
-                    session=session_str,
-                    dc_id=_string_session_dc(getattr(client, "session", None)),
-                    extra={"note": "tdata 已转换为 Telethon 会话"},
-                )
+                "zip 里没找到 tdata 内容：需要 key_datas 与 D877F783D5D3EF8C 这类文件。"
+                "打包时请进入 tdata 目录全选压缩，或按「每个号一个子目录」的结构打包。"
             )
-        if not accounts:
-            raise ImportError_("tdata 里没有可转换的已登录账号")
-        return accounts
+
+        results: list[ParsedAccount] = []
+        errors: list[str] = []
+        for root_index, root in enumerate(roots):
+            # 目录名就是账号标识（多号打包时通常是号或手机号）
+            label = root.name if root != extract_root else pathlib.Path(filename).stem
+            try:
+                tdesk = TDesktop(str(root))
+                if not tdesk.isLoaded():
+                    errors.append(f"{label}：tdata 未加载成功（目录可能不完整）")
+                    continue
+                raw_accounts = list(getattr(tdesk, "accounts", []) or [None])
+                for index, account in enumerate(raw_accounts):
+                    session_path = workdir / f"converted-{root_index}-{index}.session"
+                    try:
+                        if account is not None:
+                            try:
+                                client = await tdesk.ToTelethon(
+                                    account=account, session=str(session_path), flag=UseCurrentSession
+                                )
+                            except TypeError:
+                                # 老版本 opentele 的 ToTelethon 不接 account 参数：退回单账号转换
+                                client = await tdesk.ToTelethon(session=str(session_path), flag=UseCurrentSession)
+                        else:
+                            client = await tdesk.ToTelethon(session=str(session_path), flag=UseCurrentSession)
+                    except BaseException as exc:  # noqa: BLE001 - opentele 的异常基类是 BaseException
+                        errors.append(f"{label}#{index}：{type(exc).__name__}: {exc}")
+                        continue
+
+                    session_str = None
+                    try:
+                        session_obj = getattr(client, "session", None)
+                        if hasattr(session_obj, "save"):
+                            session_str = session_obj.save()
+                    except Exception:  # noqa: BLE001
+                        session_str = None
+                    if not session_str and session_path.exists():
+                        session_str = parse_session_file(session_path.read_bytes(), session_path.name).session
+
+                    suffix = f"#{index}" if len(raw_accounts) > 1 else ""
+                    results.append(
+                        ParsedAccount(
+                            source="tdata",
+                            label=f"{label}{suffix}",
+                            session=session_str,
+                            dc_id=_string_session_dc(getattr(client, "session", None)),
+                            extra={
+                                "note": "tdata 已转换为 Telethon 会话",
+                                "tdata_dir": str(root.relative_to(extract_root)) or ".",
+                            },
+                        )
+                    )
+            except BaseException as exc:  # noqa: BLE001 - 单个目录失败不拖垮整批
+                errors.append(f"{label}：{type(exc).__name__}: {exc}")
+
+        if not results:
+            detail = "；".join(errors[:3]) or "没有已登录账号"
+            raise ImportError_(
+                f"识别到 {len(roots)} 个 tdata 目录，但都没转换出会话。原因：{detail}。"
+                "常见情况：Telegram Desktop 的本地密码锁没关、tdata 不完整（缺 map 文件）、"
+                "或 zip 里放的是聊天记录导出而不是 tdata 目录。"
+            )
+        logger.info(
+            "tdata 解析完成：识别 %s 个目录，转换出 %s 个账号（失败 %s 个）",
+            len(roots),
+            len(results),
+            len(errors),
+            extra={"filename": filename},
+        )
+        return results
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
