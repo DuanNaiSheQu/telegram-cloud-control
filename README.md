@@ -12,7 +12,7 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.7-2AABEE.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.8-2AABEE.svg" alt="Version"></a>
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新记录-blue.svg" alt="Changelog"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
@@ -206,7 +206,7 @@
 ## 最新更新
 
 > 版本号唯一真源是仓库根的 [`VERSION`](VERSION)：后端 `/health` 返回它，前端构建时注入它（侧栏左下角可见）。
-> 完整历史见 `CHANGELOG.md`。
+> 完整历史与版本号见本页顶部的版本徽章。
 
 ### v0.3.0 — 账号矩阵成熟化（2026-09-29）
 
@@ -518,7 +518,7 @@ cd frontend && npm ci && npm run dev
 - 每天 03:10 `pg_dump -Fc` 逻辑备份（保留 7 份）；每周日 03:40 `pg_basebackup` 基础备份（保留 4 份）；
   Postgres 全程 `archive_mode=on`，WAL 归档在 `pg_wal_archive` 卷。
 - **按时间点恢复（PITR）= 基础备份 + WAL 归档**，两者缺一不可，都要一起离线保存。
-  完整步骤（含临时实例验证、权限与坑）见 `deploy/postgres-backup.md`，摘要：
+  完整步骤（含临时实例验证、权限与坑）见备份文档，摘要：
 
 ```bash
 # 日常误删：逻辑恢复（最快，先停写入）
@@ -575,12 +575,12 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 
 ## 范围与合规边界
 
-本 README 与 `规划.md` 记录的是这套控制台的**主线范围**：
+本 README 与规划文档记录的是这套控制台的**主线范围**：
 
 > 管理自己的用户号与官方 Bot → 处理这些号已经在里面的群聊与私信 → 用 Bot 转发到员工群 →
 > 员工回复按同一规则送回 → 发送要员工确认 → 全程留审计。
 
-主线**不含**下面这批批量触达动作（`规划.md` 把它们写在「不做这些」清单里）：
+主线**不含**下面这批批量触达动作（规划文档把它们写在「不做这些」清单里）：
 
 > 批量私信、批量群发、素材群发、批量加群、批量退群、强拉进群、批量改资料、吵群，
 > 以及用多个用户号自动把话说得像真人。
@@ -612,7 +612,7 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 ## 贡献
 
 - 提 Issue 请带上：版本（commit）、部署方式（Compose / 本地）、复现步骤、期望与实际、相关日志（JSON 一行一条，注意先脱敏手机号与 Token）。
-- 提 PR 请保持：`make check` 与相关验收（`make smoke` / `make e2e` / `make console-check` / `make config-check`）全绿，中文注释解释「为什么」，不要引入未在本 README 与 `规划.md` 范围内的批量能力。
+- 提 PR 请保持：`make check` 与相关验收（`make smoke` / `make e2e` / `make console-check` / `make config-check`）全绿，中文注释解释「为什么」，不要引入未在本 README 与规划文档范围内的批量能力。
 - **安全问题**不要开公开 Issue：请私下联系仓库作者，附最小复现。
 - 本项目只对接一个远程仓库（`origin`），提交时只提交你自己改动的路径，不要顺手带上别人的工作区改动。
 
