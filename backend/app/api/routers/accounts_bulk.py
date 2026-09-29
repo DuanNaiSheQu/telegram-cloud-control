@@ -20,9 +20,11 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import Field
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import leases
 from app.api.deps import (
     assert_accounts_access,
     get_current_user,
@@ -839,6 +841,70 @@ async def bulk_warmup(
         truncated=truncated,
         task_ids=task_ids,
     )
+
+# ---------------- 批量删除（危险操作，需显式确认） ----------------
+
+class BulkDeleteRequest(BulkScopeRequest):
+    """批量删除：必须显式带确认字段，避免误触把号连会话一起清掉。"""
+
+    confirm: str = Field(default="", description='必须填 "DELETE" 才会执行（防误触）')
+
+
+@router.post("/delete", response_model=BulkResultResponse, summary="批量删除账号（级联清会话/消息，不可恢复）")
+async def bulk_delete(
+    payload: BulkDeleteRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """物理删除选中的账号。
+
+    **不可恢复**：会话、消息、任务、租约都靠外键级联清掉（审计行保留但 account_id 置空）。
+    所以要求请求里带 `confirm="DELETE"`——UI 上是一道二次确认，接口上再挡一道，
+    免得脚本或误点把一批号连数据一起抹掉。
+    """
+    if payload.confirm != "DELETE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='这是不可恢复的操作：请在确认框里输入 DELETE 再提交',
+        )
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload)
+    if not accounts:
+        raise _empty()
+
+    items: List[BulkAccountResult] = []
+    deleted = 0
+    for account in accounts:
+        label = account_label(account) or account.phone_masked or str(account.id)[:8]
+        try:
+            await leases.release_account(session, account_id=account.id)
+        except Exception:  # noqa: BLE001 - 清租约失败不阻塞删除（外键会级联）
+            logger.debug("删除前清租约失败 account_id=%s", account.id)
+        try:
+            await session.delete(account)
+            deleted += 1
+            items.append(_item(account, message="已删除（会话/消息一并清除）"))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("删除账号失败 account_id=%s: %s", account.id, exc)
+            items.append(_item(account, ok=False, message=f"删除失败：{str(exc)[:100]}"))
+
+    await write_audit(
+        session,
+        action="account.bulk_delete",
+        user_id=user.id,
+        target_type="account_batch",
+        target_id=scope,
+        detail={"count": deleted, "truncated": truncated},
+    )
+    await session.commit()
+    logger.warning("批量删除账号：删除 %s 个（执行人 %s）", deleted, user.id)
+    return _response(
+        "delete",
+        accounts,
+        items,
+        message=f"已删除 {deleted} 个账号（会话与消息一并清除，不可恢复）",
+        truncated=truncated,
+    )
+
 
 # ---------------- 申诉解封（模拟真人走官方流程） ----------------
 

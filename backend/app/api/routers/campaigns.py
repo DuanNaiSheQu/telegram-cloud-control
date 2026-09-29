@@ -686,9 +686,9 @@ async def generate_texts(
     先一次性生成一批**受控**话术，再由发送端逐条取用；
     而不是让模型每次发送时自由发挥（那会跑偏到无法预期的内容）。
     """
-    from app.services import ai
+    from app.services.ai import ai_service
 
-    if not ai.available:
+    if not ai_service.available:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -701,7 +701,7 @@ async def generate_texts(
         f"语气要求：{payload.style}。要求：每条独立成行，行首不要序号与引号；"
         "长度 40 字以内，像真人随手发的；不要模板腔，最多一个 emoji；直接输出这些消息，不要解释。"
     )
-    raw = await ai.chat(
+    raw = await ai_service.chat(
         [
             {"role": "system", "content": "你是资深社群运营，擅长写不同口吻的短消息。"},
             {"role": "user", "content": prompt},
