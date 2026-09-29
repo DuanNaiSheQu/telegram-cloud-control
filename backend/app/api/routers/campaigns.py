@@ -22,6 +22,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session, visible_account_ids
+from app.api.routers.accounts_bulk import scope_clause
 from app.api.routers import enum_value, publish_task_safely
 from app.api.routers.accounts_bulk import _resolve_accounts
 from app.api.routers.tasks import CANCELLABLE_STATUSES
@@ -37,6 +38,7 @@ from app.models import (
     TaskType,
     TgAccount,
     User,
+    AccountStatus,
 )
 from app.schemas import (
     BulkAccountResult,
@@ -94,6 +96,48 @@ async def _ensure_material(session: AsyncSession, material_id) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="素材不存在（可能已被删除）")
 
 
+#: 自动补号：默认补到多少个号（目标本身有限，补太多没意义）
+AUTO_SUPPLY_DEFAULT = 10
+#: 补号上限：一次最多用多少个号承担一批目标，避免把号池全拉起来
+AUTO_SUPPLY_MAX = 50
+
+
+async def _auto_supply_accounts(
+    session: AsyncSession, user: User, accounts: List[TgAccount], *, need: int
+) -> List[TgAccount]:
+    """号不够时从号池补位：只挑**状态正常、有会话、且不在现有列表里**的号。
+
+    补进来的号同样受节流与每日配额约束（执行侧门禁对每个号独立生效），
+    所以「补号」只是让任务跑得更快，不会让某个号超发。
+    """
+    target = max(1, min(int(need), AUTO_SUPPLY_MAX))
+    if len(accounts) >= target:
+        return accounts
+    existing = {item.id for item in accounts}
+    conditions = [
+        TgAccount.status == AccountStatus.healthy,
+        TgAccount.session_enc.is_not(None),
+    ]
+    if existing:
+        conditions.append(TgAccount.id.notin_(existing))
+    visible = await visible_account_ids(session, user)
+    clause = scope_clause(TgAccount.id, visible)
+    if clause is not None:
+        conditions.append(clause)
+    extra = list(
+        (
+            await session.scalars(
+                select(TgAccount)
+                .where(*conditions)
+                .order_by(TgAccount.last_heartbeat.desc().nulls_last(), TgAccount.created_at)
+                .limit(target - len(accounts))
+            )
+        ).all()
+    )
+    if extra:
+        logger.info("自动补号：补入 %s 个可用号承担本批目标", len(extra))
+    return accounts + extra
+
 async def _submit_campaign(
     *,
     action: str,
@@ -107,6 +151,11 @@ async def _submit_campaign(
 ) -> BulkResultResponse:
     """公共提交流程：解析账号范围 → 生成 batch_id → 每号一条任务（错峰入队）→ 审计 + 回执。"""
     accounts, scope, truncated = await _resolve_accounts(session, user, payload_scope, usable_only=True)
+    # 无号自动补号：勾了这项、而可用的号不够承担这批目标时，自动从号池里补状态正常的号。
+    # 运营不用手动一个个挑——号源少了任务会变慢，这个开关让系统自己把坑填上。
+    if getattr(payload_scope, "auto_supply", False):
+        wanted = int(getattr(payload_scope, "auto_supply_target", 0) or 0) or AUTO_SUPPLY_DEFAULT
+        accounts = await _auto_supply_accounts(session, user, accounts, need=wanted)
     if not accounts:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

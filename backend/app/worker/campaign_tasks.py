@@ -331,6 +331,76 @@ class CampaignTasksMixin:
             raise TaskFailure("素材不存在（可能已被删除），请重新选择", retryable=False)
         return material
 
+    async def _gate_send_window(self, task: Task, payload: dict) -> None:
+        """发送时间窗：不在窗内就顺延到窗口开始，而不是硬发。
+
+        运营要的是「只在白天发」这种节奏，靠人工盯时间点不现实——任务照常入队，到点自动开始。
+        """
+        from datetime import datetime
+
+        window = str(payload.get("send_window") or "").strip()
+        if not window:
+            return
+        try:
+            start_text, end_text = window.split("-", 1)
+            start_h, start_m = (int(x) for x in start_text.split(":"))
+            end_h, end_m = (int(x) for x in end_text.split(":"))
+        except (ValueError, TypeError):
+            return  # 参数坏了就别卡任务，按「不限」处理
+        now = datetime.now()  # 用本机时区：运营说的「白天」是他自己的白天
+        minutes = now.hour * 60 + now.minute
+        start_minutes = start_h * 60 + start_m
+        end_minutes = end_h * 60 + end_m
+        in_window = (
+            start_minutes <= minutes < end_minutes
+            if start_minutes <= end_minutes
+            else (minutes >= start_minutes or minutes < end_minutes)  # 跨零点，如 22:00-06:00
+        )
+        if in_window:
+            return
+        wait = (start_minutes - minutes) % (24 * 60) or 24 * 60
+        raise TaskFailure(
+            f"不在发送时间窗（{window}）内，已顺延到窗口开始再发",
+            retryable=True,
+            requeue_after=wait * 60,
+        )
+
+    async def _gate_daily_quota(
+        self, session: Any, task: Task, account: TgAccount, payload: dict
+    ) -> None:
+        """每日配额：该号今天发够了就顺延到明天，避免「配 50 条、一发几百条」。"""
+        from datetime import datetime, timedelta
+
+        from sqlalchemy import func, select
+
+        from app.models import Message
+
+        quota = int(payload.get("daily_quota") or 0)
+        if quota <= 0:
+            return
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        sent_today = int(
+            await session.scalar(
+                select(func.count())
+                .select_from(Message)
+                .where(
+                    Message.account_id == account.id,
+                    Message.direction == MessageDirection.outgoing,
+                    Message.created_at >= today_start,
+                )
+            )
+            or 0
+        )
+        if sent_today < quota:
+            return
+        tomorrow = today_start + timedelta(days=1)
+        wait = max(60, int((tomorrow - datetime.now()).total_seconds()))
+        raise TaskFailure(
+            f"该号今日已达发送配额（{sent_today}/{quota} 条），顺延到明天继续",
+            retryable=True,
+            requeue_after=wait,
+        )
+
     async def _bulk_pm(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """批量私信：向 payload.targets 逐个发消息，目标之间随机间隔。"""
         assert account is not None
@@ -340,6 +410,10 @@ class CampaignTasksMixin:
         targets = [str(item).strip() for item in (payload.get("targets") or []) if str(item).strip()]
         if not targets:
             raise TaskFailure("批量私信任务缺少目标", retryable=False)
+        # 定时：不在发送时间窗内就顺延到窗口开始（不占号、不算失败）
+        await self._gate_send_window(task, payload)
+        # 定量：该号今天发够了就先歇着，顺延到明天
+        await self._gate_daily_quota(session, task, account, payload)
         client = self._client(account.id)
         rng = self._campaign_rng(task, payload)
         text = self._campaign_text(payload, rng)
@@ -701,7 +775,7 @@ class CampaignTasksMixin:
 
     async def _task_still_running(self, session: Any, task_id: uuid.UUID) -> bool:
         """循环任务每轮检查：被页面取消（或其它状态变化）就收手。"""
-        from sqlalchemy import select
+        from sqlalchemy import func, select
 
         status_value = await session.scalar(select(Task.status).where(Task.id == task_id))
         return status_value == TaskStatus.running

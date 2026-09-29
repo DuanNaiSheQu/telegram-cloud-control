@@ -560,6 +560,31 @@ export default function Campaigns() {
             <Form.Item label="最大间隔（秒）" name="max_interval" initialValue={8}>
               <InputNumber min={1} max={120} />
             </Form.Item>
+
+            <Form.Item
+              label="发送时间窗（定时）"
+              name="send_window"
+              tooltip="只在这个时间段内发；不在窗内会自动顺延到窗口开始，不用手动掐点。留空 = 不限"
+            >
+              <Input placeholder="例如 09:00-23:00（留空 = 不限）" style={{ width: 240 }} allowClear />
+            </Form.Item>
+            <Space size="large" wrap>
+              <Form.Item
+                label="每号每日配额（定量）"
+                name="daily_quota"
+                tooltip="每个号每天最多发多少条，超了自动顺延到次日。0 = 不限"
+              >
+                <InputNumber min={0} max={2000} style={{ width: 160 }} placeholder="0 = 不限" />
+              </Form.Item>
+              <Form.Item
+                label="无号时自动补号"
+                name="auto_supply"
+                valuePropName="checked"
+                tooltip="可用的号不够承担这批目标时，自动从号池补状态正常的号；补进来的号同样受配额与节流约束"
+              >
+                <Switch />
+              </Form.Item>
+            </Space>
             <Form.Item label="口语化微调" name="naturalize" valuePropName="checked" initialValue={false}>
               <Switch />
             </Form.Item>

@@ -83,6 +83,18 @@ class BulkPmRequest(BulkScopeRequest, _TextPoolMixin):
         default=None,
         description="可选：附带素材（图片/视频/文档），文本会作为配文一起发；不填则只发文本",
     )
+    # ---- 自动化：定时 / 定量 / 自动补号 ----
+    send_window: str = Field(
+        default="",
+        pattern=r"^$|^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$",
+        description="发送时间窗（如 09:00-23:00）；不在窗内自动顺延到窗口开始，空=不限",
+    )
+    daily_quota: int = Field(
+        default=0, ge=0, le=2000, description="每个号每天最多发多少条（0=不限）；超了自动顺延到次日"
+    )
+    auto_supply: bool = Field(
+        default=False, description="选中的号不足时，自动从可用的号里补足（补号只挑状态正常的）"
+    )
 
     @model_validator(mode="after")
     def _check_targets(self):
