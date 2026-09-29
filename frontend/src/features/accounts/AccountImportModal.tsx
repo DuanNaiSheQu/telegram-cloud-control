@@ -9,7 +9,7 @@
  * - tdata 需要可选依赖 opentele2，后端报告不可用时，这个入口直接标灰并给替代路径；
  * - 可顺手绑定代理与分组，并按「养号起点从今天算」入库（新号从最严档开始限速）。
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Segmented, Select, Space, Switch, Table, Tag, Typography, Upload, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { InboxOutlined, RocketOutlined } from '@ant-design/icons';
@@ -33,7 +33,7 @@ const KIND_TIP: Record<string, string> = {
 };
 
 export default function AccountImportModal({ open, onClose, onImported }: Props) {
-  const [kind, setKind] = useState('phone');
+  const [kind, setKind] = useState('');
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [proxyId, setProxyId] = useState<string | undefined>();
@@ -48,6 +48,14 @@ export default function AccountImportModal({ open, onClose, onImported }: Props)
   const formats = useAsyncData(() => accountImportApi.formats(), [open], { immediate: false });
   const proxies = useAsyncData(() => proxyApi.list(), [open], { immediate: false });
   const groups = useAsyncData(() => groupApi.list(), [open], { immediate: false });
+
+  // 格式列表由后端给：第一项作为默认选中；万一当前选中的被后端移除（比如手机号清单下线）就回退到首项
+  useEffect(() => {
+    const list = formats.data?.formats ?? [];
+    if (!list.length) return;
+    if (!list.some((item) => item.kind === kind)) setKind(list[0].kind);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formats.data]);
 
   const activeFormat = useMemo(
     () => (formats.data?.formats ?? []).find((item) => item.kind === kind),
