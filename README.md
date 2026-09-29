@@ -12,7 +12,7 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.6-2AABEE.svg" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.3.7-2AABEE.svg" alt="Version"></a>
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-更新记录-blue.svg" alt="Changelog"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/issues"><img src="https://img.shields.io/github/issues/cafinxnull/telegram-cloud-control?label=issues" alt="Issues"></a>
@@ -30,7 +30,7 @@
 </p>
 
 <p>
-  <a href="docs/SPONSOR.md"><img src="https://img.shields.io/badge/%E8%B5%9E%E5%8A%A9%E5%95%86-CAFINX%20%C2%B7%20CAFINXSIM-2AABEE" alt="赞助商"></a>
+  <img src="https://img.shields.io/badge/%E8%B5%9E%E5%8A%A9%E5%95%86-CAFINX%20%C2%B7%20CAFINXSIM-2AABEE" alt="赞助商">
 </p>
 
 <p>
@@ -80,36 +80,30 @@
       <h4>账号矩阵</h4>
       <sub>四种格式批量导入（手机号 / Session 串 / .session / tdata）、深度验活与健康分、<br>
       每号独立设备指纹、节流防封与养号阶梯</sub><br>
-      <sub><a href="docs/ACCOUNT_MATRIX.md">文档 →</a></sub>
     </td>
     <td width="33%" valign="top">
       <h4>群情报采集</h4>
       <sub>入群即采、不发言不回应；粘贴群链接自动采群员，<br>
       进度逐条可见，采完一键打包（群总表 + 成员 + 事件）</sub><br>
-      <sub><a href="docs/ACCOUNT_MATRIX.md#7-群情报入群即采无感">文档 →</a></sub>
     </td>
     <td width="33%" valign="top">
       <h4>批量运营</h4>
       <sub>私信 / 群发 / 素材群发 / 加群 / 退群 / 强拉 / 改资料 / 吵群 / 拟人发言，<br>
       按批次跟踪进度、可取消、可打包导出</sub><br>
-      <sub><a href="docs/FEATURES.md#3-营销中心批量动作">文档 →</a></sub>
     </td>
   </tr>
   <tr>
     <td valign="top">
       <h4>会话收件箱</h4>
       <sub>群聊、私信、Bot 私信统一入口，WebSocket 实时推送，AI 草稿人工确认后发送</sub><br>
-      <sub><a href="docs/FEATURES.md#4-会话与收件箱">文档 →</a></sub>
     </td>
     <td valign="top">
       <h4>任务队列与租约</h4>
       <sub>一个号同时只被一个 Worker 使用；被节流拦下的任务顺延而不是硬发</sub><br>
-      <sub><a href="docs/ARCHITECTURE.md#3-任务队列">文档 →</a></sub>
     </td>
     <td valign="top">
       <h4>审计与权限</h4>
       <sub>谁在什么时间对哪个号做了什么全部留痕；操作员只能看到分配给自己的账号</sub><br>
-      <sub><a href="docs/SECURITY.md">文档 →</a></sub>
     </td>
   </tr>
 </table>
@@ -198,7 +192,7 @@
 
 - 探测：`/health`（进程活着）、`/ready`（数据库 + Redis 都通）、`/metrics`（Prometheus）。
 - Worker 自带 `:9101/metrics`：在线号数、租约数、重连次数、任务成败与耗时、租约续期失败、心跳年龄、`tgcc_worker_info{worker_id}`。
-- **四条告警**（外加监控自身的三条兜底）见 [deploy/alert.rules.yml](deploy/alert.rules.yml)；处置步骤见 [docs/OPERATIONS.md](docs/OPERATIONS.md)。
+- **四条告警**（外加监控自身的三条兜底）见 `deploy/alert.rules.yml`；处置步骤见运维手册。
 - 日志是 JSON 一行一条，业务日志带 `account_id` / `worker_id` / `task_id`。
 - 备份：每日 `pg_dump` + 每周 `pg_basebackup`，Postgres 全程 `archive_mode=on`，支持**按时间点恢复**。
 
@@ -212,7 +206,7 @@
 ## 最新更新
 
 > 版本号唯一真源是仓库根的 [`VERSION`](VERSION)：后端 `/health` 返回它，前端构建时注入它（侧栏左下角可见）。
-> 完整历史见 [`CHANGELOG.md`](CHANGELOG.md)。
+> 完整历史见 `CHANGELOG.md`。
 
 ### v0.3.0 — 账号矩阵成熟化（2026-09-29）
 
@@ -226,7 +220,6 @@
 - **官方机制养号**：身份取自官方真实发布版本表；读服务端下发的 `help.GetAppConfig` 限制参数驱动节流
   （只收紧不放松）；`warmup_activity` 按官方客户端节奏上线/翻会话/下线，不发消息、不加群。
 - **修复**：`localStorage` 残缺结构导致的整页白屏；失败原因红字撑破列宽遮挡其它列。
-- 文档：[账号矩阵与群情报](docs/ACCOUNT_MATRIX.md)
 
 ## 界面预览
 
@@ -326,7 +319,7 @@
                                                        → Bot 转发进员工群 → 员工回复 → reply_to_origin
 ```
 
-**关键不变量**（详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)）：
+**关键不变量**（详见架构文档）：
 
 1. **每个用户号同一时刻只属于一个 Worker**：`leases` 表，30 秒过期、每 10 秒续租；进程收到 SIGTERM 先释放租约再断开。
 2. **Bot 收发不进 Worker**：Webhook 无状态，不跟某台 Worker 绑定。
@@ -353,7 +346,7 @@ frontend/
   src/theme/           设计 token（187 个 CSS 变量）与主题
   src/components/      共享组件库（DataTable / FilterBar / StatCard / Drawer …）
   src/pages/           12 个页面
-  src/api/             接口封装（与 docs/API_CONTRACT.md 对齐）
+  src/api/             接口封装（与接口契约对齐）
   Dockerfile           多阶段构建 → nginx 托管 dist
 deploy/
   prometheus.yml       抓取配置（api / worker / postgres-exporter / pushgateway）
@@ -484,7 +477,7 @@ cd frontend && npm ci && npm run dev
 | `make migrate` / `make revision M="描述"` | 跑迁移 / 生成迁移脚本 |
 | `make admin ADMIN_PASSWORD='xxx'` | 创建或重置管理员 |
 | `make monitoring` | 带 `monitoring` profile 起 Prometheus + Alertmanager + Pushgateway + postgres-exporter |
-| `make backup` / `make restore` | 立刻备份一次 / 打印恢复入口（细则见 [deploy/postgres-backup.md](deploy/postgres-backup.md)） |
+| `make backup` / `make restore` | 立刻备份一次 / 打印恢复入口 |
 | `make psql` | 进 psql 排查 |
 | `make stack-up` / `make stack-down` / `make stack-status` | 本机直接起停 API + Worker（不用 docker） |
 | `make dev-api` / `make dev-worker` / `make dev-web` | 本机分别跑进程 / 前端 dev server |
@@ -507,8 +500,7 @@ cd frontend && npm ci && npm run dev
 
 ## 部署与运维
 
-完整告警处置与故障排查在 [docs/OPERATIONS.md](docs/OPERATIONS.md)，恢复演练在
-[deploy/postgres-backup.md](deploy/postgres-backup.md)。下面是最常查的四块。
+完整告警处置与故障排查在运维手册，恢复演练在备份文档。下面是最常查的四块。
 
 ### 四条告警
 
@@ -526,7 +518,7 @@ cd frontend && npm ci && npm run dev
 - 每天 03:10 `pg_dump -Fc` 逻辑备份（保留 7 份）；每周日 03:40 `pg_basebackup` 基础备份（保留 4 份）；
   Postgres 全程 `archive_mode=on`，WAL 归档在 `pg_wal_archive` 卷。
 - **按时间点恢复（PITR）= 基础备份 + WAL 归档**，两者缺一不可，都要一起离线保存。
-  完整步骤（含临时实例验证、权限与坑）在 [deploy/postgres-backup.md](deploy/postgres-backup.md)，摘要：
+  完整步骤（含临时实例验证、权限与坑）见 `deploy/postgres-backup.md`，摘要：
 
 ```bash
 # 日常误删：逻辑恢复（最快，先停写入）
@@ -556,7 +548,7 @@ docker run --rm --name tgcc-restore -e PGDATA=/var/lib/postgresql/data/pgdata \
 
 - 恢复后只要 `.env` 里的 `SESSION_ENCRYPTION_KEY` 没变，库里加密的会话与 Bot Token 仍可解密，号不用重登；
   **换过密钥就必须重新登录所有号**。
-- 建议每季度按 [deploy/postgres-backup.md](deploy/postgres-backup.md) 第 6 节演练一次。
+- 建议每季度按备份文档第 6 节演练一次。
 
 ### 发布顺序
 
@@ -583,12 +575,12 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 
 ## 范围与合规边界
 
-本 README 与 [规划.md](规划.md) 记录的是这套控制台的**主线范围**：
+本 README 与 `规划.md` 记录的是这套控制台的**主线范围**：
 
 > 管理自己的用户号与官方 Bot → 处理这些号已经在里面的群聊与私信 → 用 Bot 转发到员工群 →
 > 员工回复按同一规则送回 → 发送要员工确认 → 全程留审计。
 
-主线**不含**下面这批批量触达动作（[规划.md](规划.md) 把它们写在「不做这些」清单里）：
+主线**不含**下面这批批量触达动作（`规划.md` 把它们写在「不做这些」清单里）：
 
 > 批量私信、批量群发、素材群发、批量加群、批量退群、强拉进群、批量改资料、吵群，
 > 以及用多个用户号自动把话说得像真人。
@@ -620,7 +612,7 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 ## 贡献
 
 - 提 Issue 请带上：版本（commit）、部署方式（Compose / 本地）、复现步骤、期望与实际、相关日志（JSON 一行一条，注意先脱敏手机号与 Token）。
-- 提 PR 请保持：`make check` 与相关验收（`make smoke` / `make e2e` / `make console-check` / `make config-check`）全绿，中文注释解释「为什么」，不要引入未在本 README 与 [规划.md](规划.md) 范围内的批量能力。
+- 提 PR 请保持：`make check` 与相关验收（`make smoke` / `make e2e` / `make console-check` / `make config-check`）全绿，中文注释解释「为什么」，不要引入未在本 README 与 `规划.md` 范围内的批量能力。
 - **安全问题**不要开公开 Issue：请私下联系仓库作者，附最小复现。
 - 本项目只对接一个远程仓库（`origin`），提交时只提交你自己改动的路径，不要顺手带上别人的工作区改动。
 
@@ -637,11 +629,11 @@ license 徽章从「待定」改成对应协议。
 
 - [Telethon](https://github.com/LonamiWebs/Telethon)、[aiogram](https://github.com/aiogram/aiogram)、[FastAPI](https://github.com/fastapi/fastapi)、[SQLAlchemy](https://github.com/sqlalchemy/sqlalchemy)、[Alembic](https://github.com/sqlalchemy/alembic)、[antd](https://github.com/ant-design/ant-design)、[Vite](https://github.com/vitejs/vite)、[Prometheus](https://github.com/prometheus/prometheus)
 - 界面设计与工程实现由本仓库的 Agent Teams 分工完成：设计底座、后端接口、三组页面分队、独立验收
-- 以及所有赞助者（名单见 [docs/SPONSOR.md](docs/SPONSOR.md#鸣谢墙)）
+- 以及所有赞助者
 
 <div align="center">
   <br>
-  <b>如果这套东西帮你省下了值班时间，给个 ⭐ 或 <a href="docs/SPONSOR.md">请我喝杯咖啡</a> ☕</b>
+  <b>如果这套东西帮你省下了值班时间，给个 ⭐ 支持一下</b>
   <br><br>
   <sub>本项目只用于管理你自己拥有或有权操作的账号与 Bot；请遵守 Telegram 服务条款与当地法律。</sub>
 </div>
