@@ -559,7 +559,7 @@ async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAc
             len(roots),
             len(results),
             len(errors),
-            extra={"filename": filename},
+            extra={"tdata_zip": filename},
         )
         return results
     finally:

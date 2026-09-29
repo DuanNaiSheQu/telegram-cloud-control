@@ -7,6 +7,27 @@
 
 ---
 
+## v0.3.26 — 2026-03-30
+
+主题：**修 tdata 导入到最后一步崩 500**。
+
+### 修复
+
+- 现象：上传 tdata 包时前端提示「服务端错误（500），请稍后重试」，
+  日志里是 `KeyError: "Attempt to overwrite 'filename' in LogRecord"`。
+- 根因：解析完成后的那条日志用了 `extra={"filename": ...}`，而 `filename` 是 Python logging 的
+  **保留字段**（用于记录日志来源文件），logging 在构造 LogRecord 时直接抛 KeyError——
+  也就是说**解析其实已经跑完了，是打完日志才崩的**，前端只看到 500。
+- 修法：`extra` 的键改成 `tdata_zip`。并全仓扫了一遍所有 `extra={...}`，
+  确认没有其它与 logging 保留字段冲突的键（name / module / msg / lineno / process 等）。
+
+### 验证
+
+- 修复后同一个多号结构 zip 上传：`/api/accounts/import/parse` 返回 **200** 并给出逐目录原因
+  （测试用的是假数据）；手机号清单路径同样 200。
+
+---
+
 ## v0.3.25 — 2026-03-30
 
 主题：**自己编码会话串**——修掉 telethon 1.45 带来的 `'bytes' object has no attribute 'key'`。
