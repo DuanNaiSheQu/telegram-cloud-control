@@ -403,3 +403,12 @@ class MaterialListResponse(BaseModel):
     total: int
     page: int = 1
     page_size: int = 20
+
+
+class GenerateTextsRequest(BaseModel):
+    """AI 生成一批话术：发送时从这批里取不同的句子，保证不重复，又都限定在这个范围内。"""
+
+    topic: str = Field(min_length=2, max_length=200, description="要围绕什么说，例如「CAFINX 虚拟卡开卡」")
+    count: int = Field(default=10, ge=1, le=50, description="生成几条")
+    style: str = Field(default="自然口语，像真人随手打的，不要广告腔", max_length=200, description="语气风格")
+    language: str = Field(default="中文", max_length=20, description="语言")

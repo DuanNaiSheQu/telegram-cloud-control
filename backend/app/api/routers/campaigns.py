@@ -57,6 +57,7 @@ from app.schemas import (
     ProfileBulkRequest,
     StormRequest,
 )
+from app.schemas.campaign import GenerateTextsRequest
 
 logger = logging.getLogger(__name__)
 
@@ -672,3 +673,53 @@ async def cancel_batch(
         failed=0,
         skipped=len(tasks) - cancelled,
     )
+
+
+@router.post("/generate-texts", summary="AI 生成一批话术（按主题与风格）")
+async def generate_texts(
+    payload: GenerateTextsRequest,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """让 AI 按主题生成 N 条互不相同的话术，填进文本池。
+
+    设计意图：运营要的是「每次发出去的话不一样，但都在我能接受的范围内」——
+    先一次性生成一批**受控**话术，再由发送端逐条取用；
+    而不是让模型每次发送时自由发挥（那会跑偏到无法预期的内容）。
+    """
+    from app.services import ai
+
+    if not ai.available:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "AI 未启用：请在 backend/.env 配置 AI_ENABLED=true、AI_API_KEY、AI_BASE_URL、AI_MODEL"
+                "（OpenAI 兼容接口，DeepSeek / 通义 / 本地 vLLM 都行），改完重启后端。"
+            ),
+        )
+    prompt = (
+        f"请围绕主题「{payload.topic}」，用{payload.language}写出 {payload.count} 条互不相同的短消息。"
+        f"语气要求：{payload.style}。要求：每条独立成行，行首不要序号与引号；"
+        "长度 40 字以内，像真人随手发的；不要模板腔，最多一个 emoji；直接输出这些消息，不要解释。"
+    )
+    raw = await ai.chat(
+        [
+            {"role": "system", "content": "你是资深社群运营，擅长写不同口吻的短消息。"},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=1.0,
+    )
+    import re as _re
+
+    texts: list[str] = []
+    for line in (raw or "").splitlines():
+        item = line.strip()
+        if not item:
+            continue
+        item = _re.sub(r"^[0-9]+[.、)]\s*", "", item)
+        item = item.strip('"\'“”「」 ')
+        if 1 < len(item) <= 200:
+            texts.append(item)
+    texts = list(dict.fromkeys(texts))[: payload.count]
+    if not texts:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI 没有返回可用文本，请稍后重试或换个主题")
+    return {"texts": texts}
