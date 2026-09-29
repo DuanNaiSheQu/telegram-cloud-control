@@ -405,29 +405,53 @@ class CampaignTasksMixin:
         """加群：邀请链接（ImportChatInvite）或公开群 @username（JoinChannel）。"""
         assert account is not None
         payload = dict(task.payload or {})
-        target = str(payload.get("target") or "").strip()
-        if not target:
+        # 兼容单个 target 与多目标 targets：批量加群时一个号可以连着进好几个群
+        raw_targets = [str(item).strip() for item in (payload.get("targets") or []) if str(item).strip()]
+        single = str(payload.get("target") or "").strip()
+        if single and single not in raw_targets:
+            raw_targets.insert(0, single)
+        if not raw_targets:
             raise TaskFailure("加群任务缺少目标", retryable=False)
         # 加群是高风险动作：按权重预检，并在成功加入后记账
         await self._throttle_gate(account, task)
         client = self._client(account.id)
-        try:
-            if "+" in target:
-                await client(functions.messages.ImportChatInviteRequest(hash=self._invite_hash(target)))
+        rng = self._campaign_rng(task, payload)
+        min_interval = self._interval_of(payload, "min_interval", 20.0)
+        max_interval = self._interval_of(payload, "max_interval", 60.0)
+
+        joined = already = 0
+        results: list[dict] = []
+        for index, target in enumerate(raw_targets):
+            try:
+                if "+" in target:
+                    await client(functions.messages.ImportChatInviteRequest(hash=self._invite_hash(target)))
+                    via = "invite"
+                else:
+                    username = target.lstrip("@").split("/")[-1].strip()
+                    entity = await client.get_input_entity(username)
+                    await client(functions.channels.JoinChannelRequest(channel=entity))
+                    via = "username"
                 await self._throttle_record(account, task)
-                return {"joined": True, "via": "invite"}
-            username = target.lstrip("@").split("/")[-1].strip()
-            entity = await client.get_input_entity(username)
-            await client(functions.channels.JoinChannelRequest(channel=entity))
-            await self._throttle_record(account, task)
-            return {"joined": True, "via": "username"}
-        except (UserAlreadyParticipantError, InviteHashExpiredError) as exc:
-            return {"joined": False, "already": True, "detail": describe_exception(exc)}
-        except (InviteHashInvalidError, ValueError) as exc:
-            raise TaskFailure(f"邀请无效或找不到目标（{target}）：{describe_exception(exc)}", retryable=False) from exc
-        except Exception as exc:  # noqa: BLE001
-            await self._apply_status(session, account, exc)
-            raise self._failure(exc, "加群失败") from exc
+                joined += 1
+                results.append({"target": target, "joined": True, "via": via})
+            except (UserAlreadyParticipantError, InviteHashExpiredError) as exc:
+                already += 1
+                results.append({"target": target, "joined": False, "already": True, "detail": describe_exception(exc)})
+            except (InviteHashInvalidError, ValueError) as exc:
+                results.append({"target": target, "joined": False, "error": describe_exception(exc)})
+            except Exception as exc:  # noqa: BLE001 - FloodWait 等交给调用方决定重试
+                await self._apply_status(session, account, exc)
+                results.append({"target": target, "joined": False, "error": describe_exception(exc)})
+                if joined == 0 and len(results) == len(raw_targets):
+                    raise self._failure(exc, "加群失败") from exc
+            if index < len(raw_targets) - 1:
+                # 连着进群之间留出间隔：短时间连续加入是最容易被判异常的动作之一
+                await sleep_human(min_interval, max_interval, rng)
+
+        if joined == 0 and already == 0 and results:
+            first_error = next((item.get("error") for item in results if item.get("error")), "未知原因")
+            raise TaskFailure(f"加群全部失败，首错：{first_error}", retryable=False)
+        return {"joined": joined, "already": already, "total": len(raw_targets), "results": results[:50]}
 
     async def _leave_group(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """退群：频道用 LeaveChannel，普通群用 DeleteChatUser；可选删除本地会话。"""

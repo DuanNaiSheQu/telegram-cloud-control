@@ -123,7 +123,25 @@ class MaterialSendRequest(BulkScopeRequest):
 # ---------------- 加群 / 退群 / 强拉 ----------------
 
 class JoinGroupRequest(BulkScopeRequest):
-    target: str = Field(description="邀请链接（t.me/+...）或公开群 @username")
+    """批量加群：一次可给多个群，群与账号之间按 dispatch 决定怎么配对。"""
+
+    target: Optional[str] = Field(default=None, description="单个群：邀请链接（t.me/+...）或公开群 @username")
+    targets: Optional[List[str]] = Field(
+        default=None, description="多个群（每行一个，最多 50 个）；与 target 二选一，同时给则合并"
+    )
+
+    @model_validator(mode="after")
+    def _merge_targets(self):
+        merged = [str(item).strip() for item in (self.targets or []) if str(item).strip()]
+        if self.target and str(self.target).strip():
+            merged.insert(0, str(self.target).strip())
+        merged = list(dict.fromkeys(merged))
+        if not merged:
+            raise ValueError("至少给一个群：邀请链接或 @公开群")
+        if len(merged) > 50:
+            raise ValueError("单次最多 50 个群，请分批")
+        self.targets = merged
+        return self
 
 
 class LeaveGroupRequest(BulkScopeRequest):

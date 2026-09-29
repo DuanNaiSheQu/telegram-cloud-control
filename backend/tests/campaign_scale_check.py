@@ -95,6 +95,32 @@ def main():
         })
         check("素材群发支持轮询分发", r.status_code == 200 and r.json()["succeeded"] == 2, r.json().get("message"))
 
+    # 3.5) 批量加群：多群 + 轮询切分
+    r = c.post("/api/campaigns/join-group", headers=H, json={
+        "scope": "selected", "account_ids": [str(ids[0]), str(ids[1])],
+        "targets": ["t.me/+aaa", "@g1", "@g2", "@g3"], "dispatch": "round_robin",
+    })
+    check("批量加群接受多群", r.status_code == 200 and r.json()["succeeded"] == 2, r.json().get("message"))
+    jt = r.json().get("task_ids", [])
+
+    async def inspect_join():
+        from sqlalchemy import select
+        from app import db
+        from app.models import Task
+        async with db.SessionFactory() as s:
+            rows = list((await s.scalars(select(Task).where(Task.id.in_([uuid.UUID(x) for x in jt])))).all())
+            return {row.payload.get("account_index"): row.payload.get("targets") for row in rows}
+    js = run(inspect_join())
+    check("加群轮询切分不重叠", set(js.get(0, [])) & set(js.get(1, [])) == set() and len(sum(js.values(), [])) == 4, js)
+
+    r = c.post("/api/campaigns/join-group", headers=H, json={
+        "scope": "selected", "account_ids": [str(ids[0])], "target": "@legacy_single",
+    })
+    check("单个 target 保持兼容", r.status_code == 200 and r.json()["succeeded"] == 1, r.json().get("message"))
+
+    r = c.post("/api/campaigns/join-group", headers=H, json={"scope": "all", "targets": []})
+    check("空目标被拦", r.status_code == 422, r.status_code)
+
     # 4) 并发配置存在
     from app.config import settings
     check("并发可配且默认提升", settings.task_concurrency >= 10 and settings.task_batch >= 10,

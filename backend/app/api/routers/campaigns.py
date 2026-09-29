@@ -279,13 +279,21 @@ async def join_group(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> BulkResultResponse:
+    targets = payload.targets or []
+    round_robin = payload.dispatch == "round_robin"
     return await _submit_campaign(
         action="campaign.join_group",
         task_type=TaskType.join_group,
         payload_scope=payload,
-        params={"target": payload.target.strip()},
+        params={"target": targets[0] if targets else "", "targets": targets, "dispatch": payload.dispatch},
         session=session,
         user=user,
+        # 轮询模式：群按账号轮流切分，一个群只由一个号去加（避免所有号都去挤同一个群）
+        per_account=(
+            (lambda account, index, total: {"targets": _split_round_robin(targets, index, total)})
+            if round_robin
+            else None
+        ),
     )
 
 

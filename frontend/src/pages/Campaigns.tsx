@@ -651,15 +651,36 @@ export default function Campaigns() {
       children: (
         <ActionTab
           title="批量加群"
-          description="一批号加入同一个群：邀请链接（t.me/+...）或 @公开群用户名。已加入的号自动跳过。"
+          description="一批号加入一个或多个群：邀请链接（t.me/+...）或 @公开群用户名，一行一个。已加入的自动跳过；群多时可选「按账号轮询分配」，让每个号分头进不同的群。"
           buildPayload={(scope, values) => ({
             ...scopePayload(scope),
-            target: String(values.target ?? '').trim(),
+            targets: splitField(values.targets),
+            dispatch: String(values.dispatch ?? 'each'),
           })}
           submit={(payload) => campaignApi.joinGroup(payload as unknown as JoinGroupRequest)}
         >
-          <Form.Item label="邀请链接或公开群" name="target" rules={[{ required: true, message: '必填' }]}>
-            <Input placeholder="邀请链接 t.me/+xxxx 或 @公开群用户名" />
+          <Form.Item
+            label="邀请链接或公开群（一行一个，可批量）"
+            name="targets"
+            rules={[{ required: true, message: '至少填一个群' }]}
+          >
+            <Input.TextArea
+              placeholder={'t.me/+AbCdEfGh1234\n@public_group\nt.me/another_group'}
+              autoSize={{ minRows: 3, maxRows: 10 }}
+            />
+          </Form.Item>
+          <Form.Item
+            label="分发方式"
+            name="dispatch"
+            initialValue="each"
+            tooltip="轮询分配：群按账号轮流切分，一个群只由一个号去加——避免所有号同时挤进同一个群"
+          >
+            <Segmented
+              options={[
+                { label: '每个号都加全部群', value: 'each' },
+                { label: '按账号轮询分配群', value: 'round_robin' },
+              ]}
+            />
           </Form.Item>
         </ActionTab>
       ),
