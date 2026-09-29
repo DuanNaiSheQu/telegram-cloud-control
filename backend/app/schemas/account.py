@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.enums import AccountStatus, CurrentTask
 from app.schemas.common import ORMModel
@@ -64,6 +64,14 @@ class AccountOut(ORMModel):
     last_heartbeat: Optional[datetime] = None
     last_checked_at: Optional[datetime] = None
     last_error: str = ""
+
+    @field_validator("last_error", mode="after")
+    @classmethod
+    def _translate_last_error(cls, value: str) -> str:
+        """库里存的历史错误是英文原文，展示时翻成中文（新写的已经是中文，会原样返回）。"""
+        from app.services.error_text import translate_error
+
+        return translate_error(value)
     worker_id: Optional[str] = None
     lease_until: Optional[datetime] = None
     remark: str = ""
