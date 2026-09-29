@@ -234,7 +234,16 @@ async def _summary(session: AsyncSession, ids: Optional[List[uuid.UUID]]) -> Acc
     active_leases = await session.scalar(
         select(func.count()).select_from(Lease).where(Lease.lease_until > now, *lease_scope)
     )
+    # 按状态分布：一次查询拿全，供页面上的分类芯片用（冻结 / 限流 / 提示码 / 失效 / 停用…）
+    rows = (
+        await session.execute(
+            select(TgAccount.status, func.count()).where(*scope).group_by(TgAccount.status)
+        )
+    ).all()
+    by_status = {enum_value(row[0]): int(row[1]) for row in rows}
+
     return AccountSummary(
+        by_status=by_status,
         total=int(total or 0),
         healthy=int(healthy or 0),
         abnormal=int(abnormal or 0),

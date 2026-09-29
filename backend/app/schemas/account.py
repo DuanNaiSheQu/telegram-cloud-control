@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -84,6 +84,8 @@ class AccountSummary(BaseModel):
     new_this_week: int = 0
     online: int = 0
     leased: int = 0
+    # 按状态分类的计数：页面用它们做「冻结 / 限流 / 待登录 / 失效 / 停用」筛选芯片
+    by_status: Dict[str, int] = Field(default_factory=dict)
 
 
 class AccountListResponse(BaseModel):

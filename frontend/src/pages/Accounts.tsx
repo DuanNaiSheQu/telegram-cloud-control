@@ -539,6 +539,39 @@ export default function Accounts() {
         />
       </StatGrid>
 
+      {/* 状态分类：冻结 / 限流这类异常态单独成类，一点就看那批号，不用在长列表里翻 */}
+      <div className="tg-account-cats">
+        {(() => {
+          const by = summary?.by_status ?? {};
+          const cats: { key: string; label: string; tone?: string }[] = [
+            { key: '', label: '全部' },
+            { key: 'healthy', label: '正常', tone: 'is-ok' },
+            { key: 'frozen', label: '冻结', tone: 'is-danger' },
+            { key: 'needs_code', label: '待验证码', tone: 'is-warn' },
+            { key: 'invalid', label: '失效', tone: 'is-danger' },
+            { key: 'dead', label: '永久双向', tone: 'is-danger' },
+            { key: 'disabled', label: '已停用', tone: 'is-muted' },
+          ];
+          const current = q.filters.status || '';
+          return cats.map((cat) => {
+            const count = cat.key ? (by[cat.key] ?? 0) : (summary?.total ?? 0);
+            return (
+              <button
+                key={cat.key || 'all'}
+                type="button"
+                className={['tg-account-cat', cat.tone ?? '', current === cat.key ? 'is-active' : '']
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={() => q.setFilter('status', cat.key)}
+              >
+                {cat.label}
+                <b>{count}</b>
+              </button>
+            );
+          });
+        })()}
+      </div>
+
       <FilterBar
         collapsible
         onReset={() => {

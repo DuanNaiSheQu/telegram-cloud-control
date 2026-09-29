@@ -107,6 +107,8 @@ export interface AccountOut {
 }
 
 export interface AccountSummary {
+  /** 按状态分类的计数（冻结 / 待验证码 / 失效 / 停用…），供分类芯片用 */
+  by_status?: Record<string, number>;
   total: number;
   healthy: number;
   abnormal: number;

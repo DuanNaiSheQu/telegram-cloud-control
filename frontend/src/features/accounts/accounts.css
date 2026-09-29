@@ -34,3 +34,48 @@
 .tg-result-stat.is-task {
   color: var(--tg-color-info, var(--tg-color-primary));
 }
+
+/* 账号页状态分类芯片：异常态（冻结/失效/停用）各自成类，点一下只看那批 */
+.tg-account-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tg-space-sm);
+  margin-bottom: var(--tg-space-md);
+}
+.tg-account-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 var(--tg-space-md);
+  border-radius: var(--tg-radius-pill);
+  border: 1px solid var(--tg-color-border);
+  background: var(--tg-color-bg-card);
+  color: var(--tg-color-text-secondary);
+  font-size: var(--tg-font-size-sm);
+  cursor: pointer;
+}
+.tg-account-cat b {
+  font-family: var(--tg-font-mono);
+  color: var(--tg-color-text);
+}
+.tg-account-cat:hover {
+  border-color: var(--tg-color-border-strong);
+}
+.tg-account-cat.is-active {
+  border-color: var(--tg-color-primary);
+  background: var(--tg-color-primary-bg);
+  color: var(--tg-color-primary);
+}
+.tg-account-cat.is-danger b {
+  color: var(--tg-color-error);
+}
+.tg-account-cat.is-warn b {
+  color: var(--tg-color-warning);
+}
+.tg-account-cat.is-ok b {
+  color: var(--tg-color-success);
+}
+.tg-account-cat.is-muted b {
+  color: var(--tg-color-text-tertiary);
+}
