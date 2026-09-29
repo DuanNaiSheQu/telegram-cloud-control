@@ -519,6 +519,98 @@ async def collect_by_link(
 
 # ---------------- 群档案 ----------------
 
+@router.get("/library", summary="群资源库：把采到的群做成可检索的投放资源")
+async def group_library(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+    keyword: str = Query(default="", description="按群名 / 用户名 / 简介搜"),
+    min_members: int = Query(default=0, ge=0, le=10000000, description="人数下限"),
+    max_members: int = Query(default=0, ge=0, le=10000000, description="人数上限（0 = 不限）"),
+    kind: str = Query(default="", description="group / channel，留空=都看"),
+    public_only: bool = Query(default=False, description="只看公开群（有 username / 有公开链接）"),
+    order_by: str = Query(default="members", description="members 人数 / recent 最近采集 / title 名称"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=200),
+) -> dict:
+    """**群资源库**：把已经采到的群档案当成投放资源来检索。
+
+    与「群档案」列表的区别：那一页是采集过程的原始记录，这一页是**面向投放的筛选视图**——
+    按人数区间、群/频道、是否公开、关键词（群名/用户名/简介）筛，按人数排序，
+    选出来的群可以直接拿去「群发」或「加群」（页面上一键带过去）。
+    """
+    conditions: list = []
+    if keyword.strip():
+        like = f"%{keyword.strip()}%"
+        conditions.append(
+            or_(GroupProfile.title.ilike(like), GroupProfile.username.ilike(like), GroupProfile.about.ilike(like))
+        )
+    if min_members:
+        conditions.append(GroupProfile.member_count >= min_members)
+    if max_members:
+        conditions.append(GroupProfile.member_count <= max_members)
+    if kind in ("group", "channel"):
+        # 库里群的 kind 存的是 Telegram 的原值（megagroup / broadcast / chat），
+        # 对外用 group / channel 更好懂，这里做一次映射，免得筛「群」筛不出来
+        mapped = {"group": "megagroup", "channel": "broadcast"}[kind]
+        conditions.append(or_(GroupProfile.kind == mapped, GroupProfile.kind == kind))
+    if public_only:
+        conditions.append(GroupProfile.is_public.is_(True))
+
+    total = int(await session.scalar(select(func.count()).select_from(GroupProfile).where(*conditions)) or 0)
+    if order_by == "recent":
+        order = GroupProfile.collected_at.desc().nulls_last()
+    elif order_by == "title":
+        order = GroupProfile.title
+    else:
+        order = GroupProfile.member_count.desc().nulls_last()
+    rows = list(
+        (
+            await session.scalars(
+                select(GroupProfile)
+                .where(*conditions)
+                .order_by(order, GroupProfile.id)
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+        ).all()
+    )
+
+    # 资源库的概览数字：总数 + 各类型 + 人数分布（方便判断「库里有多少能用的」）
+    kind_rows = (
+        await session.execute(select(GroupProfile.kind, func.count()).group_by(GroupProfile.kind))
+    ).all()
+    big = int(
+        await session.scalar(
+            select(func.count()).select_from(GroupProfile).where(GroupProfile.member_count >= 1000)
+        )
+        or 0
+    )
+    return {
+        "items": [
+            {
+                "id": str(row.id),
+                "title": row.title or "",
+                "username": row.username,
+                "tg_chat_id": row.tg_chat_id,
+                "kind": row.kind,
+                "member_count": row.member_count,
+                "is_public": bool(row.is_public),
+                "invite_link": row.invite_link,
+                "about": (row.about or "")[:200],
+                "collected_at": row.collected_at,
+            }
+            for row in rows
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "stats": {
+            "by_kind": {str(k): int(v) for k, v in kind_rows},
+            "over_1000_members": big,
+        },
+    }
+
+
 @router.get("/profiles", response_model=GroupProfileListResponse, summary="群档案列表")
 async def list_profiles(
     q: Optional[str] = Query(default=None, description="按群名/用户名模糊搜索"),
