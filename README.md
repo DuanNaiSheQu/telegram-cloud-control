@@ -10,7 +10,7 @@
 <!-- 徽章说明：仓库为 private 时 shields.io 的 github/* 徽章会显示 not found，
      改成 public 后自动恢复；其余静态徽章不受影响。 -->
 <p>
-  <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
+  <a href="#许可证"><img src="https://img.shields.io/badge/license-Proprietary-red-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/version-0.5.4-2AABEE.svg" alt="Version"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/changelog-%E6%9B%B4%E6%96%B0%E8%AE%B0%E5%BD%95-blue.svg" alt="Changelog"></a>
   <a href="https://t.me/TGCloudcontrol"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-2AABEE?logo=telegram&logoColor=white" alt="Telegram 交流群"></a>
@@ -614,12 +614,13 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 
 ## 许可证
 
-**许可证待定**：作者正在为开源发布选定协议（常见选择：AGPL-3.0 或 MIT）。
-在 `LICENSE` 文件落地之前，你可以自由地自托管部署并使用本项目的全部功能；
-对外二次分发或商用请先联系仓库作者。
+**专有授权（Proprietary）** —— 核心源码为闭源商业成果，著作权归作者所有；**获得发行版不等于获得源码授权**。
 
-选定协议后只需两步：把所选协议的 `LICENSE` 文件加入仓库根目录，并把本 README 顶部的
-license 徽章从「待定」改成对应协议。
+发行版可用于**自用部署与评估**；**禁止转售、去除标识、以衍生版提供商业服务**。
+
+完整条款见 **[LICENSE](LICENSE)**：源码归属 / 授权范围 / 禁止事项 / 商用洽谈 / 免责声明。
+
+需要**商用、二次开发或源码授权**，到 [交流群](https://t.me/TGCloudcontrol) 洽谈。
 
 ## 鸣谢
 
