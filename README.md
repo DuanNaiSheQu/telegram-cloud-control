@@ -1,6 +1,26 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" width="120" alt="Telegram 云控">
+<!-- 内联 SVG：GitHub 对私有仓库的相对路径图片会经 camo 代理转发，代理拿不到源文件 → 破图；
+     直接内联就不会再请求任何外部资源 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="120" height="120" role="img" aria-label="Telegram 云控">
+  <defs>
+    <linearGradient id="tgcc-bg" x1="12" y1="8" x2="116" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2AABEE"/>
+      <stop offset="0.55" stop-color="#38B6FF"/>
+      <stop offset="1" stop-color="#7C5CFF"/>
+    </linearGradient>
+    <linearGradient id="tgcc-plane" x1="36" y1="34" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E8F6FF"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#tgcc-bg)"/>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="2"/>
+  <path d="M28 78c0-11 9-20 20-20 3-10 12-17 23-17 14 0 25 11 25 25v2c8 1 14 8 14 16 0 9-8 16-17 16H45c-9 0-17-7-17-16z" fill="rgba(255,255,255,0.16)"/>
+  <path d="M28 78c0-11 9-20 20-20 3-10 12-17 23-17 14 0 25 11 25 25v2c8 1 14 8 14 16" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M100 34 30 62c-2.6 1.1-2.5 4.8.2 5.6l18.4 5.6 6.4 19.6c.9 2.8 4.6 3.1 5.9.5l8.4-16.4 18.6 13.7c2.2 1.6 5.3.5 6-2.1L103.6 38c.7-2.7-1.6-5.1-3.6-4z" fill="url(#tgcc-plane)"/>
+  <path d="M48.6 73.2 96 42" fill="none" stroke="#2AABEE" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+</svg>
 
 <h1>Telegram 云控</h1>
 
@@ -50,23 +70,11 @@
 <table>
   <tr>
     <td align="center" width="50%">
-      <a href="https://cafinx.com">
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinx-white.png">
-          <img src="docs/assets/sponsor/cafinx.png" width="76" alt="CAFINX 虚拟卡">
-        </picture>
-      </a><br>
-      <b><a href="https://cafinx.com">CAFINX 虚拟卡</a></b><br>
+      <b><a href="https://cafinx.com">💳 CAFINX 虚拟卡</a></b><br>
       <sub>跨境收付虚拟卡 · cafinx.com</sub>
     </td>
     <td align="center" width="50%">
-      <a href="https://cafinxsim.com">
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinxsim-white.png">
-          <img src="docs/assets/sponsor/cafinxsim.png" width="196" alt="CAFINXSIM">
-        </picture>
-      </a><br>
-      <b><a href="https://cafinxsim.com">CAFINXSIM</a></b><br>
+      <b><a href="https://cafinxsim.com">📶 CAFINXSIM</a></b><br>
       <sub>全球 eSIM 流量卡 · cafinxsim.com</sub>
     </td>
   </tr>
