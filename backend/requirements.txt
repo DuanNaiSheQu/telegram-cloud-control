@@ -14,7 +14,7 @@ alembic>=1.13,<1.15
 redis>=5.0,<6
 
 # --- Telegram ---
-telethon>=1.36,<1.39
+telethon>=1.45,<1.46          # opentele2 依赖 1.45（已按其运行回归通过）
 aiogram>=3.13,<3.20
 # 用户号走代理（socks5/socks4/http）必需：Telethon 只声明 cryptg extra，
 # 不装它在配了代理的号上会 import 失败，Telethon 会退化成直连（泄露真实出口 IP）
