@@ -21,6 +21,7 @@ import {
   IdcardOutlined,
   RadarChartOutlined,
   InboxOutlined,
+  MailOutlined,
   MergeCellsOutlined,
   MessageOutlined,
   NotificationOutlined,
@@ -110,7 +111,13 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     key: 'messages',
     title: '消息',
-    items: [
+    items: [    {
+      path: '/inbox',
+      label: '客服收件箱',
+      icon: <MailOutlined />,
+      description: '跨账号汇总待处理私信，未读优先，点进去直接回复',
+    },
+
       {
         path: '/dialogs',
         label: '会话',

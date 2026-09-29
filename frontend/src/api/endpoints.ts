@@ -266,6 +266,22 @@ export const assignmentApi = {
 // ---------------------------------------------------------------- 会话 / 消息
 
 export const dialogApi = {
+  /** 客服收件箱：跨账号聚合「有人刚发来、还没处理」的私信，未读优先 */
+  inbox: (query?: { limit?: number; only_unread?: boolean }) =>
+    api.get<{
+      items: {
+        dialog_id: string;
+        account_id: string | null;
+        account_label: string | null;
+        title: string;
+        username?: string | null;
+        unread_count: number;
+        last_message_at?: string | null;
+        last_message_preview: string;
+      }[];
+      total: number;
+      unread_total: number;
+    }>('/api/dialogs/inbox', query),
   list: (query: DialogListQuery, options?: RequestOptions) =>
     api.get<DialogListResponse>('/api/dialogs', { ...query }, options),
   get: (id: UUID) => api.get<DialogOut>(`/api/dialogs/${id}`),
