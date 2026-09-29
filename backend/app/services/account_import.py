@@ -378,7 +378,42 @@ TDATA_HINT = (
 )
 
 
-def _session_from_tdesktop(tdesk: Any) -> list[ParsedAccount]:
+#: 像手机号的目录名：8-15 位数字（可带 +）
+_PHONE_LIKE_DIR = re.compile(r"^\+?\d{8,15}$")
+
+
+def _identity_from_dir(root: pathlib.Path, extract_root: pathlib.Path, filename: str) -> tuple[str, Optional[str]]:
+    """从 tdata 目录名推断账号标识与手机号。
+
+    批量导出的包常见两种命名：目录名就是手机号（`959791178160`），或者一批目录都叫
+    `tdata`（这时真正有区分度的是它的**父目录名**）。规则：
+    1. 目录名像手机号 → 标识取脱敏手机号，并把号码带进建档（写进 phone_enc）；
+    2. 目录名没信息（如 `tdata`）→ 用父目录名；
+    3. 都没有 → 退回文件名。
+    """
+    name = root.name.strip()
+    digits = re.sub(r"[^\d+]", "", name)
+    if _PHONE_LIKE_DIR.match(digits):
+        normalized = digits if digits.startswith("+") else f"+{digits}"
+        return mask_phone(normalized), normalized
+
+    generic = {"tdata", "td", "telegram", "desktop"}
+    if name.lower() in generic or not name:
+        parent = root.parent
+        if parent != extract_root and parent.name and parent.name.lower() not in generic:
+            # 父目录通常才是「这个号是谁」
+            parent_digits = re.sub(r"[^\d+]", "", parent.name)
+            if _PHONE_LIKE_DIR.match(parent_digits):
+                normalized = parent_digits if parent_digits.startswith("+") else f"+{parent_digits}"
+                return mask_phone(normalized), normalized
+            return parent.name.strip(), None
+        return pathlib.Path(filename).stem, None
+    return name, None
+
+
+def _session_from_tdesktop(
+    tdesk: Any, *, label_hint: str = "", phone_hint: Optional[str] = None
+) -> list[ParsedAccount]:
     """从已加载的 TDesktop 里直接取 authKey + dcId，自己组装 StringSession。
 
     为什么不用 opentele 的 `ToTelethon()`：它在部分版本上会走 serialize 路径并抛
@@ -412,10 +447,13 @@ def _session_from_tdesktop(tdesk: Any) -> list[ParsedAccount]:
                 except (TypeError, ValueError):
                     user_id = None
                 break
+        _accounts_total = len(list(getattr(tdesk, 'accounts', []) or []))
+        suffix = f"#{index}" if _accounts_total > 1 else ""
         results.append(
             ParsedAccount(
                 source="tdata",
-                label=f"#{index}",
+                label=f"{label_hint}{suffix}" if label_hint else f"tdata{suffix}",
+                phone=phone_hint if index == 0 else None,
                 session=build_string_session(bytes(key_bytes), dc_id),
                 dc_id=dc_id,
                 tg_user_id=user_id,
@@ -488,18 +526,19 @@ async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAc
         results: list[ParsedAccount] = []
         errors: list[str] = []
         for root_index, root in enumerate(roots):
-            # 目录名就是账号标识（多号打包时通常是号或手机号）
-            label = root.name if root != extract_root else pathlib.Path(filename).stem
+            # 账号标识：目录名像手机号就用脱敏号，否则用目录名 / 父目录名
+            label_hint, phone_hint = _identity_from_dir(root, extract_root, filename)
+            label = label_hint
             try:
                 tdesk = TDesktop(str(root))
                 if not tdesk.isLoaded():
                     errors.append(f"{label}：tdata 未加载成功（目录可能不完整）")
                     continue
                 # 先走「直接组装」（快且不受上层 API 变化影响），不行再退回 ToTelethon
-                direct = _session_from_tdesktop(tdesk)
+                direct = _session_from_tdesktop(tdesk, label_hint=label_hint, phone_hint=phone_hint)
                 if direct:
                     for item in direct:
-                        item.label = f"{label}{item.label}"
+                        item.remark = f"tdata:{root.relative_to(extract_root)}"
                         results.append(item)
                     continue
 
@@ -636,7 +675,8 @@ async def import_accounts(
             authorized_at=now if item.session else None,
             group_id=group_id,
             proxy_id=proxy_id,
-            remark=item.remark or remark,
+            # tdata 来源标注与用户填的备注都保留
+            remark="/".join(part for part in (item.remark, remark) if part)[:255],
             import_source=item.source,
             import_batch_id=outcome.batch_id,
             device_model=item.device_model or fingerprint["device_model"],
