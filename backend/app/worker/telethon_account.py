@@ -338,9 +338,13 @@ async def persist_identity(
     *,
     session_string: Optional[str] = None,
     reset_authorized_at: bool = False,
+    client_kind: Optional[str] = None,
 ) -> None:
-    """连接成功 / 登录成功后回填身份：用户 ID、用户名、展示名、状态、号龄。"""
+    """连接成功 / 登录成功后回填身份：用户 ID、用户名、展示名、状态、号龄、对齐的客户端平台。"""
     now = datetime.now(tz=timezone.utc)
+    if client_kind and not account.client_kind:
+        # 连上以后把实际使用的官方客户端平台写回，页面就不再显示「未对齐」
+        account.client_kind = client_kind
     if user is not None:
         account.tg_user_id = getattr(user, "id", None) or account.tg_user_id
         account.username = getattr(user, "username", None) or account.username
@@ -450,7 +454,9 @@ class AccountConnection:
             system_version=identity["system_version"] or settings.telegram_system_version,
             app_version=identity["app_version"] or settings.telegram_app_version,
             lang_code=identity["lang_code"] or "en",
-            lang_pack=identity["lang_pack"] or "",
+            # 注意：telethon 1.45 起不再接受 lang_pack（旧版本要求传），这里按支持情况动态组装，
+            # 免得升级后又因为一个参数直接连不上（账号会一直「未上线」）
+            **({"system_lang_code": identity["lang_pack"]} if identity.get("lang_pack") else {}),
             timeout=15,
             request_retries=3,
             connection_retries=3,
@@ -543,7 +549,7 @@ class AccountConnection:
                 account = await session.get(TgAccount, self.account_id)
                 if account is None:
                     raise AccountUnavailable("账号已被删除")
-                await persist_identity(session, account, me)
+                await persist_identity(session, account, me, client_kind=self._identity().get("lang_pack") or None)
         except Exception as exc:  # noqa: BLE001 - 连接失败都在这里收口
             if client is not None:
                 await self._safe_disconnect(client)
@@ -656,7 +662,7 @@ class AccountConnection:
         async with session_scope() as session:
             account = await session.get(TgAccount, self.account_id)
             if account is not None:
-                await persist_identity(session, account, me)
+                await persist_identity(session, account, me, client_kind=self._identity().get("lang_pack") or None)
         return me
 
     async def refresh_identity(self) -> bool:

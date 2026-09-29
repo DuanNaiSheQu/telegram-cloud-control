@@ -7,6 +7,29 @@
 
 ---
 
+## v0.3.29 — 2026-03-30
+
+主题：**修 telethon 1.45 的 `lang_pack` 参数**——这是「号连不上」的真正原因。
+
+### 修复
+
+- 配好 API 凭据后 Worker 依然连不上账号，日志里是
+  `TypeError: TelegramBaseClient.__init__() got an unexpected keyword argument 'lang_pack'`。
+- 根因：telethon 1.45 **移除了** `lang_pack` 参数（改为 `system_lang_code`）。我们在「身份对齐」
+  里按老版本传了 `lang_pack`，于是构造客户端就抛异常——账号一直「未上线」，任务全部卡在队列里。
+- 修法：按 telethon 实际支持的参数动态组装（有 `lang_pack` 就传 `system_lang_code`，
+  不再传被移除的参数）。同时把「连上以后把实际使用的官方客户端平台写回账号」补上，
+  页面上不再显示「未对齐」。
+
+### 结果（本机实测）
+
+配好 `TELEGRAM_API_ID/HASH` 后：`telegram_ready=true`，两个 tdata 账号**已上线**
+（用户 ID 8613547597 / 8966880282），客户端身份分别对齐到 iOS(iPhone 15 Pro) 与
+Android(HUAWEI ALN-AL00)——设备指纹是分开的，符合设计意图；批量私信任务开始执行
+（报错是目标用户名不存在，说明发送链路已通）。
+
+---
+
 ## v0.3.28 — 2026-03-30
 
 主题：**界面上直接告诉你为什么任务不执行**（缺 Telegram API 凭据）。
