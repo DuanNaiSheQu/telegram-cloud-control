@@ -87,7 +87,7 @@ export default function Accounts() {
   const [throttleForm] = Form.useForm();
 
   const q = useTableQuery<AccountFilters>({
-    filters: { group_id: null, status: '', current_task: '', phone: '', keyword: '' },
+    filters: { group_id: null, status: '', current_task: '', phone: '', keyword: '', archived: '' },
     pageSize: 20,
   });
 
@@ -100,6 +100,8 @@ export default function Accounts() {
         current_task: (q.filters.current_task as CurrentTask) || undefined,
         phone: (q.filters.phone as string) || undefined,
         keyword: (q.filters.keyword as string) || undefined,
+        // 归档筛选：默认只看在用的号；选「已归档」才列出被自动归档的号和原因
+        archived: q.filters.archived === 'yes' ? true : undefined,
         sort: q.sort ?? undefined,
         order: q.order ?? undefined,
       }),
@@ -602,6 +604,12 @@ export default function Accounts() {
             clear: () => q.setFilter('group_id', null),
           },
           {
+            key: 'archived',
+            label: '归档',
+            display: q.filters.archived === 'yes' ? '已归档' : undefined,
+            clear: () => q.setFilter('archived', ''),
+          },
+          {
             key: 'status',
             label: '状态',
             display: ACCOUNT_STATUS_OPTIONS.find((o) => o.value === q.filters.status)?.label,
@@ -617,6 +625,14 @@ export default function Accounts() {
           { key: 'keyword', label: '关键词', display: q.filters.keyword as string, clear: () => { setDraftKeyword(''); q.setFilter('keyword', ''); } },
         ])}
       >
+        <Select
+          allowClear
+          placeholder="归档（默认只看在用）"
+          style={{ width: 190 }}
+          value={(q.filters.archived as string) || undefined}
+          onChange={(value) => q.setFilter('archived', value ?? '')}
+          options={[{ label: '已归档的号', value: 'yes' }]}
+        />
         <Select
           allowClear
           placeholder="分组"
