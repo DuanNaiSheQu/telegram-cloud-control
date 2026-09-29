@@ -38,3 +38,6 @@ sessions/
 
 # 截图脚本的中间产物（manifest 会随主题变化，不入库）
 frontend/screenshots/manifest-*.json
+
+# 图片替换时的旧版备份，不入库
+docs/assets/_backup/

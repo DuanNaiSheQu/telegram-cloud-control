@@ -4,7 +4,7 @@
 
 <div align="center">
 
-<img src="assets/logo.svg" width="88" alt="Telegram 云控">
+<img src="assets/logo.png" width="88" alt="Telegram 云控">
 
 **感谢以下赞助商，让这套控制台持续跟进 Telegram 的变化**
 

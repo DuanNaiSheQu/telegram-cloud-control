@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg?v=2" width="120" alt="Telegram 云控">
+<img src="docs/assets/logo.png" width="132" alt="TGcloud">
 
 <h1>Telegram 云控</h1>
 
@@ -51,20 +51,14 @@
   <tr>
     <td align="center" width="50%">
       <a href="https://cafinx.com">
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinx-white.png?v=2">
-          <img src="docs/assets/sponsor/cafinx.png?v=2" width="76" alt="CAFINX 虚拟卡">
-        </picture>
+        <img src="docs/assets/sponsor/cafinx.png" width="178" alt="CAFINX 虚拟卡">
       </a><br>
       <b><a href="https://cafinx.com">CAFINX 虚拟卡</a></b><br>
       <sub>跨境收付虚拟卡 · cafinx.com</sub>
     </td>
     <td align="center" width="50%">
       <a href="https://cafinxsim.com">
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="docs/assets/sponsor/cafinxsim-white.png?v=2">
-          <img src="docs/assets/sponsor/cafinxsim.png?v=2" width="196" alt="CAFINXSIM">
-        </picture>
+        <img src="docs/assets/sponsor/cafinxsim.png" width="200" alt="CAFINXSIM">
       </a><br>
       <b><a href="https://cafinxsim.com">CAFINXSIM</a></b><br>
       <sub>全球 eSIM 流量卡 · cafinxsim.com</sub>
