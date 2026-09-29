@@ -4,7 +4,7 @@
  * 内容结构：品牌名 + 价值主张 + 四张能力卡 + 底部状态条。
  * 纯 CSS 质感（渐变 + 光晕 + 网格），不引外链图片；颜色全走变量，深浅主题自适应。
  */
-import { CheckCircleFilled } from '@ant-design/icons';
+import { CheckCircleFilled, StarFilled, GithubOutlined, SendOutlined, HeartFilled } from '@ant-design/icons';
 
 interface Feature {
   title: string;
@@ -66,6 +66,37 @@ export default function BrandPanel() {
               </span>
             </div>
           ))}
+        </div>
+      </div>
+
+
+      {/* 赞助商与开源入口：登录页是每个部署者都会看到的第一屏，
+          放这里能让赞助商获得稳定的曝光，也方便访客找到源码仓库 */}
+      <div className="login-brand-sponsors">
+        <div className="login-brand-sponsors-label">
+          <StarFilled className="login-brand-sponsors-icon" />
+          赞助商
+        </div>
+        <div className="login-brand-sponsors-row">
+          <a href="https://cafinx.com" target="_blank" rel="noreferrer" title="CAFINX 虚拟卡 · 跨境收付">
+            <img src="/sponsors/cafinx.png" alt="CAFINX 虚拟卡" className="login-brand-sponsor-logo is-wide" />
+          </a>
+          <a href="https://cafinxsim.com" target="_blank" rel="noreferrer" title="CAFINXSIM · 全球 eSIM 流量卡">
+            <img src="/sponsors/cafinxsim.png" alt="CAFINXSIM" className="login-brand-sponsor-logo is-wide" />
+          </a>
+        </div>
+        <div className="login-brand-links">
+          <a href="https://github.com/DuanNaiSheQu/telegram-cloud-control" target="_blank" rel="noreferrer">
+            <GithubOutlined /> 源码仓库
+          </a>
+          <span className="login-brand-links-sep">·</span>
+          <a href="https://t.me/TGCloudcontrol" target="_blank" rel="noreferrer">
+            <SendOutlined /> 交流群
+          </a>
+          <span className="login-brand-links-sep">·</span>
+          <a href="https://github.com/sponsors/DuanNaiSheQu" target="_blank" rel="noreferrer">
+            <HeartFilled /> 赞助
+          </a>
         </div>
       </div>
 
