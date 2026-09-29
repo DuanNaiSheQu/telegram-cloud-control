@@ -258,6 +258,8 @@ class GroupIntelMixin:
         limit = max(10, min(int(payload.get("limit") or 1000), 5000))
         exclude_admins = bool(payload.get("exclude_admins", False))
         exclude_bots = bool(payload.get("exclude_bots", True))
+        # 关键词：只捞聊到这些话题的人（走 Telegram 服务端搜索，比本地过滤准且省流量）
+        keywords = [str(item).strip() for item in (payload.get("keywords") or []) if str(item).strip()][:10]
         client = self._client(account.id)
 
         from app.models import GroupProfile
@@ -312,13 +314,32 @@ class GroupIntelMixin:
         )
 
         scanned = found = skipped_admin = skipped_bot = 0
+        matched = 0
         seen: dict[int, dict] = {}
+        keyword_hits: dict[str, int] = {}
         try:
-            async for message in client.iter_messages(entity, limit=limit):
-                message_date = getattr(message, "date", None)
-                if message_date is not None and message_date < cutoff:
-                    break  # 已经扫到时间范围之外（从新往旧）
-                scanned += 1
+            sources = (
+                [(kw, client.iter_messages(entity, search=kw, limit=limit)) for kw in keywords]
+                if keywords
+                else [(None, client.iter_messages(entity, limit=limit))]
+            )
+            for keyword, stream in sources:
+                if keyword:
+                    await self._report_progress(
+                        session, task, stage="searching",
+                        detail=f"搜索关键词「{keyword}」（已扫 {scanned} 条，识别 {found} 人）",
+                        scanned=scanned, found=found, total=limit,
+                    )
+                async for message in stream:
+                    message_date = getattr(message, "date", None)
+                    if message_date is not None and message_date < cutoff:
+                        if keyword is None:
+                            break  # 全量扫描是「从新往旧」，越过时间范围即可停；搜索模式交给 limit 控制
+                        continue
+                    if keyword:
+                        keyword_hits[keyword] = keyword_hits.get(keyword, 0) + 1
+                        matched += 1
+                    scanned += 1
                 sender = None
                 try:
                     sender = await message.get_sender()
@@ -335,6 +356,8 @@ class GroupIntelMixin:
                 user_id = int(sender.id)
                 if user_id in seen:
                     seen[user_id]["messages"] += 1
+                    if keyword:
+                        seen[user_id]["keywords"].add(keyword)
                 else:
                     username = getattr(sender, "username", None)
                     name = (
@@ -347,7 +370,9 @@ class GroupIntelMixin:
                         or (f"@{username}" if username else "")
                         or str(user_id)
                     )
-                    seen[user_id] = {"messages": 1, "name": name, "username": username}
+                    seen[user_id] = {"messages": 1, "name": name, "username": username, "keywords": set()}
+                    if keyword:
+                        seen[user_id]["keywords"].add(keyword)
                     await upsert_member(
                         session,
                         profile=profile,
@@ -359,6 +384,11 @@ class GroupIntelMixin:
                         is_admin=user_id in admin_ids,
                         source="from_messages",
                         bump_message=True,
+                        raw={
+                            "matched_keywords": sorted(seen[user_id]["keywords"]),
+                            "last_matched_text": (message.message or "")[:300],
+                            "last_matched_at": message_date.isoformat() if message_date else None,
+                        },
                     )
                     found += 1
                 if scanned % 50 == 0:
@@ -376,12 +406,19 @@ class GroupIntelMixin:
         top_names = "、".join(f"{info['name']}({info['messages']})" for _, info in active[:5])
         await self._report_progress(
             session, task, stage="done",
-            detail=f"扫描 {scanned} 条消息，识别 {found} 个发言成员"
+            detail=(
+                f"扫描 {scanned} 条消息（命中关键词 {matched} 条），识别 {found} 个发言成员"
+                if keywords
+                else f"扫描 {scanned} 条消息，识别 {found} 个发言成员"
+            )
                    + (f"；发言最多：{top_names}" if top_names else ""),
             scanned=scanned, found=found, total=limit,
         )
         return {
             "scanned": scanned,
+            "matched": matched,
+            "keywords": keywords,
+            "keyword_hits": keyword_hits,
             "found": found,
             "skipped_admin": skipped_admin,
             "skipped_bot": skipped_bot,

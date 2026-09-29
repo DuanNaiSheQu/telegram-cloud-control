@@ -149,3 +149,8 @@ class CollectMessagesRequest(BaseModel):
     exclude_admins: bool = Field(default=False, description="跳过管理员的发言")
     exclude_bots: bool = Field(default=True, description="跳过机器人")
     limit: int = Field(default=1000, ge=10, le=5000, description="最多扫多少条消息")
+    keywords: List[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description="只捞聊到这些词的人（留空=全量扫；命中走 Telegram 服务端搜索，比本地过滤准）",
+    )

@@ -324,6 +324,8 @@ export const groupIntelApi = {
     exclude_admins: boolean;
     exclude_bots: boolean;
     limit: number;
+    /** 只捞聊到这些词的人（留空=全量扫，命中走服务端搜索） */
+    keywords?: string[];
   }) => api.post<BulkResultOut>('/api/group-intel/collect-messages', payload),
   /** 按群链接采集：粘贴链接，自动解析群 + 采群员（可选先加入、采完退出） */
   collectByLink: (payload: CollectLinkRequest) =>

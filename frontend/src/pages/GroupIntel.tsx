@@ -65,6 +65,7 @@ export default function GroupIntel() {
   const [msgExcludeAdmins, setMsgExcludeAdmins] = useState(false);
   const [msgIncludeBots, setMsgIncludeBots] = useState(false);
   const [msgLimit, setMsgLimit] = useState(1000);
+  const [msgKeywords, setMsgKeywords] = useState('');
   const [memberScope, setMemberScope] = useState<'all' | 'human' | 'bot'>('all');
   const [collectOpen, setCollectOpen] = useState(false);
   const [collectBusy, setCollectBusy] = useState(false);
@@ -684,6 +685,10 @@ export default function GroupIntel() {
               exclude_admins: msgExcludeAdmins,
               exclude_bots: !msgIncludeBots,
               limit: msgLimit,
+              keywords: msgKeywords
+                .split(/[,\n，]/)
+                .map((item) => item.trim())
+                .filter(Boolean),
             });
             setMsgOpen(false);
             setCollectResult(res);
@@ -714,6 +719,16 @@ export default function GroupIntel() {
                 { label: '30 天', value: 30 },
               ]}
             />
+            <div className="tg-stack" style={{ gap: 2 }}>
+              <span>关键词（可选，逗号或换行分隔）</span>
+              <Input.TextArea
+                rows={2}
+                style={{ maxWidth: 420 }}
+                placeholder="例如：开卡、USDT、怎么收费 —— 只捞聊到这些词的人，留空则全量扫"
+                value={msgKeywords}
+                onChange={(e) => setMsgKeywords(e.target.value)}
+              />
+            </div>
             <Space>
               <span className="tg-muted">最多扫多少条</span>
               <InputNumber min={50} max={5000} step={100} value={msgLimit} onChange={(v) => setMsgLimit(Number(v) || 1000)} />

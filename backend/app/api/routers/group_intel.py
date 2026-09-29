@@ -256,6 +256,7 @@ async def collect_group_messages(
                     "exclude_admins": payload.exclude_admins,
                     "exclude_bots": payload.exclude_bots,
                     "limit": payload.limit,
+                    "keywords": payload.keywords,
                     "source": "manual_collect_messages",
                 },
                 created_by=user.id,
@@ -278,14 +279,23 @@ async def collect_group_messages(
         user_id=user.id,
         target_type="group_profile",
         target_id=str(profile.id),
-        detail={"accounts": len(accounts), "days": payload.days, "exclude_admins": payload.exclude_admins},
+        detail={
+            "accounts": len(accounts),
+            "days": payload.days,
+            "exclude_admins": payload.exclude_admins,
+            "keywords": payload.keywords,
+        },
     )
     await session.commit()
     succeeded = sum(1 for item in items if item.ok)
     return BulkResultResponse(
         ok=succeeded > 0,
         action="collect_messages",
-        message=f"已排队扫描最近 {payload.days} 天的对话（{succeeded} 个号）；发过言的人会落成成员档案",
+        message=(
+            f"已排队扫描最近 {payload.days} 天的对话（{succeeded} 个号）"
+            + ("，按关键词 " + "、".join(payload.keywords) + " 过滤" if payload.keywords else "")
+            + "；发过言的人会落成成员档案"
+        ),
         requested=len(accounts),
         succeeded=succeeded,
         failed=len(items) - succeeded,
