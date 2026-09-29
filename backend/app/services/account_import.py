@@ -515,13 +515,45 @@ async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAc
         except zipfile.BadZipFile as exc:
             raise ImportError_("这不是一个有效的 zip 文件（tdata 请打包成 zip 后上传）") from exc
 
-        # tdata 根：含 key_* 文件的目录（多号打包时每个子目录一个）
-        roots = sorted({path.parent for path in extract_root.rglob("key_*") if path.is_file()})
+        # 忽略 macOS 打包垃圾：__MACOSX、._ 前缀的伴生文件、.DS_Store
+        # （它们既会干扰目录判断，也会让「包里有什么」的诊断输出得没法看）
+        def _is_junk(rel: pathlib.PurePath) -> bool:
+            return any(part.startswith("._") or part in ("__MACOSX", ".DS_Store") for part in rel.parts)
+
+        all_files = [
+            path
+            for path in extract_root.rglob("*")
+            if path.is_file() and not _is_junk(path.relative_to(extract_root))
+        ]
+
+        # tdata 根：只要目录里有 tdesktop 的特征文件就算一个（多号打包时每个子目录一个）。
+        # 特征放宽到三种常见形态，避免「明明是对的 tdata，却因为文件名差一点被拒」：
+        #   1. key_datas / key_data（tdesktop 的密钥文件，新旧版本命名）；
+        #   2. key_ 开头的其它文件；
+        #   3. 大写十六进制目录（D877F783D5D3EF8C 这类账号数据目录）里的 key* 文件。
+        roots: set[pathlib.Path] = set()
+        for path in all_files:
+            name = path.name
+            if name.startswith("key"):
+                roots.add(path.parent)
         if not roots:
+            # 退一步：整包只有一层目录且里面像 tdata（有 map / configs / D877F7… 之类），
+            # 也认它——有些导出工具会把 tdata 内容直接铺在包根。
+            hexlike = re.compile(r"^[0-9A-F]{16}$")
+            for path in all_files:
+                if hexlike.match(path.parent.name or ""):
+                    roots.add(path.parent.parent)
+        if not roots:
+            listing = "\n".join(str(path.relative_to(extract_root)) for path in all_files[:30])
+            hint = listing or "（压缩包里没有任何文件，或只有 macOS 的 __MACOSX 伴生文件）"
             raise ImportError_(
-                "zip 里没找到 tdata 内容：需要 key_datas 与 D877F783D5D3EF8C 这类文件。"
-                "打包时请进入 tdata 目录全选压缩，或按「每个号一个子目录」的结构打包。"
+                "zip 里没找到 tdata 内容。压缩包里实际是这些（最多列 30 条）：\n"
+                f"{hint}\n\n"
+                "tdata 目录里应当有 key_datas（或 key_data），以及 D877F783D5D3EF8C 这类十六进制命名的目录。"
+                "正确做法：打开 Telegram Desktop 的 tdata 目录 → 全选里面的**内容** → 压缩成 zip 上传；"
+                "多个号就按「每个号一个子目录」打包。"
             )
+        roots = sorted(roots)
 
         results: list[ParsedAccount] = []
         errors: list[str] = []
