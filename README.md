@@ -10,7 +10,7 @@
 <!-- 徽章说明：仓库为 private 时 shields.io 的 github/* 徽章会显示 not found，
      改成 public 后自动恢复；其余静态徽章不受影响。 -->
 <p>
-  <a href="#许可证"><img src="https://img.shields.io/badge/license-Proprietary-red-yellow.svg" alt="License"></a>
+  <a href="#许可证"><img src="https://img.shields.io/badge/license-Proprietary-red.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/version-0.5.4-2AABEE.svg" alt="Version"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/changelog-%E6%9B%B4%E6%96%B0%E8%AE%B0%E5%BD%95-blue.svg" alt="Changelog"></a>
   <a href="https://t.me/TGCloudcontrol"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-2AABEE?logo=telegram&logoColor=white" alt="Telegram 交流群"></a>
