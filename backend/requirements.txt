@@ -28,3 +28,8 @@ bcrypt>=4.1,<5
 # --- Ops / observability ---
 httpx>=0.27,<0.29
 prometheus-client>=0.20,<0.22
+
+# 可选的 tdata 导入支持（Telegram Desktop 目录 → Telethon 会话）
+# 装上「批量导入 → tdata 目录」通道就会自动打开；不装则其余三种导入方式照常可用。
+# 注意：它会一并升级 telethon（已在 1.45.0 上回归通过）。
+opentele2==1.2.1

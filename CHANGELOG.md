@@ -7,6 +7,30 @@
 
 ---
 
+## v0.3.21 — 2026-03-30
+
+主题：**打通 tdata 导入**（Telegram Desktop 目录）。
+
+### 修复
+
+- **tdata 导入此前不可用**：`opentele2` 没装（tdata 页签显示黄色提示、按钮置灰）。现已安装
+  `opentele2==1.2.1` 并写入 `requirements.txt`，接口 `/api/accounts/import/formats` 返回
+  `tdata_available: true`，页面上「tdata 目录」通道自动打开。
+- **导入名写错了**：包在 PyPI 上叫 `opentele2`，导入名也是 `opentele2.*`（不是 `opentele.*`）。
+  原来的探测与调用都按 `opentele.*` 写，所以即便装了也认不出来。现在两种命名都兼容。
+- **异常捕获漏了 BaseException**：opentele2 的 `OpenTeleException` 继承自 **BaseException**
+  而不是 `Exception`，所以 `except Exception` 抓不到它——tdata 解析失败时异常会直接逃逸成 500，
+  页面上只看到「服务器错误」。现在相关捕获点都改成 `BaseException`，失败时返回可读原因
+  （例如「zip 里要包含 key_datas 与 D877F783D5D3EF8C 这类文件，且本地密码锁需关闭」）。
+
+### 验证
+
+- 本地直调与接口端到端都验证：内容不对的 zip 现在返回 **200 + 可读错误**（此前是 500）。
+- telethon 被 opentele2 一并升到 1.45.0，回归全绿：`e2e_check` 41/41、`campaign_api` 30/30、
+  `matrix_check` 14/14。
+
+---
+
 ## v0.3.20 — 2026-03-30
 
 主题：**上真实数据前的一键清库 + 修复本地备份**

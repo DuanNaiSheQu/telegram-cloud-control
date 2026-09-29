@@ -125,12 +125,14 @@ async def import_formats(user: User = Depends(get_current_user)) -> dict:
 
 def _tdata_available() -> bool:
     """opentele 是否可用（不可用时前端把 tdata 入口标灰并给替代路径）。"""
-    try:
-        import opentele.td  # noqa: F401
-
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+    # 包名与导入名不一致：PyPI 上是 opentele2
+    for module_name in ("opentele2.td", "opentele.td"):
+        try:
+            __import__(module_name)
+            return True
+        except BaseException:  # noqa: BLE001 - opentele2 的异常基类是 BaseException
+            continue
+    return False
 
 
 @router.post("/parse", response_model=AccountImportParseResponse, summary="解析预览（不写库）")

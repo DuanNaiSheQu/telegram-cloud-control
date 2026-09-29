@@ -363,19 +363,30 @@ def build_string_session(auth_key: bytes, dc_id: int) -> str:
 
 TDATA_HINT = (
     "导入 tdata 需要可选依赖 opentele2（tdata ⇄ Telethon 会话互转）："
-    "`pip install opentele2`（需要能编译 C++ 扩展）。"
+    "`uv pip install --python .venv/bin/python opentele2` 或 `pip install opentele2`。"
     "装不上时的兜底路径：用 Telegram Desktop 导出会话后走「.session 文件」导入，或在手机端用验证码登录。"
 )
 
 
 async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAccount]:
     """把 tdata 目录（zip 打包）转成 Telethon 会话。依赖缺失时抛出带指引的错误。"""
-    try:
-        from opentele.api import UseCurrentSession  # type: ignore
-        from opentele.td import TDesktop  # type: ignore
-        from opentele.tl import TelegramClient as OpenTeleClient  # type: ignore
-    except Exception as exc:  # noqa: BLE001 - 依赖缺失或平台不支持
-        raise ImportError_(f"{TDATA_HINT}（当前环境加载失败：{type(exc).__name__}）") from exc
+    # 包名与导入名不一致：PyPI 上是 opentele2，导入既有 opentele2.* 也有 opentele.* 的情况
+    UseCurrentSession = None
+    TDesktop = None
+    last_error: Exception | None = None
+    for module_root in ("opentele2", "opentele"):
+        try:
+            api_module = __import__(f"{module_root}.api", fromlist=["UseCurrentSession"])
+            td_module = __import__(f"{module_root}.td", fromlist=["TDesktop"])
+            UseCurrentSession = api_module.UseCurrentSession
+            TDesktop = td_module.TDesktop
+            break
+        except BaseException as exc:  # noqa: BLE001 - 继续试下一个包名（opentele2 抛 BaseException）
+            last_error = exc
+    if TDesktop is None or UseCurrentSession is None:
+        raise ImportError_(
+            f"{TDATA_HINT}（当前环境加载失败：{type(last_error).__name__ if last_error else 'ImportError'}）"
+        ) from last_error
 
     workdir = pathlib.Path(tempfile.mkdtemp(prefix="tgcc-tdata-"))
     try:
@@ -392,7 +403,17 @@ async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAc
                 with zf.open(member) as src, open(target, "wb") as dst:
                     shutil.copyfileobj(src, dst)
 
-        tdesk = TDesktop(str(extract_dir))
+        try:
+            tdesk = TDesktop(str(extract_dir))
+        except ImportError_:
+            raise
+        except BaseException as exc:  # noqa: BLE001 - opentele2 的异常继承自 BaseException（不是 Exception），
+            # 用 except Exception 抓不到，异常会直接逃逸成 500
+            raise ImportError_(
+                f"tdata 加载失败（{type(exc).__name__}）：确认 zip 里是 Telegram Desktop 的 tdata 目录内容"
+                "（含 key_datas 与 D877F783D5D3EF8C 这类文件），且本地密码锁已关闭；"
+                f"详情：{exc}"
+            ) from exc
         if not tdesk.isLoaded():
             raise ImportError_("tdata 加载失败：确认 zip 里是 Telegram Desktop 的 tdata 目录内容（key_datas 与 D877F783D5D3EF8C 之类）")
 
@@ -412,7 +433,7 @@ async def parse_tdata(blob: bytes, filename: str = "tdata.zip") -> list[ParsedAc
                         client = await tdesk.ToTelethon(session=str(session_path), flag=UseCurrentSession)
                 else:
                     client = await tdesk.ToTelethon(session=str(session_path), flag=UseCurrentSession)
-            except Exception as exc:  # noqa: BLE001 - opentele 的异常类型不稳定
+            except BaseException as exc:  # noqa: BLE001 - opentele 的异常基类是 BaseException
                 accounts.append(
                     ParsedAccount(
                         source="tdata",
