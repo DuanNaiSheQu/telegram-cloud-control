@@ -2913,3 +2913,29 @@ body .ant-spin-container::after {
     box-shadow: var(--tg-shadow-md);
   }
 }
+
+/* ---- 表单排版：分组标题 + 自适应网格 ----
+   放在全局样式里，营销中心的各功能页都能直接用，不必各自引入一份 CSS */
+.tg-form-group-title {
+  margin: var(--tg-space-lg) 0 var(--tg-space-sm);
+  padding-left: 8px;
+  border-left: 3px solid var(--tg-color-primary);
+  font-weight: var(--tg-font-weight-semibold);
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-color-text-secondary);
+}
+.tg-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--tg-space-md) var(--tg-space-lg);
+  align-items: start;
+}
+.tg-form-grid > .ant-form-item,
+.tg-form-grid > .ant-space {
+  margin-bottom: 0;
+  width: 100%;
+}
+.tg-form-grid .ant-input-number,
+.tg-form-grid .ant-select {
+  width: 100%;
+}

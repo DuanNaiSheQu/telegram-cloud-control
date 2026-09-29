@@ -79,3 +79,23 @@
 .tg-account-cat.is-muted b {
   color: var(--tg-color-text-tertiary);
 }
+
+/* 表单网格：把平铺一列的字段排成自适应多列，宽度不一的输入框也能对齐 */
+.tg-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--tg-space-md) var(--tg-space-lg);
+  align-items: start;
+}
+.tg-form-grid .ant-form-item {
+  margin-bottom: 0;
+}
+/* 分组小标题：让「内容 / 节奏与配额 / 执行方式」一眼分开 */
+.tg-form-group-title {
+  margin: var(--tg-space-sm) 0 var(--tg-space-xs);
+  padding-left: 8px;
+  border-left: 3px solid var(--tg-color-primary);
+  font-weight: var(--tg-font-weight-semibold);
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-color-text-secondary);
+}

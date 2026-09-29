@@ -536,6 +536,7 @@ export default function Campaigns() {
           })}
           submit={(payload) => campaignApi.bulkPm(payload as unknown as BulkPmRequest)}
         >
+          <div className="tg-form-group-title">内容：发什么、发给谁</div>
           <Form.Item label="私信目标" name="targets" rules={[{ required: true, message: '至少一个目标' }]}>
             <Input.TextArea placeholder="@user1\n@user2\n+12025550143" autoSize={{ minRows: 3, maxRows: 6 }} />
           </Form.Item>
@@ -553,46 +554,45 @@ export default function Campaigns() {
               />
             )}
           </Form.Item>
-          <Space wrap>
+          {/* 节奏与配额：什么时候发、发多快、一天发多少 */}
+          <div className="tg-form-group-title">节奏与配额</div>
+          <div className="tg-form-grid">
             <Form.Item label="目标间最小间隔（秒）" name="min_interval" initialValue={3}>
-              <InputNumber min={1} max={60} />
+              <InputNumber min={1} max={60} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item label="最大间隔（秒）" name="max_interval" initialValue={8}>
-              <InputNumber min={1} max={120} />
+              <InputNumber min={1} max={120} style={{ width: '100%' }} />
             </Form.Item>
-
             <Form.Item
               label="发送时间窗（定时）"
               name="send_window"
               tooltip="只在这个时间段内发；不在窗内会自动顺延到窗口开始，不用手动掐点。留空 = 不限"
             >
-              <Input placeholder="例如 09:00-23:00（留空 = 不限）" style={{ width: 240 }} allowClear />
+              <Input placeholder="09:00-23:00（留空 = 不限）" allowClear />
             </Form.Item>
-            <Space size="large" wrap>
-              <Form.Item
-                label="每号每日配额（定量）"
-                name="daily_quota"
-                tooltip="每个号每天最多发多少条，超了自动顺延到次日。0 = 不限"
-              >
-                <InputNumber min={0} max={2000} style={{ width: 160 }} placeholder="0 = 不限" />
-              </Form.Item>
-              <Form.Item
-                label="无号时自动补号"
-                name="auto_supply"
-                valuePropName="checked"
-                tooltip="可用的号不够承担这批目标时，自动从号池补状态正常的号；补进来的号同样受配额与节流约束"
-              >
-                <Switch />
-              </Form.Item>
-            </Space>
-            <Form.Item label="口语化微调" name="naturalize" valuePropName="checked" initialValue={false}>
+            <Form.Item
+              label="每号每日配额（定量）"
+              name="daily_quota"
+              tooltip="每个号每天最多发多少条，超了自动顺延到次日。0 = 不限"
+            >
+              <InputNumber min={0} max={2000} style={{ width: '100%' }} placeholder="0 = 不限" />
+            </Form.Item>
+            <Form.Item
+              label="口语化微调"
+              name="naturalize"
+              valuePropName="checked"
+              initialValue={false}
+              tooltip="在文本里做轻微改写（同义替换、标点变化），让不同号发出去的话不完全一样"
+            >
               <Switch />
             </Form.Item>
-          </Space>
-          <Form.Item
-            label="分发方式"
-            name="dispatch"
-            initialValue="each"
+          </div>
+          <div className="tg-form-group-title">执行方式</div>
+          <div className="tg-form-grid">
+            <Form.Item
+              label="分发方式"
+              name="dispatch"
+              initialValue="each"
             tooltip="轮询分配：目标按账号轮流切分，一个目标只由一个号处理——多号并行分摊，互不重复打扰"
           >
             <Segmented
@@ -601,7 +601,16 @@ export default function Campaigns() {
                 { label: '按账号轮询分配目标', value: 'round_robin' },
               ]}
             />
-          </Form.Item>
+            </Form.Item>
+            <Form.Item
+              label="无号时自动补号"
+              name="auto_supply"
+              valuePropName="checked"
+              tooltip="可用的号不够承担这批目标时，自动从号池补状态正常的号；补进来的号同样受配额与节流约束"
+            >
+              <Switch />
+            </Form.Item>
+          </div>
         </ActionTab>
       ),
     },
