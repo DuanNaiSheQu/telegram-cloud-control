@@ -11,10 +11,10 @@
      改成 public 后自动恢复；其余静态徽章不受影响。 -->
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
-  <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/version-0.5.4-2AABEE.svg" alt="Version"></a>
-  <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/changelog-%E6%9B%B4%E6%96%B0%E8%AE%B0%E5%BD%95-blue.svg" alt="Changelog"></a>
+  <a href="https://github.com/DuanNaiSheQu/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/version-0.5.4-2AABEE.svg" alt="Version"></a>
+  <a href="https://github.com/DuanNaiSheQu/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/changelog-%E6%9B%B4%E6%96%B0%E8%AE%B0%E5%BD%95-blue.svg" alt="Changelog"></a>
   <a href="https://t.me/TGCloudcontrol"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-2AABEE?logo=telegram&logoColor=white" alt="Telegram 交流群"></a>
-  <a href="https://github.com/sponsors/cafinxnull"><img src="https://img.shields.io/badge/Sponsor-%E8%B5%9E%E5%8A%A9-EA4AAA?logo=githubsponsors&logoColor=white" alt="赞助"></a>
+  <a href="https://github.com/sponsors/DuanNaiSheQu"><img src="https://img.shields.io/badge/Sponsor-%E8%B5%9E%E5%8A%A9-EA4AAA?logo=githubsponsors&logoColor=white" alt="赞助"></a>
 
 </p>
 
@@ -29,7 +29,6 @@
 </p>
 
 <p>
-  <img src="https://img.shields.io/badge/%E8%B5%9E%E5%8A%A9%E5%95%86-CAFINX%20%C2%B7%20CAFINXSIM-2AABEE" alt="赞助商">
 </p>
 
 <p>
@@ -38,7 +37,7 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="#部署与运维">部署</a> ·
   <a href="#开发与测试">开发</a> ·
-  <a href="#赞助商">赞助商</a> · <a href="https://t.me/TGCloudcontrol">交流群</a>
+  <a href="#支持这个项目">赞助</a> · <a href="https://t.me/TGCloudcontrol">交流群</a>
 </p>
 
 ---
@@ -50,14 +49,12 @@
 <table>
   <tr>
     <td align="center" width="50%">
-      <a href="https://cafinx.com">
-        <img src="docs/assets/sponsor/cafinx.png" width="178" alt="CAFINX 虚拟卡"></a><br>
+      <a href="https://cafinx.com"><img src="docs/assets/sponsor/cafinx.png" width="178" alt="CAFINX 虚拟卡"></a><br>
       <b><a href="https://cafinx.com">CAFINX 虚拟卡</a></b><br>
       <sub>跨境收付虚拟卡 · cafinx.com</sub>
     </td>
     <td align="center" width="50%">
-      <a href="https://cafinxsim.com">
-        <img src="docs/assets/sponsor/cafinxsim.png" width="200" alt="CAFINXSIM"></a><br>
+      <a href="https://cafinxsim.com"><img src="docs/assets/sponsor/cafinxsim.png" width="200" alt="CAFINXSIM"></a><br>
       <b><a href="https://cafinxsim.com">CAFINXSIM</a></b><br>
       <sub>全球 eSIM 流量卡 · cafinxsim.com</sub>
     </td>
@@ -68,6 +65,20 @@
 
 ---
 
+<div align="center">
+
+### 支持这个项目
+
+<a href="https://github.com/sponsors/DuanNaiSheQu"><img src="https://img.shields.io/badge/Sponsor-%E8%B5%9E%E5%8A%A9-EA4AAA?logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
+<a href="https://t.me/TGCloudcontrol"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-2AABEE?logo=telegram&logoColor=white" alt="Telegram 交流群"></a>
+
+**USDT（TRC20）**：`TYozr2b8tV4fikCuQYYvaHRCW555555555`　⚠️ 必须走 TRC20 网络
+
+如果这套系统帮你省下了时间，欢迎赞助支持持续维护 —— **赞助者的需求优先处理**。
+
+</div>
+
+---
 ### 核心能力
 
 <table>
