@@ -7,6 +7,31 @@
 
 ---
 
+## v0.3.65 — 2026-03-30
+
+主题：**修 `NameError: name 'client' is not defined`**（账号检测全挂）。
+
+### 修复
+
+- 现象：账号检测全部失败，报 `账号检测失败：Telegram 调用失败（NameError: name 'client' is not defined）`，
+  日志里是「刷新账号身份失败」。
+- 根因：v0.3.59 加头像缓存时，给 `persist_identity` 传了 `client_for_avatar=client`，
+  但**这一处的作用域里没有 `client` 变量**——那句代码是 `await self.require_client().get_me()`，
+  直接用了链式调用没落变量，于是每次刷新身份都抛 NameError。
+- 修法：该处先 `client = self.require_client()` 再使用；另一处（局部变量 `client` 确实存在）保持不变。
+
+### 验证
+
+修复后跑账号检测：**3 成功**（此前是 0 成功、全挂）。剩余失败属真实状态
+（某号「会话存在但 Telegram 不认，需要重新用验证码登录」）。
+
+### 已知遗留
+
+有一个号在账号检测里报 `TypeError: object method can't be used in 'await' expression`，
+与该号自身的会话状态有关（其它同批次账号正常），下一步单独查。
+
+---
+
 ## v0.3.64 — 2026-03-30
 
 主题：**「tdata 包」里装的是 .session 文件——现在自动认出来**。

@@ -744,7 +744,8 @@ class AccountConnection:
             ok = await self.ensure_connected()
             if not ok:
                 raise AccountUnavailable(self.last_error or "该号当前未连接")
-        me = await self.require_client().get_me()
+        client = self.require_client()
+        me = await client.get_me()
         if me is None:
             raise SessionNotAuthorized("get_me 返回空，会话不可用")
         async with session_scope() as session:
