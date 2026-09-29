@@ -4,11 +4,10 @@
  * 输入是 /api/accounts/bulk/* 的统一响应 BulkResultOut；
  * 命中上限截断（truncated）时在顶部给黄色提示，引导缩小范围。
  */
-import { Modal, Alert, Table, Typography, Tooltip } from 'antd';
+import { Modal, Alert, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Link } from 'react-router-dom';
 import type { BulkItemResult, BulkResultOut } from '../../api/types';
-import { StatusBadge } from '../../components';
 
 interface Props {
   open: boolean;
@@ -46,20 +45,13 @@ export default function BulkResultModal({ open, result, onClose }: Props) {
       ),
     },
     {
-      title: '检测状态',
-      dataIndex: 'status',
-      width: 120,
-      render: (_: unknown, record) =>
-        record.status ? <StatusBadge status={record.status} label={record.status_label} size="sm" /> : <span className="tg-muted">—</span>,
-    },
-    {
       title: '关联任务',
       dataIndex: 'task_id',
       width: 160,
       render: (value: string | null) =>
         value ? (
           <Link className="tg-mono" to={`/tasks?account_id=${value}`} style={{ fontSize: 'var(--tg-font-size-xs)' }}>
-            {value.slice(0, 8)}…
+            任务 {value.slice(0, 6)}
           </Link>
         ) : (
           <span className="tg-muted">—</span>
@@ -67,17 +59,50 @@ export default function BulkResultModal({ open, result, onClose }: Props) {
     },
   ];
 
+  // 只有确实带检测结果的批次才显示这一列，避免整列全是「—」占位
+  const columnsWithCheck = items.some((item) => item.status_label)
+    ? [
+        ...columns.slice(0, 3),
+        {
+          title: '检测状态',
+          dataIndex: 'status_label',
+          width: 110,
+          render: (value?: string) => (value ? <Tag>{value}</Tag> : <span className="tg-muted">—</span>),
+        },
+        ...columns.slice(3),
+      ]
+    : columns;
+
   return (
     <Modal open={open} title="批量操作结果" onCancel={onClose} onOk={onClose} okText="知道了" cancelText="关闭" width={760}>
       {result ? (
         <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
-          <Typography.Text>
-            共命中 <span className="tg-num">{result.requested}</span> 个账号：
-            <span style={{ color: 'var(--tg-color-success)' }}> 成功 {result.succeeded}</span>
-            {result.failed ? <span style={{ color: 'var(--tg-color-danger)' }}> · 失败 {result.failed}</span> : null}
-            {result.skipped ? <span className="tg-muted"> · 跳过 {result.skipped}</span> : null}
-            {result.task_ids.length ? <span className="tg-muted"> · 入队任务 {result.task_ids.length} 个</span> : null}
-          </Typography.Text>
+          {/* 统计块：每个数字独立成块，配色区分「成了几个 / 挂了几个 / 跳了几个」 */}
+          <div className="tg-flex" style={{ gap: 'var(--tg-space-sm)', flexWrap: 'wrap' }}>
+            <span className="tg-result-stat is-total">
+              命中 <b>{result.requested}</b>
+            </span>
+            {result.succeeded ? (
+              <span className="tg-result-stat is-ok">
+                成功 <b>{result.succeeded}</b>
+              </span>
+            ) : null}
+            {result.failed ? (
+              <span className="tg-result-stat is-fail">
+                失败 <b>{result.failed}</b>
+              </span>
+            ) : null}
+            {result.skipped ? (
+              <span className="tg-result-stat is-skip">
+                跳过 <b>{result.skipped}</b>
+              </span>
+            ) : null}
+            {result.task_ids.length ? (
+              <span className="tg-result-stat is-task">
+                入队任务 <b>{result.task_ids.length}</b>
+              </span>
+            ) : null}
+          </div>
           {result.truncated ? (
             <Alert
               type="warning"
@@ -89,7 +114,7 @@ export default function BulkResultModal({ open, result, onClose }: Props) {
           <Table<BulkItemResult>
             size="small"
             rowKey={(record) => record.account_id}
-            columns={columns}
+            columns={columnsWithCheck}
             dataSource={items}
             pagination={{ pageSize: 10, showSizeChanger: false, size: 'small', showTotal: (total) => `共 ${total} 条` }}
           />

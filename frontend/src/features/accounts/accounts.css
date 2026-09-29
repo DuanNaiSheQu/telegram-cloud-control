@@ -1,0 +1,36 @@
+
+
+/* 批量操作结果：统计块（命中 / 成功 / 失败 / 跳过 / 入队任务） */
+.tg-result-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  height: 26px;
+  padding: 0 var(--tg-space-md);
+  border-radius: var(--tg-radius-pill);
+  border: 1px solid var(--tg-color-border);
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-color-text-secondary);
+}
+.tg-result-stat b {
+  font-family: var(--tg-font-mono);
+  font-size: var(--tg-font-size-md);
+}
+.tg-result-stat.is-total b {
+  color: var(--tg-color-text);
+}
+.tg-result-stat.is-ok {
+  border-color: var(--tg-color-success-border, var(--tg-color-success));
+  color: var(--tg-color-success);
+}
+.tg-result-stat.is-fail {
+  border-color: var(--tg-color-error-border, var(--tg-color-error));
+  background: var(--tg-color-error-bg, rgba(255, 77, 79, 0.08));
+  color: var(--tg-color-error);
+}
+.tg-result-stat.is-skip {
+  color: var(--tg-color-text-tertiary);
+}
+.tg-result-stat.is-task {
+  color: var(--tg-color-info, var(--tg-color-primary));
+}
