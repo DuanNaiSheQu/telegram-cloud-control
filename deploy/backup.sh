@@ -33,13 +33,34 @@ cd "$PROJECT_DIR"
 
 BACKUP_KIND="${1:-${BACKUP_KIND:-all}}"
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_DIR/backups}"
-BACKUP_MODE="${BACKUP_MODE:-docker}"                 # docker | direct
+# 备份模式：优先 docker（生产 compose），本机没装 docker 就自动回退本地直连
+if [ -z "${BACKUP_MODE:-}" ]; then
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    BACKUP_MODE=docker
+  else
+    BACKUP_MODE=direct
+  fi
+fi
+BACKUP_MODE="${BACKUP_MODE}"                         # docker | direct
 BACKUP_KEEP_DAILY="${BACKUP_KEEP_DAILY:-7}"          # 保留几个日备
 BACKUP_KEEP_WEEKLY="${BACKUP_KEEP_WEEKLY:-4}"        # 保留几个周备
 BACKUP_COMPOSE_SERVICE="${BACKUP_COMPOSE_SERVICE:-postgres}"
 BACKUP_TIMEOUT_SECONDS="${BACKUP_TIMEOUT_SECONDS:-3600}"
 PGUSER="${PGUSER:-${POSTGRES_USER:-cloudctl}}"
 PGDATABASE="${PGDATABASE:-${POSTGRES_DB:-cloudctl}}"
+
+# direct 模式且没手工给连接参数时，从 backend/.env 的 DATABASE_URL 取（本机直跑场景）
+ENV_FILE="$PROJECT_DIR/backend/.env"
+if [ "$BACKUP_MODE" = "direct" ] && [ -f "$ENV_FILE" ] && [ -z "${PGPORT:-}" ]; then
+  _db_url="$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+  if [ -n "$_db_url" ]; then
+    _url="${_db_url#*://}"                 # user:pass@host:port/db
+    _creds="${_url%%@*}"; _hostpart="${_url#*@}"
+    PGUSER="${_creds%%:*}"; PGPASSWORD="${_creds#*:}"
+    PGHOST="${_hostpart%%:*}"; _rest="${_hostpart#*:}"
+    PGPORT="${_rest%%/*}"; PGDATABASE="${_rest#*/}"
+  fi
+fi
 
 COMPOSE_BIN="${COMPOSE_BIN:-docker compose}"
 read -r -a _compose_bin <<< "$COMPOSE_BIN"
@@ -135,7 +156,7 @@ pg_dump_to() {
     "${COMPOSE[@]}" exec -T "$BACKUP_COMPOSE_SERVICE" \
       pg_dump -Fc -U "$PGUSER" -d "$PGDATABASE" > "$target"
   else
-    pg_dump -Fc -h "${PGHOST:-127.0.0.1}" -p "${PGPORT:-5432}" -U "$PGUSER" -d "$PGDATABASE" > "$target"
+    pg_dump -Fc -h "${PGHOST:-127.0.0.1}" -p "${PGPORT:-55432}" -U "$PGUSER" -d "$PGDATABASE" > "$target"
   fi
 }
 
@@ -156,7 +177,7 @@ pg_basebackup_to() {
       pg_basebackup -D - -Ft -z -X none -c fast -U "$PGUSER" > "$target"
   else
     pg_basebackup -D - -Ft -z -X none -c fast \
-      -h "${PGHOST:-127.0.0.1}" -p "${PGPORT:-5432}" -U "$PGUSER" > "$target"
+      -h "${PGHOST:-127.0.0.1}" -p "${PGPORT:-55432}" -U "$PGUSER" > "$target"
   fi
 }
 
@@ -167,7 +188,7 @@ psql_query() {
     "${COMPOSE[@]}" exec -T "$BACKUP_COMPOSE_SERVICE" \
       psql -U "$PGUSER" -d "$PGDATABASE" -tAc "$sql"
   else
-    psql -h "${PGHOST:-127.0.0.1}" -p "${PGPORT:-5432}" -U "$PGUSER" -d "$PGDATABASE" -tAc "$sql"
+    psql -h "${PGHOST:-127.0.0.1}" -p "${PGPORT:-55432}" -U "$PGUSER" -d "$PGDATABASE" -tAc "$sql"
   fi
 }
 

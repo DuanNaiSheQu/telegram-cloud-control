@@ -7,6 +7,28 @@
 
 ---
 
+## v0.3.20 — 2026-03-30
+
+主题：**上真实数据前的一键清库 + 修复本地备份**
+
+### 新增
+
+- `backend/scripts/purge_test_data.py`：清理测试数据，把控制台恢复成「刚部署完、只有管理员」的状态。
+  默认 dry-run 先列清单，`--yes` 才真删；清空账号 / 会话 / 消息 / 任务 / 租约 / 素材 / 群情报 /
+  导入批次 / 通知 / 审计 / 指标样本等 20 张业务表，**保留 `users`**（加 `--purge-users` 才会清用户），
+  并顺手清 Redis 里本项目的键（心跳、节流计数、任务事件流），避免页面显示已不存在的号的心跳。
+  已在本地执行：清掉 1724 行测试数据 + 2 个 Redis 键。
+
+### 修复
+
+- `deploy/backup.sh` 在本机（没有 docker）会直接失败：原来 `BACKUP_MODE` 默认写死 docker，
+  执行到 `docker exec` 就报 `docker: command not found`。现在**自动探测**——有 docker 走容器，
+  没有就回退本地直连，并从 `backend/.env` 的 `DATABASE_URL` 补齐 host/port/user/password/db，
+  direct 模式默认端口也对齐本地的 55432。修复后 `make backup` 在本机可正常出包（已实测 76K）。
+- `.gitignore` 忽略 `backups/`，备份产物不入库。
+
+---
+
 ## v0.3.19 — 2026-03-30
 
 主题：**账号管理对齐同类产品的信息密度**——补 API 配置列、行内检测与头像。
