@@ -14,6 +14,7 @@ import {
   UserSwitchOutlined,
   ImportOutlined,
 } from '@ant-design/icons';
+import { api } from '../api/client';
 import { accountApi, accountBulkApiExtra, exportApi, groupApi, proxyApi, userApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { useTableQuery, buildActiveFilters } from '../hooks/useTableQuery';
@@ -67,6 +68,10 @@ export default function Accounts() {
   // 账号矩阵入口：导入向导、深度验活、节流设置
   const [importOpen, setImportOpen] = useState(false);
   // 申诉解封：模拟真人向官方 @SpamBot 走一遍流程（24 小时内不重复）
+  // 批量删除：不可恢复，弹窗里要手打 DELETE 才让提交（接口也再挡一道）
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [deletePhrase, setDeletePhrase] = useState('');
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [appealOpen, setAppealOpen] = useState(false);
   const [appealBusy, setAppealBusy] = useState(false);
   const [appealWarmup, setAppealWarmup] = useState(true);
@@ -498,6 +503,8 @@ export default function Accounts() {
 
   const bulkMenuItems = [
     { key: 'appeal', label: '申诉解封（@SpamBot）' },
+    { type: 'divider' as const },
+    { key: 'bulk_delete', danger: true, label: '批量删除账号（不可恢复）' },
     { key: 'warmup', label: '官方养号（上线/翻会话）' },
     { key: 'probe', label: '深度验活（健康分）' },
     { key: 'throttle', label: '设置发送节流（防封）' },
@@ -772,6 +779,52 @@ export default function Accounts() {
           reloadAll();
         }}
       />
+
+      <Modal
+        open={bulkDeleteOpen}
+        title={`批量删除账号（${selection.count} 个）`}
+        okText="确认删除"
+        okButtonProps={{ danger: true, disabled: deletePhrase !== 'DELETE' }}
+        cancelText="取消"
+        confirmLoading={bulkDeleting}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onOk={async () => {
+          setBulkDeleting(true);
+          try {
+            const res = await api.post(
+              '/api/accounts/bulk/delete',
+              { scope: 'selected', account_ids: selection.selectedIds, confirm: 'DELETE' },
+              { silent: true },
+            );
+            setBulkDeleteOpen(false);
+            setBulkResult(res as never);
+            selection.clear?.();
+            reloadAll();
+          } catch {
+            /* client 已提示 */
+          } finally {
+            setBulkDeleting(false);
+          }
+        }}
+      >
+        <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
+          <Alert
+            type="error"
+            showIcon
+            message="这是不可恢复的操作"
+            description="删除后该号的会话、消息记录、任务、租约都会一并清除（审计行保留但不再关联账号），无法找回。"
+          />
+          <div className="tg-stack" style={{ gap: 'var(--tg-space-xs)' }}>
+            <span>请输入 DELETE 确认：</span>
+            <Input
+              value={deletePhrase}
+              onChange={(e) => setDeletePhrase(e.target.value)}
+              placeholder="DELETE"
+              style={{ width: 200 }}
+            />
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={appealOpen}
