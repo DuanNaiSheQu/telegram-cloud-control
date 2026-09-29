@@ -269,7 +269,7 @@ export default function Dashboard() {
           description="账号是整套系统的起点：先用一个自己的号通过验证码登录，系统才能同步会话、接收消息并按你的指令发送。登录后建议顺手做一次「账号检测」确认号在线。"
           action={
             <Space direction={isCompact ? 'vertical' : 'horizontal'}>
-              <Button type="primary" onClick={() => navigate('/accounts?wizard=1')}>
+              <Button type="primary" onClick={() => navigate('/accounts')}>
                 登录第一个账号
               </Button>
               <Button onClick={() => navigate('/accounts')}>进入账号管理</Button>

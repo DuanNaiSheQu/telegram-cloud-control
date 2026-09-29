@@ -9,7 +9,6 @@ import {
   CloudSyncOutlined,
   DeleteOutlined,
   EditOutlined,
-  KeyOutlined,
   SafetyCertificateOutlined,
   StopOutlined,
   ThunderboltOutlined,
@@ -34,7 +33,6 @@ export interface AccountDetailHandlers {
   onSync: (account: AccountOut) => Promise<void> | void;
   onEdit: (account: AccountOut) => void;
   onProfile: (account: AccountOut) => void;
-  onLogin: (account: AccountOut) => void;
   onReleaseLease: (account: AccountOut) => Promise<void> | void;
   onToggleEnabled: (account: AccountOut) => Promise<void> | void;
   onRemove: (account: AccountOut) => Promise<void> | void;
@@ -168,9 +166,6 @@ export default function AccountDetailDrawer({ accountId, handlers, onClose }: Pr
             </Button>
             <Button size="small" icon={<UserSwitchOutlined />} onClick={() => handlers.onProfile(account)}>
               改资料
-            </Button>
-            <Button size="small" icon={<KeyOutlined />} onClick={() => handlers.onLogin(account)}>
-              重新登录
             </Button>
             <Button size="small" icon={<ThunderboltOutlined />} onClick={() => void run(handlers.onReleaseLease)}>
               清除租约

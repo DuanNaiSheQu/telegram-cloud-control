@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { Alert, Avatar, Button, Checkbox, Dropdown, Form, Input, InputNumber, Modal, Select, Space, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -7,7 +6,6 @@ import {
   DownOutlined,
   EditOutlined,
   ExportOutlined,
-  KeyOutlined,
   MoreOutlined,
   PlusOutlined,
   SafetyCertificateOutlined,
@@ -36,7 +34,6 @@ import {
   StatGrid,
   StatusBadge,
 } from '../components';
-import AccountLoginWizard from '../components/AccountLoginWizard';
 import AccountDetailDrawer, { type AccountDetailHandlers } from '../features/accounts/AccountDetailDrawer';
 import { BulkActionModal, CreateAccountModal, EditAccountModal, ProfileModal } from '../features/accounts/AccountModals';
 import BulkResultModal from '../features/accounts/BulkResultModal';
@@ -59,18 +56,6 @@ export default function Accounts() {
   const [draftKeyword, setDraftKeyword] = useState('');
   const selection = useRowSelection();
   const [createOpen, setCreateOpen] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
-  // 从工作台/引导条带 ?wizard=1 进来时直接开登录向导，参数用完即清（避免刷新又弹）
-  const [searchParams, setSearchParams] = useSearchParams();
-  useEffect(() => {
-    if (searchParams.get('wizard') !== '1') return;
-    setWizardAccount(null);
-    setWizardOpen(true);
-    const next = new URLSearchParams(searchParams);
-    next.delete('wizard');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
-  const [wizardAccount, setWizardAccount] = useState<AccountOut | null>(null);
   const [editAccount, setEditAccount] = useState<AccountOut | null>(null);
   const [profileAccount, setProfileAccount] = useState<AccountOut | null>(null);
   const [deleteAccount, setDeleteAccount] = useState<AccountOut | null>(null);
@@ -180,10 +165,6 @@ export default function Accounts() {
     onSync: handleSync,
     onEdit: setEditAccount,
     onProfile: setProfileAccount,
-    onLogin: (account) => {
-      setWizardAccount(account);
-      setWizardOpen(true);
-    },
     onReleaseLease: handleReleaseLease,
     onToggleEnabled: handleToggleEnabled,
     onRemove: (account) => setDeleteAccount(account),
@@ -301,7 +282,6 @@ export default function Accounts() {
                   { key: 'sync', icon: <CloudSyncOutlined />, label: '同步会话' },
                   { key: 'edit', icon: <EditOutlined />, label: '改分组 / 代理' },
                   { key: 'profile', icon: <UserSwitchOutlined />, label: '改资料' },
-                  { key: 'login', icon: <KeyOutlined />, label: '重新登录（登录向导）' },
                   { key: 'release', icon: <ThunderboltOutlined />, label: '清除租约' },
                   { type: 'divider' },
                   record.status === 'disabled'
@@ -315,10 +295,6 @@ export default function Accounts() {
                   if (key === 'sync') void handleSync(record);
                   if (key === 'edit') setEditAccount(record);
                   if (key === 'profile') setProfileAccount(record);
-                  if (key === 'login') {
-                    setWizardAccount(record);
-                    setWizardOpen(true);
-                  }
                   if (key === 'release') void handleReleaseLease(record);
                   if (key === 'disable' || key === 'enable') void handleToggleEnabled(record);
                   if (key === 'delete') setDeleteAccount(record);
@@ -543,12 +519,7 @@ export default function Accounts() {
           <Button icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>
             批量导入
           </Button>
-          <Button icon={<KeyOutlined />} onClick={() => { setWizardAccount(null); setWizardOpen(true); }}>
-            登录向导
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-            新建账号
-          </Button>
+
         </Space>
       }
     >
@@ -690,8 +661,8 @@ export default function Accounts() {
         empty={{
           art: 'accounts',
           title: '还没有账号',
-          description: '先建档、再用「登录向导」发验证码拿到会话。',
-          action: <Button type="primary" onClick={() => setCreateOpen(true)}>新建账号</Button>,
+          description: '用右上角「批量导入」上传手机号清单、Session 串、.session 文件或 tdata 目录。',
+          action: <Button type="primary" onClick={() => setImportOpen(true)}>批量导入</Button>,
         }}
       />
 
@@ -706,17 +677,6 @@ export default function Accounts() {
         }}
       />
 
-      <AccountLoginWizard
-        open={wizardOpen}
-        account={wizardAccount}
-        groups={groups.data ?? []}
-        proxies={proxies.data ?? []}
-        onCancel={() => setWizardOpen(false)}
-        onDone={() => {
-          void accounts.reload();
-          void groups.reload();
-        }}
-      />
 
       <EditAccountModal
         account={editAccount}

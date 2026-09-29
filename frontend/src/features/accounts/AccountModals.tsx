@@ -51,7 +51,7 @@ export function CreateAccountModal({
         proxy_id: values.proxy_id || null,
         remark: values.remark ?? '',
       });
-      toast.success('账号已建档，接着用「登录向导」发验证码');
+      toast.success('账号已建档（状态为待登录）');
       form.resetFields();
       onSuccess();
     } catch {
