@@ -1,7 +1,7 @@
 {
   "name": "tgcc-frontend",
   "private": true,
-  "version": "0.3.31",
+  "version": "0.3.32",
   "type": "module",
   "description": "Telegram 云控 前端控制台",
   "engines": {

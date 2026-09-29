@@ -152,15 +152,63 @@ class CampaignTasksMixin:
                 f"目标群打不开（{raw}）：{describe_exception(exc)}", retryable=network
             ) from exc
 
-    async def _resolve_member_entity(self, client: Any, raw: str) -> Any:
-        """成员目标（@username / 手机号 / 数字 user_id）→ 实体。"""
+    async def _why_unresolvable(self, client: Any, value: str) -> str:
+        """解析失败后追问一句原因：目标不存在，还是这个号被限制/冻结。
+
+        `get_entity()` 对两种情况都抛同一个 `ValueError`，光看它分不清——
+        之前就是因此把「号被冻结」误报成「找不到成员」，把排查方向带偏了。
+        """
+        name = value.lstrip("@").strip()
         try:
-            return await client.get_entity(str(raw).strip())
+            await client(functions.contacts.ResolveUsernameRequest(username=name))
+            return "ok"
+        except BaseException as exc:  # noqa: BLE001 - opentele 之外的异常都在这里收口
+            if flood_wait_seconds(exc):
+                return "flood"
+            name_of_exc = type(exc).__name__
+            if "Frozen" in name_of_exc or "Restricted" in name_of_exc:
+                return "frozen"
+            if name_of_exc in ("UsernameNotOccupiedError", "UsernameInvalidError", "UsernameOccupiedError"):
+                return "not_found"
+            if "UsernameNotOccupied" in str(exc) or "USERNAME_NOT_OCCUPIED" in str(exc):
+                return "not_found"
+            return "unknown"
+
+    async def _resolve_member_entity(
+        self, client: Any, raw: str, *, session: Any = None, account: Any = None
+    ) -> Any:
+        """成员目标（@username / 手机号 / 数字 user_id）→ 实体。
+
+        失败时把原因说清楚：目标不存在 / 这个号被冻结或受限 / 其它。
+        判定为冻结时会顺手把账号状态标成冻结，后续任务不再拿它去撞墙。
+        """
+        value = str(raw).strip()
+        try:
+            return await client.get_entity(value)
         except ValueError as exc:
-            raise TaskFailure(f"找不到成员：{raw}", retryable=False) from exc
+            reason = await self._why_unresolvable(client, value)
+            if reason == "ok":
+                # ResolveUsername 能查到，说明只是这个号解析缓存/权限的偶发问题
+                raise TaskFailure(f"暂时解析不到成员 {value}，稍后重试", retryable=True) from exc
+            if reason == "frozen":
+                if session is not None and account is not None:
+                    await self._apply_status(session, account, exc)
+                raise TaskFailure(
+                    f"该号被 Telegram 冻结，无法解析/联系目标 {value}"
+                    "（冻结期间不能联系他人，需要找 @SpamBot 申诉解冻）",
+                    retryable=False,
+                ) from exc
+            if reason == "flood":
+                raise TaskFailure(f"解析成员被限流（{value}），稍后重试", retryable=True, requeue_after=60) from exc
+            if reason == "not_found":
+                raise TaskFailure(
+                    f"目标不存在或搜不到：{value}（用户名拼错、已注销，或对方隐私设置不允许被搜索）",
+                    retryable=False,
+                ) from exc
+            raise TaskFailure(f"找不到成员：{value}", retryable=False) from exc
         except Exception as exc:  # noqa: BLE001
             raise TaskFailure(
-                f"成员打不开（{raw}）：{describe_exception(exc)}", retryable=is_network_error(exc)
+                f"成员打不开（{value}）：{describe_exception(exc)}", retryable=is_network_error(exc)
             ) from exc
 
     async def _record_campaign_sent(
@@ -272,7 +320,7 @@ class CampaignTasksMixin:
         failures: list[dict] = []
         for index, raw in enumerate(targets):
             try:
-                entity = await self._resolve_member_entity(client, raw)
+                entity = await self._resolve_member_entity(client, raw, session=session, account=account)
                 await self._campaign_send_one(
                     session, task, account, client, entity, text, material=material
                 )
@@ -333,7 +381,10 @@ class CampaignTasksMixin:
             raw_targets = [str(item).strip() for item in (payload.get("targets") or []) if str(item).strip()]
             if not raw_targets:
                 raise TaskFailure("素材群发任务缺少目标", retryable=False)
-            targets = [await self._resolve_member_entity(client, raw) for raw in raw_targets]
+            targets = [
+                await self._resolve_member_entity(client, raw, session=session, account=account)
+                for raw in raw_targets
+            ]
 
         min_interval = self._interval_of(payload, "min_interval", 3.0)
         max_interval = self._interval_of(payload, "max_interval", 8.0)
