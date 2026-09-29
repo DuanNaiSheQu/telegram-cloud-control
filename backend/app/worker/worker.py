@@ -131,9 +131,30 @@ class Worker:
     async def run_forever(self) -> None:
         """主循环：每轮认领租约、维护连接、续租心跳、执行任务。"""
         await self.startup()
+        last_reap = 0.0
         while not self.stopping.is_set():
             try:
                 await self._tick()
+                # 运行期定期回收卡在「执行中」的任务。
+                # 只在启动时回收是不够的：Worker 跑着跑着某个任务挂住（等不到返回），
+                # 状态就一直停在 running，页面上永远显示「执行中」、进度 0。
+                # 每 60 秒扫一次，时间窗 5 分钟——卡住的任务最多 5 分钟后自动回队列或标失败。
+                now_mono = asyncio.get_running_loop().time()
+                if now_mono - last_reap > 60:
+                    last_reap = now_mono
+                    try:
+                        async with session_scope() as session:
+                            reaped = await requeue_stale_running(
+                                session,
+                                started_before=datetime.now(tz=timezone.utc) - timedelta(minutes=5),
+                            )
+                        if reaped:
+                            self.log.warning(
+                                "回收卡在「执行中」的任务",
+                                extra={"worker_id": self.worker_id, "count": reaped},
+                            )
+                    except Exception:  # noqa: BLE001 - 回收失败不影响主循环
+                        self.log.exception("定期回收失败", extra={"worker_id": self.worker_id})
             except Exception:  # noqa: BLE001 - 单轮异常不能让 Worker 退出
                 self.log.exception("Worker 主循环单轮异常，继续运行", extra={"worker_id": self.worker_id})
             self._publish_metrics()
