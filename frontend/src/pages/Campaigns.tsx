@@ -33,6 +33,7 @@ import {
 } from '@ant-design/icons';
 import BulkResultModal from '../features/accounts/BulkResultModal';
 import AccountPickerModal from '../components/AccountPickerModal';
+import MaterialThumb from '../features/materials/MaterialThumb';
 import MaterialPicker from '../features/materials/MaterialSelect';
 import { PageContainer, StatusBadge } from '../components';
 import { campaignApi, groupApi, materialApi } from '../api/endpoints';
@@ -213,6 +214,14 @@ function MaterialsTab() {
   };
 
   const columns: ColumnsType<MaterialOut> = [
+    {
+      title: '预览',
+      dataIndex: 'id',
+      width: 72,
+      render: (_: string, record) => (
+        <MaterialThumb materialId={record.id} kind={record.kind} alt={record.name} />
+      ),
+    },
     { title: '名称', dataIndex: 'name', width: 180 },
     {
       title: '类型',
