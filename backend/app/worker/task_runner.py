@@ -58,6 +58,7 @@ from app.worker.telethon_account import (
     TaskFailure,
     describe_exception,
     flood_wait_seconds,
+    friendly_error_text,
     is_network_error,
     map_exception_to_status,
     persist_identity,
@@ -384,7 +385,8 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             return TaskFailure(f"{prefix}：{describe_exception(exc)}", retryable=True, requeue_after=wait + 1)
         if retryable is None:
             retryable = is_network_error(exc)
-        return TaskFailure(f"{prefix}：{describe_exception(exc)}", retryable=retryable)
+        # 常见错误（账号被冻结、PeerFlood、永久双向）附一句人话解释，页面直接可读
+        return TaskFailure(f"{prefix}：{friendly_error_text(exc)}", retryable=retryable)
 
     @staticmethod
     def _clamp_limit(raw: Any, *, default: int, maximum: int) -> int:

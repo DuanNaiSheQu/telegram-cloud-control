@@ -33,6 +33,7 @@ from telethon.errors import (
     SessionPasswordNeededError,
     SessionRevokedError,
     UserBannedInChannelError,
+    FrozenMethodInvalidError,
     UserDeactivatedBanError,
     UserDeactivatedError,
     UserRestrictedError,
@@ -110,9 +111,39 @@ def map_exception_to_status(exc: BaseException) -> Optional[AccountStatus]:
         return AccountStatus.needs_code
     if isinstance(exc, PhoneNumberBannedError):
         return AccountStatus.frozen  # 号被限制，不再替它发送
+    if isinstance(exc, FrozenMethodInvalidError):
+        # 420：账号被 Telegram 冻结，受限方法（改资料、发消息等）一律不可用
+        return AccountStatus.frozen
     if isinstance(exc, (FloodWaitError, PeerFloodError, UserBannedInChannelError, UserRestrictedError, ChatWriteForbiddenError)):
         return AccountStatus.frozen
     return None
+
+
+#: 常见错误的「人话」解释：任务失败原因直接展示给运营同学
+FRIENDLY_ERROR_HINTS = (
+    (
+        FrozenMethodInvalidError,
+        "账号已被 Telegram 冻结：发消息、改资料等操作都不可用。"
+        "需要去 Telegram 里找 @SpamBot 申诉解冻，冻结期间这个号不能干活。",
+    ),
+    (
+        PeerFloodError,
+        "触发发送频率限制（PeerFlood）：账号暂时不能主动发消息，先停手，"
+        "降低每日额度、拉长间隔，过一两天再试。",
+    ),
+    (
+        AuthKeyDuplicatedError,
+        "会话被两个地方同时使用（永久双向）：这个号已经不能用了，需要重新登录或弃用。",
+    ),
+)
+
+
+def friendly_error_text(exc: BaseException) -> str:
+    """给常见 Telegram 错误附上一句中文解释，便于直接展示在任务失败原因里。"""
+    for exc_type, hint in FRIENDLY_ERROR_HINTS:
+        if isinstance(exc, exc_type):
+            return f"{describe_exception(exc)}｜{hint}"
+    return describe_exception(exc)
 
 
 def is_network_error(exc: BaseException) -> bool:
