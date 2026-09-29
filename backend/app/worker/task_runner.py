@@ -934,9 +934,18 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
                         retryable=False,
                     )
                 path = self._material_path(material)
+                before_photo = await self._avatar_photo_id(client)
                 uploaded = await client.upload_file(path)
                 await client(functions.photos.UploadProfilePhotoRequest(file=uploaded))
-                changed.append("photo")
+                # 回读确认真的换了：Telegram 偶尔收下请求但不动头像，不回读就会「显示成功、其实没变」
+                after_photo = await self._avatar_photo_id(client)
+                if before_photo is None or after_photo is None or after_photo != before_photo:
+                    changed.append("photo")
+                else:
+                    raise TaskFailure(
+                        "头像上传后回读没有变化（Telegram 未采纳该图片，建议换一张正方形、小于 5MB 的图）",
+                        retryable=False,
+                    )
             elif payload.get("photo_url"):
                 await self._upload_profile_photo(client, str(payload["photo_url"]))
                 changed.append("photo")
@@ -963,6 +972,20 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
         )
         return {"updated": changed, "display_name": account.display_name, "username": account.username}
 
+    async def _avatar_photo_id(self, client: Any) -> Optional[int]:
+        """读当前头像的 photo_id。
+
+        注意读法：`UserFull.profile_photo` 拿不到 photo_id（返回 Photo 类型但字段为空），
+        必须走 `users[0].photo`（UserProfilePhoto）——之前用前者验证，于是「上传成功」永远判不出来。
+        """
+        try:
+            full = await client(functions.users.GetFullUserRequest(id="me"))
+            user = (getattr(full, "users", None) or [None])[0]
+            photo = getattr(user, "photo", None) if user is not None else None
+            return getattr(photo, "photo_id", None)
+        except Exception:  # noqa: BLE001 - 读不到不阻塞主流程
+            return None
+
     async def _upload_profile_photo(self, client: Any, photo_url: str) -> None:
         """下载图片并设为头像（只需要 httpx，已在 requirements 里）。"""
         try:
@@ -978,8 +1001,15 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             raise TaskFailure(f"头像下载失败：{type(exc).__name__}: {exc}", retryable=True, requeue_after=30) from exc
         if not content:
             raise TaskFailure("头像下载为空", retryable=False)
+        before_photo = await self._avatar_photo_id(client)
         uploaded = await client.upload_file(io.BytesIO(content), file_name="avatar.jpg")
         await client(functions.photos.UploadProfilePhotoRequest(file=uploaded))
+        after_photo = await self._avatar_photo_id(client)
+        if before_photo is not None and after_photo is not None and after_photo == before_photo:
+            raise TaskFailure(
+                "头像上传后回读没有变化（Telegram 未采纳该图片），请检查图片格式与尺寸",
+                retryable=False,
+            )
 
     async def _login_start(self, session: AsyncSession, task: Task, account: Optional[TgAccount]) -> dict:
         """登录第一步：发送验证码。"""
