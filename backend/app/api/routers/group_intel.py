@@ -726,7 +726,9 @@ async def export_members(
 async def collect_jobs(
     limit: int = Query(default=50, ge=1, le=200),
     batch_id: Optional[str] = Query(default=None, description="只看某一批链接"),
-    only_active: bool = Query(default=False, description="只看排队与执行中的"),
+    # 默认只看活跃任务：这一栏叫「采集进度」，就该显示正在跑的；
+    # 已结束的失败/完成记录留在任务中心看，否则一屏全是历史，看不出到底还在不在采。
+    only_active: bool = Query(default=True, description="只看排队与执行中的（默认）；传 false 看全部历史"),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> dict:
