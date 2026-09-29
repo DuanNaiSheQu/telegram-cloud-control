@@ -290,6 +290,25 @@ export default function Dashboard() {
         />
       </StatGrid>
 
+      <SectionCard title="快捷入口" subtitle="常用页面一键跳转">
+        <div className="tg-quick-grid">
+          {QUICK_LINKS.map((item) => (
+            <button
+              key={item.path}
+              type="button"
+              className="tg-quick-link"
+              onClick={() => navigate(item.path)}
+            >
+              <span className={`tg-quick-link-icon is-${item.tone}`}>{item.icon}</span>
+              <span className="tg-stack" style={{ gap: 'var(--tg-space-xxs)', minWidth: 0 }}>
+                <span className="tg-quick-link-label">{item.label}</span>
+                <span className="tg-quick-link-desc tg-ellipsis">{item.desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </SectionCard>
+
       <SectionCard
         title="在线趋势"
         subtitle="在线账号 / 异常账号 / 任务成功 / 任务失败，按小时（7d、30d 为按天）聚合"
@@ -418,7 +437,7 @@ export default function Dashboard() {
             onRetry={() => void notifications.reload()}
             empty={
               notifications.data && !notifications.loading
-                ? { art: 'inbox', title: '没有未读通知', description: '一切正常；异常发生时这里会出现提醒。' }
+                ? { art: 'inbox', compact: true, title: '没有未读通知', description: '一切正常；异常发生时这里会出现提醒。' }
                 : false
             }
             bodyPadding="none"
@@ -458,24 +477,6 @@ export default function Dashboard() {
             </div>
           </SectionCard>
 
-          <SectionCard title="快捷入口" subtitle="常用页面一键跳转">
-            <div className="tg-quick-grid">
-              {QUICK_LINKS.map((item) => (
-                <button
-                  key={item.path}
-                  type="button"
-                  className="tg-quick-link"
-                  onClick={() => navigate(item.path)}
-                >
-                  <span className={`tg-quick-link-icon is-${item.tone}`}>{item.icon}</span>
-                  <span className="tg-stack" style={{ gap: 'var(--tg-space-xxs)', minWidth: 0 }}>
-                    <span className="tg-quick-link-label">{item.label}</span>
-                    <span className="tg-quick-link-desc tg-ellipsis">{item.desc}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </SectionCard>
         </div>
       </div>
     </PageContainer>
