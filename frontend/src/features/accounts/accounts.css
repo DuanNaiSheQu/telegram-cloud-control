@@ -35,67 +35,85 @@
   color: var(--tg-color-info, var(--tg-color-primary));
 }
 
-/* 账号页状态分类芯片：异常态（冻结/失效/停用）各自成类，点一下只看那批 */
+/* 账号页状态分类芯片：胶囊 + 色点 + 数字徽标，异常态用色区分 */
 .tg-account-cats {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--tg-space-sm);
-  margin-bottom: var(--tg-space-md);
+  margin-bottom: var(--tg-space-lg);
 }
+
 .tg-account-cat {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
-  padding: 0 var(--tg-space-md);
-  border-radius: var(--tg-radius-pill);
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
   border: 1px solid var(--tg-color-border);
   background: var(--tg-color-bg-card);
   color: var(--tg-color-text-secondary);
   font-size: var(--tg-font-size-sm);
+  line-height: 1;
   cursor: pointer;
+  transition: all var(--tg-motion-duration-fast) var(--tg-motion-ease-standard);
 }
+
+/* 色点：一眼区分正常 / 待处理 / 异常 */
+.tg-account-cat::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tg-color-text-tertiary);
+  flex: 0 0 auto;
+}
+.tg-account-cat.is-ok::before {
+  background: var(--tg-color-success);
+}
+.tg-account-cat.is-warn::before {
+  background: var(--tg-color-warning);
+}
+.tg-account-cat.is-danger::before {
+  background: var(--tg-color-error);
+}
+
+/* 数字做成小徽标，与文字分开，不和标签粘在一起 */
 .tg-account-cat b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--tg-color-bg-hover);
   font-family: var(--tg-font-mono);
+  font-size: var(--tg-font-size-xs);
+  font-weight: var(--tg-font-weight-semibold);
   color: var(--tg-color-text);
 }
+
 .tg-account-cat:hover {
   border-color: var(--tg-color-border-strong);
+  background: var(--tg-color-bg-hover);
 }
+
 .tg-account-cat.is-active {
   border-color: var(--tg-color-primary);
   background: var(--tg-color-primary-bg);
   color: var(--tg-color-primary);
 }
-.tg-account-cat.is-danger b {
-  color: var(--tg-color-error);
-}
-.tg-account-cat.is-warn b {
-  color: var(--tg-color-warning);
-}
-.tg-account-cat.is-ok b {
-  color: var(--tg-color-success);
-}
-.tg-account-cat.is-muted b {
-  color: var(--tg-color-text-tertiary);
+.tg-account-cat.is-active b {
+  background: var(--tg-color-primary);
+  color: #fff;
 }
 
-/* 表单网格：把平铺一列的字段排成自适应多列，宽度不一的输入框也能对齐 */
-.tg-form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: var(--tg-space-md) var(--tg-space-lg);
-  align-items: start;
+/* 计数为 0 的格子弱化，不跟有数的抢注意力 */
+.tg-account-cat.is-zero {
+  opacity: 0.55;
 }
-.tg-form-grid .ant-form-item {
-  margin-bottom: 0;
-}
-/* 分组小标题：让「内容 / 节奏与配额 / 执行方式」一眼分开 */
-.tg-form-group-title {
-  margin: var(--tg-space-sm) 0 var(--tg-space-xs);
-  padding-left: 8px;
-  border-left: 3px solid var(--tg-color-primary);
-  font-weight: var(--tg-font-weight-semibold);
-  font-size: var(--tg-font-size-sm);
-  color: var(--tg-color-text-secondary);
+.tg-account-cat.is-zero:hover {
+  opacity: 1;
 }

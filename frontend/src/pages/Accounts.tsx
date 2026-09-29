@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import { accountApi, accountBulkApiExtra, exportApi, groupApi, proxyApi, userApi } from '../api/endpoints';
+import '../features/accounts/accounts.css';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { useTableQuery, buildActiveFilters } from '../hooks/useTableQuery';
 import { useAuth } from '../auth/AuthContext';
@@ -566,7 +567,12 @@ export default function Accounts() {
               <button
                 key={cat.key || 'all'}
                 type="button"
-                className={['tg-account-cat', cat.tone ?? '', current === cat.key ? 'is-active' : '']
+                className={[
+                  'tg-account-cat',
+                  cat.tone ?? '',
+                  count === 0 && cat.key ? 'is-zero' : '',
+                  current === cat.key ? 'is-active' : '',
+                ]
                   .filter(Boolean)
                   .join(' ')}
                 onClick={() => q.setFilter('status', cat.key)}
