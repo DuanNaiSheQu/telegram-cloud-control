@@ -467,7 +467,7 @@ def _enrich_batch_item(task: Task, account: Optional[TgAccount]) -> CampaignBatc
 @router.get("/batches", response_model=CampaignBatchListResponse, summary="批次列表（按 batch_id 聚合）")
 async def list_batches(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> CampaignBatchListResponse:

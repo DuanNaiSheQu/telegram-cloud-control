@@ -254,7 +254,7 @@ async def run_import(
 @router.get("/batches", response_model=list[AccountImportBatchOut], summary="导入批次列表")
 async def list_batches(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> list[AccountImportBatchOut]:

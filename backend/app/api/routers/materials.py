@@ -67,7 +67,7 @@ async def list_materials(
     kind: Optional[MaterialKind] = Query(default=None),
     q: Optional[str] = Query(default=None, description="按名称模糊搜索"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=200),
     sort: Optional[str] = Query(default=None, description="created_at | name"),
     order: Optional[str] = Query(default=None, description="asc | desc"),
     session: AsyncSession = Depends(get_session),

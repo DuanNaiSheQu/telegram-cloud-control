@@ -141,7 +141,7 @@ export function EditAccountModal({
   return (
     <Modal
       open={Boolean(account)}
-      title={`修改分组 / 代理：${account?.phone_masked ?? ''}`}
+      title={`修改分组 / 代理：${account?.display_label || account?.phone_masked || ''}`}
       onCancel={onCancel}
       onOk={() => form.submit()}
       okText="保存"
@@ -229,7 +229,7 @@ export function ProfileModal({
   return (
     <Modal
       open={Boolean(account)}
-      title={`修改本号资料：${account?.phone_masked ?? ''}`}
+      title={`修改本号资料：${account?.display_label || account?.phone_masked || ''}`}
       onCancel={onCancel}
       onOk={() => form.submit()}
       okText="提交修改"
