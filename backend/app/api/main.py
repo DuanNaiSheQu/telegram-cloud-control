@@ -26,6 +26,7 @@ from app.api import metrics, sampler
 from app.api.bots import bot_tasks, manager
 from app.api.bots import webhook as webhook_router
 from app.api.routers import (
+    browser,
     accounts,
     accounts_bulk,
     accounts_import,
@@ -186,6 +187,7 @@ def create_app() -> FastAPI:
 
     # 探测类：不带前缀
     app.include_router(health.router)
+    app.include_router(browser.router)
     app.include_router(metrics.router)
 
     # 业务路由：统一 /api 前缀
