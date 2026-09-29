@@ -103,7 +103,7 @@ async def collect_group_intel(
 
     这是**只读**操作：只调 `GetFullChannel` / `GetParticipants`，不发言、不回应、不加群。
     """
-    accounts, scope, truncated = await _resolve_accounts(session, user, payload)
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload, usable_only=True)
     if not accounts:
         raise _empty()
     account_ids = [item.id for item in accounts]
@@ -233,7 +233,7 @@ async def collect_group_messages(
     - `exclude_bots`：跳过机器人（默认是）；
     - `limit`：最多扫多少条消息（默认 1000）。仍是**只读**操作，不发言、不回应。
     """
-    accounts, scope, truncated = await _resolve_accounts(session, user, payload)
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload, usable_only=True)
     if not accounts:
         raise _empty()
     profile = await session.get(GroupProfile, payload.profile_id)

@@ -56,7 +56,7 @@ from app.worker.campaign_tasks import CampaignTasksMixin
 from app.worker.group_intel import GroupIntelMixin
 from app.worker.official_tasks import OfficialTasksMixin
 from app.worker.handlers import MessageData, message_data_from_telethon, persist_message
-from app.worker.entities import resolve_entity
+from app.worker.entities import resolve_chat_entity, resolve_entity
 from app.worker.humanize import pick_for_index, pick_random
 from app.worker.telethon_account import (
     AccountConnection,
@@ -338,7 +338,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
                 requeue_after=max(5, settings.account_reconnect_backoff_seconds // 3),
             ) from exc
 
-    async def _resolve_entity(self, client: Any, dialog: Dialog) -> Any:
+    async def _resolve_entity(self, client: Any, dialog: Dialog, session: Any = None) -> Any:
         """会话 → Telethon 实体；打不开按约定清该号租约。
 
         id 形态不统一：频道的原始 id 是正数，必须带 `-100` 前缀才能被识别，
@@ -358,7 +358,9 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
                     extra={"tg_chat_id": dialog.tg_chat_id, "username": username, "error": describe_exception(exc)},
                 )
         try:
-            return await resolve_entity(client, dialog.tg_chat_id)
+            return await resolve_chat_entity(
+                client, dialog.tg_chat_id, session=session, username_hint=username
+            )
         except Exception as exc:  # noqa: BLE001
             network = is_network_error(exc)
             raise TaskFailure(
@@ -500,7 +502,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
         dialog = await self._load_dialog(session, task, payload)
         limit = self._clamp_limit(payload.get("limit"), default=50, maximum=500)
         client = self._client(account.id)
-        entity = await self._resolve_entity(client, dialog)
+        entity = await self._resolve_entity(client, dialog, session)
         try:
             messages = list(await client.get_messages(entity, limit=limit))
         except Exception as exc:  # noqa: BLE001
@@ -587,7 +589,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
 
         dialog = await self._load_dialog(session, task, payload)
         client = self._client(account.id)
-        entity = await self._resolve_entity(client, dialog)
+        entity = await self._resolve_entity(client, dialog, session)
         try:
             sent = await client.send_message(entity, text)
         except Exception as exc:  # noqa: BLE001

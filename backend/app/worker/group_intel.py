@@ -29,7 +29,7 @@ from app.services.group_intel import (
     upsert_member,
     upsert_profile,
 )
-from app.worker.entities import resolve_entity
+from app.worker.entities import resolve_chat_entity, resolve_entity
 from app.worker.telethon_account import TaskFailure, describe_exception, flood_wait_seconds
 
 logger = logging.getLogger(__name__)
@@ -167,7 +167,7 @@ class GroupIntelMixin:
         dialog = await self._resolve_group_dialog(session, task, payload)
         tg_chat_id = int(payload.get("tg_chat_id") or dialog.tg_chat_id)
         client = self._client(account.id)
-        entity = await self._resolve_entity(client, dialog) if dialog is not None else await resolve_entity(client, tg_chat_id)
+        entity = await self._resolve_entity(client, dialog, session) if dialog is not None else await resolve_chat_entity(client, tg_chat_id, session=session)
 
         try:
             full = await self._full_chat(client, entity)
@@ -271,7 +271,7 @@ class GroupIntelMixin:
             tg_chat_id = int(payload.get("tg_chat_id") or (dialog.tg_chat_id if dialog is not None else 0))
             if not tg_chat_id:
                 raise TaskFailure("采集对话任务缺少 profile_id 或 tg_chat_id", retryable=False)
-            entity = await resolve_entity(client, tg_chat_id)
+            entity = await resolve_chat_entity(client, tg_chat_id, session=session)
             profile = await upsert_profile(
                 session,
                 account_id=account.id,
@@ -282,7 +282,7 @@ class GroupIntelMixin:
                 **profile_fields_from_entity(entity),
             )
         else:
-            entity = await self._resolve_entity(client, dialog) if dialog is not None else await resolve_entity(client, profile.tg_chat_id)
+            entity = await self._resolve_entity(client, dialog, session) if dialog is not None else await resolve_chat_entity(client, profile.tg_chat_id, session=session, username_hint=getattr(profile, 'username', '') or '')
 
         # 不在群里就读不到对话，先把原因说清楚（与成员采集同一套探测）
         blocked = await self._member_visibility(client, entity)
@@ -448,7 +448,7 @@ class GroupIntelMixin:
             tg_chat_id = int(payload.get("tg_chat_id") or (dialog.tg_chat_id if dialog is not None else 0))
             if not tg_chat_id:
                 raise TaskFailure("采集成员任务缺少 profile_id 或 tg_chat_id", retryable=False)
-            entity = await resolve_entity(client, tg_chat_id)
+            entity = await resolve_chat_entity(client, tg_chat_id, session=session)
             profile = await upsert_profile(
                 session,
                 account_id=account.id,
@@ -461,7 +461,7 @@ class GroupIntelMixin:
             profile_entity = entity
         else:
             profile_entity = (
-                await self._resolve_entity(client, dialog) if dialog is not None else await resolve_entity(client, profile.tg_chat_id)
+                await self._resolve_entity(client, dialog, session) if dialog is not None else await resolve_chat_entity(client, profile.tg_chat_id, session=session, username_hint=getattr(profile, 'username', '') or '')
             )
 
         await self._report_progress(
