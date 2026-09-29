@@ -3007,3 +3007,198 @@ body .ant-spin-container::after {
   border-color: var(--tg-color-primary);
   background: var(--tg-color-primary-bg);
 }
+
+/* ============================================================================
+   企业级营销页面设计系统
+   营销中心各功能页共用 ActionTab 外壳，这里统一页头 / 分组卡片 / 字段网格 /
+   吸底提交栏的观感：宽屏不散、窄屏不挤、每个字段都有明确的层级与说明。
+   ============================================================================ */
+
+/* ---- 页面容器：限宽居中，底部留出提交栏高度 ---- */
+.tg-action-page {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 4px 24px 132px;
+}
+
+/* ---- 页头 ---- */
+.tg-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 24px;
+  margin-bottom: 18px;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.tg-page-head-main { min-width: 0; }
+.tg-page-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--tg-color-text);
+}
+.tg-page-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--tg-color-text-secondary);
+  max-width: 76ch;
+}
+.tg-page-head-meta {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  padding-top: 2px;
+}
+.tg-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  color: var(--tg-color-primary);
+  background: color-mix(in srgb, var(--tg-color-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tg-color-primary) 24%, transparent);
+  white-space: nowrap;
+}
+.tg-chip-soft {
+  color: var(--tg-color-text-secondary);
+  background: var(--tg-color-bg-hover);
+  border-color: var(--tg-color-border);
+}
+
+/* ---- 表单主体与分组卡片 ---- */
+.tg-action-form { max-width: none; }
+.tg-form-body { display: flex; flex-direction: column; }
+
+.tg-form-group-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  margin: 22px 0 18px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--tg-color-text);
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border);
+  border-left: 3px solid var(--tg-color-primary);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+.tg-form-body > .tg-form-group-title:first-child { margin-top: 0; }
+
+/* ---- 字段网格：自适应列宽，窄屏自动折行 ---- */
+.tg-form-grid,
+.tg-action-form .tg-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px 20px;
+  align-items: start;
+  justify-content: stretch;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+.tg-form-grid > .ant-form-item,
+.tg-form-grid > .ant-space { width: 100%; margin-bottom: 0; }
+.tg-form-grid .ant-input-number,
+.tg-form-grid .ant-select,
+.tg-form-grid .ant-picker { width: 100%; }
+
+/* 分组标题紧跟其字段卡片：视觉上绑成一节 */
+.tg-form-body > .tg-form-group-title + .tg-form-grid { margin-top: 0; }
+
+/* 未包在分组里的字段（直接铺在表单下的）：也给一张卡 */
+.tg-form-body > .ant-form-item {
+  padding: 16px 20px 0;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border);
+  border-radius: 12px;
+}
+.tg-form-body > .ant-form-item:last-child { padding-bottom: 16px; }
+
+/* ---- 账号范围卡片（section 形式） ---- */
+.tg-section {
+  margin-top: 22px;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  overflow: hidden;
+}
+.tg-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--tg-color-border);
+  background: var(--tg-color-bg-hover);
+}
+.tg-section-bar {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--tg-color-primary);
+  flex-shrink: 0;
+}
+.tg-section-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tg-color-text);
+  white-space: nowrap;
+}
+.tg-section-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tg-color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tg-section > *:not(.tg-section-head) { padding: 18px 20px; }
+
+/* ---- 吸底提交栏 ---- */
+.tg-submit-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 22px;
+  padding: 14px 20px;
+  background: color-mix(in srgb, var(--tg-color-bg-card) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--tg-color-border);
+  border-radius: 12px;
+  box-shadow: 0 -2px 16px rgba(15, 23, 42, 0.06);
+}
+.tg-submit-hint { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tg-submit-hint strong { font-size: 13px; font-weight: 600; color: var(--tg-color-text); }
+.tg-submit-hint span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tg-color-text-secondary);
+}
+
+/* 老版本遗留的提交区样式不再需要（已由 dock 取代） */
+.tg-submit-bar { margin-top: 18px; padding: 0; border: none; background: none; }
+
+@media (max-width: 900px) {
+  .tg-action-page { padding: 4px 12px 140px; }
+  .tg-page-head { flex-direction: column; gap: 12px; }
+  .tg-section-note { white-space: normal; }
+}

@@ -511,22 +511,41 @@ function ActionTab({ title, description, submit, buildPayload, children }: Actio
   };
 
   return (
-    <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)' }}>
-      <Alert type="info" showIcon message={title} description={description} />
+    <div className="tg-action-page">
+      <header className="tg-page-head">
+        <div className="tg-page-head-main">
+          <h1 className="tg-page-title">{title}</h1>
+          <p className="tg-page-desc">{description}</p>
+        </div>
+        <div className="tg-page-head-meta">
+          <span className="tg-chip">错峰入队</span>
+          <span className="tg-chip tg-chip-soft">Worker 执行</span>
+        </div>
+      </header>
+
       <Form form={form} layout="vertical" className="tg-action-form" onFinish={(values) => void onFinish(values)}>
-        {children}
-        <Form.Item label="账号范围" className="tg-submit-bar">
-        <Typography.Text type="secondary" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
-          冻结 / 失效 / 停用的号会自动跳过（它们发不出去消息）；检测 / 申诉解封 / 官方养号不受此限制。
-        </Typography.Text>
+        <div className="tg-form-body">{children}</div>
+
+        <section className="tg-section">
+          <div className="tg-section-head">
+            <span className="tg-section-bar" />
+            <h2 className="tg-section-title">账号范围</h2>
+            <span className="tg-section-note">
+              冻结 / 失效 / 停用的号会自动跳过（它们发不出去消息）；检测 / 申诉解封 / 官方养号不受此限制
+            </span>
+          </div>
           <ScopeFields value={scope} onChange={setScope} />
-        </Form.Item>
-        <Space>
-          <Button type="primary" htmlType="submit" icon={<RocketOutlined />} loading={submitting}>
+        </section>
+
+        <footer className="tg-submit-dock">
+          <Button type="primary" size="large" htmlType="submit" icon={<RocketOutlined />} loading={submitting}>
             提交任务
           </Button>
-          <Typography.Text type="secondary">提交后按「一 号一任务」错峰入队，由 Worker 执行</Typography.Text>
-        </Space>
+          <div className="tg-submit-hint">
+            <strong>提交即排队</strong>
+            <span>按「一号一任务」错峰入队，由 Worker 执行；进度在「批次进度」页查看与取消</span>
+          </div>
+        </footer>
       </Form>
       <BulkResultModal open={!!result} result={result} onClose={() => setResult(null)} />
     </div>
