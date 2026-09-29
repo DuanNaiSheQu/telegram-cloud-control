@@ -3336,3 +3336,19 @@ body .ant-spin-container::after {
   color: var(--tg-color-text-secondary);
   white-space: nowrap;
 }
+
+/* 日志展开区的空状态：排队中/已完成但无日志时，给出明确说明而不是一片空白 */
+.tg-task-logs-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--tg-color-bg-hover);
+  border-radius: 8px;
+}
+.tg-task-logs-empty > p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--tg-color-text-secondary);
+}
+.tg-task-logs-error { color: #d4380d !important; }

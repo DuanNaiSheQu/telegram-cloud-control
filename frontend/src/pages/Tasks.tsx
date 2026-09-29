@@ -295,14 +295,23 @@ export default function Tasks() {
         key: 'error',
         dataIndex: 'error',
         width: 320,
-        render: (value: string) =>
-          value ? (
+        render: (value: string, record) => {
+          if (!value) return <Typography.Text type="secondary">—</Typography.Text>;
+          // 待执行 / 执行中：这条 error 是上一轮留下的旧账（重试中的任务会有），
+          // 用灰字标成「上次失败」，别让它看着像当前正在报错
+          if (record.status !== 'failed') {
+            return (
+              <Tooltip title={<div style={{ maxWidth: 520, whiteSpace: 'pre-wrap' }}>上次尝试失败：{value}</div>}>
+                <span className="tg-clamp-cell tg-muted">上次失败：{value}</span>
+              </Tooltip>
+            );
+          }
+          return (
             <Tooltip title={<div style={{ maxWidth: 520, whiteSpace: 'pre-wrap' }}>{value}</div>}>
               <span className="tg-clamp-cell tg-text-danger">{value}</span>
             </Tooltip>
-          ) : (
-            <Typography.Text type="secondary">—</Typography.Text>
-          ),
+          );
+        },
       },
       {
         title: '重试次数',
@@ -418,7 +427,25 @@ export default function Tasks() {
             const summaryParts = ['sent', 'total', 'joined', 'fetched']
               .filter((key) => progress[key] !== undefined)
               .map((key) => `${key}=${progress[key]}`);
-            if (!logs.length && !summaryParts.length) return null;
+            // 没有日志时也要给反馈：之前这里直接 return null，用户点「日志」
+            // 展开后一片空白，看起来就像功能坏了。排队中的任务本来就没有日志，
+            // 得说清楚它现在处于什么状态、接下来会怎样。
+            if (!logs.length && !summaryParts.length) {
+              const stateText: Record<string, string> = {
+                pending: '排队中：等 Worker 认领这个号之后就开始，执行过程会写入这里',
+                running: '执行中：正在跑，日志马上就出来（本页会自动刷新）',
+                failed: '已失败，但没有留下执行日志——可点「重试」重新排队',
+                completed: '已完成，但没有产生日志条目（该任务类型可能不上报步骤）',
+                cancelled: '已取消',
+              };
+              return (
+                <div className="tg-task-logs-empty">
+                  <b style={{ fontSize: 'var(--tg-font-size-sm)' }}>执行日志</b>
+                  <p>{stateText[record.status] ?? `当前状态：${record.status_label}`}</p>
+                  {record.error ? <p className="tg-task-logs-error">失败原因：{record.error}</p> : null}
+                </div>
+              );
+            }
             return (
               <div className="tg-stack" style={{ gap: 'var(--tg-space-xs)' }}>
                 <b style={{ fontSize: 'var(--tg-font-size-sm)' }}>
