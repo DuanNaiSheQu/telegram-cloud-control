@@ -166,7 +166,7 @@ class GroupIntelMixin:
         dialog = await self._resolve_group_dialog(session, task, payload)
         tg_chat_id = int(payload.get("tg_chat_id") or dialog.tg_chat_id)
         client = self._client(account.id)
-        entity = await self._resolve_entity(client, dialog) if dialog is not None else await client.get_entity(tg_chat_id)
+        entity = await self._resolve_entity(client, dialog) if dialog is not None else await resolve_entity(client, tg_chat_id)
 
         try:
             full = await self._full_chat(client, entity)
@@ -256,7 +256,7 @@ class GroupIntelMixin:
             tg_chat_id = int(payload.get("tg_chat_id") or (dialog.tg_chat_id if dialog is not None else 0))
             if not tg_chat_id:
                 raise TaskFailure("采集成员任务缺少 profile_id 或 tg_chat_id", retryable=False)
-            entity = await client.get_entity(tg_chat_id)
+            entity = await resolve_entity(client, tg_chat_id)
             profile = await upsert_profile(
                 session,
                 account_id=account.id,
@@ -269,7 +269,7 @@ class GroupIntelMixin:
             profile_entity = entity
         else:
             profile_entity = (
-                await self._resolve_entity(client, dialog) if dialog is not None else await client.get_entity(profile.tg_chat_id)
+                await self._resolve_entity(client, dialog) if dialog is not None else await resolve_entity(client, profile.tg_chat_id)
             )
 
         await self._report_progress(

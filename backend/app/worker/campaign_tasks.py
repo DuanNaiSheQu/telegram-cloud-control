@@ -171,7 +171,8 @@ class CampaignTasksMixin:
         if not raw:
             raise TaskFailure("任务缺少目标群", retryable=False)
         try:
-            return await client.get_entity(raw)
+            # 群 id 可能是频道的原始 id（正数），解析交给 resolve_entity 统一处理
+            return await resolve_entity(client, raw)
         except ValueError as exc:
             raise TaskFailure(f"找不到目标群：{raw}", retryable=False) from exc
         except Exception as exc:  # noqa: BLE001
@@ -631,7 +632,7 @@ class CampaignTasksMixin:
         await self._throttle_gate(account, task)
         client = self._client(account.id)
         try:
-            group = await client.get_entity(groups_raw[0])
+            group = await resolve_entity(client, groups_raw[0])
         except ValueError as exc:
             raise TaskFailure(f"找不到目标群：{groups_raw[0]}", retryable=False) from exc
         except Exception as exc:  # noqa: BLE001
