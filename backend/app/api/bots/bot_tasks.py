@@ -362,12 +362,14 @@ async def _handle_bot_broadcast(session: AsyncSession, task: Task) -> None:
     for target in targets:
         try:
             if forward_chat_id is not None and forward_message_id is not None:
-                await runtime.client.forward_messages(
-                    entity=target, messages=int(forward_message_id), from_peer=int(forward_chat_id)
+                # 走 manager 的统一封装：属性是 runtime.bot（不是 .client），
+                # 且带 15 秒超时 + 中文错误翻译 + 可重试判定
+                await manager.forward_message(
+                    runtime, target, int(forward_chat_id), int(forward_message_id)
                 )
                 via = "forward"
             else:
-                await runtime.client.send_message(entity=target, message=text)
+                await manager.send_text(runtime, target, text)
                 via = "text"
             sent += 1
             results.append({"target": target, "ok": True, "via": via})

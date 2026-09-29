@@ -71,6 +71,9 @@ export default function Tasks() {
       account_id: searchParams.get('account_id') as string | null,
       bot_id: null as string | null,
       only_failed: searchParams.get('only_failed') === 'true',
+      // 批次：同一次提交（选 N 个号做同一件事）产生的任务共享 batch_id，
+      // 点列表里的批次号就把筛选切到「只看这一批」
+      batch: searchParams.get('batch') ?? null,
     },
     pageSize: 20,
   });
@@ -281,7 +284,7 @@ export default function Tasks() {
                 size="small"
                 className="tg-mono"
                 style={{ padding: 0 }}
-                onClick={() => q.setFilters({ batch: batch })}
+                onClick={() => q.setFilter('batch', batch)}
               >
                 {batch.slice(0, 8)}
               </Button>
@@ -289,6 +292,7 @@ export default function Tasks() {
           );
         },
       },
+      {
         title: '状态',
         key: 'status',
         dataIndex: 'status',
@@ -378,7 +382,7 @@ export default function Tasks() {
       {
         title: '操作',
         key: 'actions',
-        width: 160,
+        width: 230,
         fixed: 'right',
         render: (_: unknown, record) => {
           const logCount = ((record.result as Record<string, unknown> | null)?.logs as unknown[] | undefined)?.length ?? 0;

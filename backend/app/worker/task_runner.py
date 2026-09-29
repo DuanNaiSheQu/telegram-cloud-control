@@ -185,6 +185,30 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
                 account = await session.get(TgAccount, task.account_id)
                 if account is None:
                     raise TaskFailure("任务对应的账号不存在", retryable=False)
+
+                # 任务一启动就写第一条日志。此前要等 handler 干出第一步才有内容，
+                # 而用户点「日志」往往正是在任务刚启动、还没有任何步骤的时候——
+                # 那时展开是空的，看起来像功能坏了。
+                try:
+                    started_at = _now().isoformat()
+                    previous = dict(task.result or {})
+                    logs = list(previous.get("logs") or [])
+                    logs.append({
+                        "at": started_at,
+                        "stage": "start",
+                        "detail": f"任务开始执行（第 {task.attempts} 次尝试，账号 {account_label(account) or '—'}）",
+                    })
+                    task.result = {
+                        **previous,
+                        "stage": "start",
+                        "detail": "已启动，正在执行",
+                        "updated_at": started_at,
+                        "logs": logs[-50:],
+                    }
+                    await session.flush()
+                except Exception:  # noqa: BLE001 - 写日志失败不能挡住任务本身
+                    self.log.debug("写入启动日志失败 task_id=%s", claim.id)
+
                 try:
                     result = await handler(session, task, account)
                 except TaskFailure as exc:

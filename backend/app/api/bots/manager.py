@@ -14,7 +14,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 from aiogram import Bot as AiogramBot
 from aiogram import Dispatcher
@@ -287,11 +287,32 @@ async def apply_webhook(
 
 # ---------------- 发消息 ----------------
 
-async def send_text(runtime: BotRuntime, chat_id: int, text: str) -> TgMessage:
-    """Bot 发一条文本。失败抛 BotSendError（中文原因 + 是否值得重试）。"""
+async def send_text(runtime: BotRuntime, chat_id: Union[int, str], text: str) -> TgMessage:
+    """Bot 发一条文本。失败抛 BotSendError（中文原因 + 是否值得重试）。
+
+    chat_id 允许 `@channel` 这类字符串：群发目标里两种写法都有。
+    """
     try:
         return await asyncio.wait_for(
             runtime.bot.send_message(chat_id=chat_id, text=text),
+            timeout=TELEGRAM_CALL_TIMEOUT,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise BotSendError(describe_telegram_error(exc), retryable=_is_retryable(exc)) from exc
+
+
+async def forward_message(
+    runtime: BotRuntime,
+    chat_id: Union[int, str],
+    from_chat_id: Union[int, str],
+    message_id: int,
+) -> TgMessage:
+    """Bot 转发一条已有消息。与 send_text 同口径：统一超时 + 中文错误 + 可重试判定。"""
+    try:
+        return await asyncio.wait_for(
+            runtime.bot.forward_message(
+                chat_id=chat_id, from_chat_id=from_chat_id, message_id=message_id
+            ),
             timeout=TELEGRAM_CALL_TIMEOUT,
         )
     except Exception as exc:  # noqa: BLE001
@@ -310,6 +331,7 @@ __all__ = [
     "describe_telegram_error",
     "ensure_runtime",
     "fetch_me",
+    "forward_message",
     "get",
     "load_all",
     "register",
