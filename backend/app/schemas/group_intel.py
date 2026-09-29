@@ -212,3 +212,16 @@ class ReplyRuleUpdate(BaseModel):
     enabled: Optional[bool] = None
     priority: Optional[int] = None
     cooldown_seconds: Optional[int] = None
+
+
+class SearchGroupsRequest(BulkScopeRequest):
+    """按关键词找公开群（走 Telegram 原生搜索）。
+
+    继承 `BulkScopeRequest` 是为了复用统一的账号范围（scope / account_ids / limit），
+    所以「每个词取多少结果」单独叫 `per_keyword`，避免和账号上限的 `limit` 撞名。
+    """
+
+    keywords: List[str] = Field(default_factory=list, min_length=1, max_length=20, description="关键词，最多 20 个")
+    per_keyword: int = Field(default=50, ge=1, le=100, description="每个关键词最多取多少个结果")
+    min_members: int = Field(default=0, ge=0, le=1000000, description="成员数门槛：小于这个数的不收")
+    kind: str = Field(default="any", pattern="^(any|group|channel)$", description="只要群 / 只要频道 / 都要")

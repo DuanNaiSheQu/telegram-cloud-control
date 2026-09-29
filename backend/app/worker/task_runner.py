@@ -143,6 +143,7 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             TaskType.collect_members.value: self._collect_members,
             TaskType.collect_messages.value: self._collect_messages,
             TaskType.screen_groups.value: self._screen_groups,
+            TaskType.search_groups.value: self._search_groups,
             TaskType.inspect_groups.value: self._inspect_groups,
             TaskType.collect_link.value: self._collect_link,
             TaskType.sync_official.value: self._sync_official,

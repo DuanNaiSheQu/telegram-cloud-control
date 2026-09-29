@@ -114,6 +114,7 @@ class TaskType(str, enum.Enum):
     appeal_spam = "appeal_spam"          # 模拟真人向 @SpamBot 申诉：/start → 看状态 → 点「这是误判」
     collect_messages = "collect_messages"  # 采集群内对话：按时间范围扫消息，把发言者落成成员档案
     screen_groups = "screen_groups"      # 筛群：批量检测群有效性/人数/在线/类型/发言权限/审核状态
+    search_groups = "search_groups"      # 找群：按关键词用 Telegram 原生搜索找公开群/频道
     inspect_groups = "inspect_groups"    # 筛群：批量体检群链接（有效性/人数/类型/能否发言/是否审核）
     # Bot（API 执行）
     relay_to_staff = "relay_to_staff"    # 转发到员工群
@@ -156,6 +157,7 @@ TASK_TYPE_LABELS = {
     "appeal_spam": "申诉解封",
     "collect_messages": "采集群内对话",
     "screen_groups": "筛群检测",
+    "search_groups": "按关键词找群",
     "inspect_groups": "筛群体检",
     "relay_to_staff": "转发到员工群",
     "bot_reply": "Bot 自动回复",

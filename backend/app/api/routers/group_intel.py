@@ -25,6 +25,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_session, visible_account_ids
+from app.api.routers.campaigns import _submit_campaign
 from app.api.routers import build_order_by, enum_value, publish_task_safely
 from app.api.routers.accounts_bulk import scope_clause
 from app.services.account_label import account_label
@@ -69,6 +70,7 @@ from app.schemas import (
     KeywordWatchUpdate,
     ReplyRuleRequest,
     ReplyRuleUpdate,
+    SearchGroupsRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,6 +104,37 @@ def _event_out(event: GroupEvent, titles: dict[int, str]) -> GroupEventOut:
 
 
 # ---------------- 采集 ----------------
+
+@router.post("/search-groups", response_model=BulkResultResponse, summary="按关键词找公开群（Telegram 原生搜索）")
+async def search_public_groups(
+    payload: SearchGroupsRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """输入关键词，用 **Telegram 原生搜索**找出公开群/频道，直接落进群档案。
+
+    对手（彩虹）靠 hao123 / soso 这类第三方群目录站收集群链接——要爬、会失效、结果还旧；
+    官方 `contacts.Search` 实时返回匹配结果，**连成员数一起给**。找到的群之后可以直接
+    接「筛群」判定值不值得投、或直接「采集成员」。
+
+    参数：`keywords`（最多 20 个）、`limit`（每词取多少，≤100）、`min_members`（成员数门槛）、
+    `kind`（any / group / channel）。只读操作，不加群、不发言。
+    """
+    return await _submit_campaign(
+        session=session,
+        user=user,
+        action='search_groups',
+        task_type=TaskType.search_groups,
+        payload_scope=payload,
+        params={
+            "keywords": payload.keywords,
+            "limit": payload.per_keyword,
+            "min_members": payload.min_members,
+            "kind": payload.kind,
+        },
+        priority=65,
+    )
+
 
 @router.post("/collect", response_model=BulkResultResponse, summary="批量采集群情报（群档案 + 可选成员）")
 async def collect_group_intel(

@@ -336,6 +336,89 @@ class GroupIntelMixin:
         )
         return {"total": len(raw_links), "ok": ok_count, "failed": len(raw_links) - ok_count, "results": results[:200]}
 
+    async def _search_groups(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
+        """按关键词找公开群：走 **Telegram 原生搜索**（`contacts.Search`），不依赖第三方群目录站。
+
+        对手（彩虹）是靠 hao123 / soso 这类站收集群链接的——要爬、会失效、结果还旧。
+        官方接口直接返回匹配的公开群/频道，**连成员数一起给**，实时且无反爬。
+        找到的群落进群档案（来源标记 `keyword_search`），之后用筛群工具判定值不值得投。
+        """
+        assert account is not None
+        self._ensure_sendable(account)
+        payload = dict(task.payload or {})
+        keywords = [str(item).strip() for item in (payload.get("keywords") or []) if str(item).strip()][:20]
+        if not keywords:
+            raise TaskFailure("找群任务缺少关键词", retryable=False)
+        per_keyword = max(1, min(int(payload.get("limit") or 50), 100))
+        min_members = max(0, int(payload.get("min_members") or 0))
+        want = str(payload.get("kind") or "any")  # any / group / channel
+        client = self._client(account.id)
+
+        results: list[dict] = []
+        seen_ids: set[int] = set()
+        try:
+            for index, keyword in enumerate(keywords):
+                try:
+                    res = await client(functions.contacts.SearchRequest(q=keyword, limit=per_keyword))
+                except BaseException as exc:  # noqa: BLE001 - 单个词失败继续下一个
+                    results.append({"keyword": keyword, "ok": False, "error": f"{type(exc).__name__}: {str(exc)[:100]}"})
+                    continue
+                hits = []
+                for chat in getattr(res, "chats", []) or []:
+                    chat_id = int(getattr(chat, "id", 0) or 0)
+                    if not chat_id or chat_id in seen_ids:
+                        continue
+                    is_megagroup = bool(getattr(chat, "megagroup", False))
+                    is_broadcast = bool(getattr(chat, "broadcast", False))
+                    kind = "group" if is_megagroup else ("channel" if is_broadcast else "group")
+                    if want != "any" and kind != want:
+                        continue
+                    members = getattr(chat, "participants_count", None)
+                    if min_members and (members or 0) < min_members:
+                        continue
+                    seen_ids.add(chat_id)
+                    # 落进群档案：之后可以直接用「筛群」「采集成员」接着处理
+                    try:
+                        await upsert_profile(
+                            session,
+                            account_id=account.id,
+                            tg_chat_id=chat_id,
+                            source="keyword_search",
+                            touch_collected_at=False,
+                            **profile_fields_from_entity(chat),
+                        )
+                    except BaseException:  # noqa: BLE001 - 单个群落档失败不影响整批
+                        self.log.debug("落档失败 tg_chat_id=%s", chat_id)
+                    hits.append(
+                        {
+                            "title": getattr(chat, "title", None) or "",
+                            "username": getattr(chat, "username", None),
+                            "tg_chat_id": chat_id,
+                            "kind": kind,
+                            "members": members,
+                        }
+                    )
+                results.append({"keyword": keyword, "ok": True, "found": len(hits), "chats": hits[:50]})
+                await self._report_progress(
+                    session, task, stage="searching",
+                    detail=f"关键词「{keyword}」找到 {len(hits)} 个群（累计 {len(seen_ids)} 个）",
+                    scanned=index + 1, found=len(seen_ids), total=len(keywords),
+                )
+                if index < len(keywords) - 1:
+                    await sleep_human(2.0, 5.0, self._campaign_rng(task, payload))
+        except BaseException as exc:  # noqa: BLE001
+            await self._apply_status(session, account, exc)
+            raise self._failure(exc, "按关键词找群失败") from exc
+
+        total = sum(item.get("found", 0) for item in results if item.get("ok"))
+        return {
+            "keywords": keywords,
+            "unique_groups": len(seen_ids),
+            "total_hits": total,
+            "results": results,
+            "summary": f"{len(keywords)} 个关键词共找到 {len(seen_ids)} 个不同的群/频道（已落进群档案）",
+        }
+
     async def _collect_messages(self, session: Any, task: Task, account: Optional[TgAccount]) -> dict:
         """采集群内对话：按时间范围扫消息，把发言的人落成成员档案。
 

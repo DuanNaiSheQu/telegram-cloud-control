@@ -85,6 +85,7 @@ from app.schemas.group_intel import (
     KeywordWatchUpdate,
     ReplyRuleRequest,
     ReplyRuleUpdate,
+    SearchGroupsRequest,
 )
 from app.schemas.matrix import (
     AccountImportBatchOut,
