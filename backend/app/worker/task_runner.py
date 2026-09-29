@@ -338,11 +338,24 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             ) from exc
 
     async def _resolve_entity(self, client: Any, dialog: Dialog) -> Any:
-        """tg_chat_id → Telethon 实体；打不开按约定清该号租约。
+        """会话 → Telethon 实体；打不开按约定清该号租约。
 
         id 形态不统一：频道的原始 id 是正数，必须带 `-100` 前缀才能被识别，
         直接传正数会被当成用户（报 PeerUser 找不到）——统一交给 resolve_entity 处理。
+
+        再叠一层：**优先按用户名解析**。执行号不在某个群里时，它的 entity 缓存里没有这个群，
+        按 id 解析会直接失败（`Could not find the input entity for PeerChannel`），
+        而用户名是公开的、任何号都能解析到——这正是「号还没入群但要读群资料」的场景。
         """
+        username = (getattr(dialog, "username", None) or "").strip().lstrip("@")
+        if username:
+            try:
+                return await client.get_entity(f"@{username}")
+            except Exception as exc:  # noqa: BLE001 - 解析不到就退回按 id
+                self.log.debug(
+                    "按用户名解析会话失败，改用 id",
+                    extra={"tg_chat_id": dialog.tg_chat_id, "username": username, "error": describe_exception(exc)},
+                )
         try:
             return await resolve_entity(client, dialog.tg_chat_id)
         except Exception as exc:  # noqa: BLE001

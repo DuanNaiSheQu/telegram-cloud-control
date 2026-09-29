@@ -531,7 +531,7 @@ export default function GroupIntel() {
                     dataSource={members.data?.items ?? []}
                     loading={members.loading}
                     pagination={{ pageSize: 10, size: 'small' }}
-                    locale={{ emptyText: '还没有成员数据：用「采集群情报」勾上「同时采成员名单」' }}
+                    locale={{ emptyText: '还没有成员数据：用「采集群情报」采集（默认就会采成员名单）' }}
                   />
                 ),
               },
@@ -585,7 +585,7 @@ export default function GroupIntel() {
             message="只读采集，不会在群里留下任何痕迹"
             description="对账号选择范围内全部可见账号执行：读取它们已加入群的资料；开启成员名单后会按页拉取（页间有间隔、单群有上限）。"
           />
-          <Form form={collectForm} layout="vertical" initialValues={{ limit_groups: 30, sample_members: 0, with_members: false, member_limit: 200 }}>
+          <Form form={collectForm} layout="vertical" initialValues={{ limit_groups: 30, sample_members: 0, with_members: true, member_limit: 200 }}>
             <Form.Item label="每个号最多采多少个群" name="limit_groups">
               <InputNumber min={1} max={300} style={{ width: 200 }} />
             </Form.Item>
@@ -593,7 +593,7 @@ export default function GroupIntel() {
               <InputNumber min={0} max={500} style={{ width: 200 }} />
             </Form.Item>
             <Form.Item name="with_members" valuePropName="checked">
-              <Checkbox>同时为每个群排队「采集群成员」任务（拉更大名单，速度慢一些）</Checkbox>
+              <Checkbox>同时为每个群排队「采集群成员」任务（默认开启；按群成员名单采集，速度慢一些）</Checkbox>
             </Form.Item>
             <Form.Item label="成员任务每群上限" name="member_limit">
               <InputNumber min={1} max={500} style={{ width: 200 }} />

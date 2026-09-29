@@ -29,6 +29,7 @@ from app.services.group_intel import (
     upsert_member,
     upsert_profile,
 )
+from app.worker.entities import resolve_entity
 from app.worker.telethon_account import TaskFailure, describe_exception, flood_wait_seconds
 
 logger = logging.getLogger(__name__)
@@ -536,6 +537,41 @@ class GroupIntelMixin:
             return await client(functions.messages.GetFullChatRequest(chat_id=entity.id))
         return None
 
+    async def _member_visibility(self, client: Any, entity: Any) -> Optional[str]:
+        """检查「能不能采这个群的成员」，返回 None 表示可以，否则返回给用户看的原因。
+
+        两个常见原因都会让 Telegram 返回空列表（看起来像「采集没效果」）：
+        1. **执行号不在群里**——非成员看不到成员名单；
+        2. **群主隐藏了成员名单**（`participants_hidden`）——这时任何客户端都拉不到，
+           不是权限或代码问题，只能群主去群设置里关掉。
+        """
+        try:
+            full = await client(functions.channels.GetFullChannelRequest(channel=entity))
+            full_chat = getattr(full, "full_chat", None)
+            if getattr(full_chat, "participants_hidden", False):
+                return (
+                    "该群隐藏了成员名单（群主在群设置里开启的），Telegram 不允许任何客户端拉取成员；"
+                    "需要群主到「群设置 → 成员 → 隐藏成员列表」关掉后才能采集。"
+                )
+        except BaseException as exc:  # noqa: BLE001 - 读不到群详情不阻塞，继续做成员探测
+            self.log.debug("读群详情失败（继续探测成员）: %s", describe_exception(exc))
+
+        try:
+            await client(functions.channels.GetParticipantRequest(channel=entity, participant="me"))
+        except BaseException as exc:  # noqa: BLE001
+            name = type(exc).__name__
+            if "NotParticipant" in name or "PARTICIPANT" in str(exc):
+                return (
+                    "执行采集的号不在这个群里，非成员看不到成员名单；"
+                    "先用「加群」把它拉进群，或换一个已在群里的号再采集。"
+                )
+            if "ChatAdminRequired" in name:
+                return "群权限不足（需要管理员权限才能读取成员），请换一个有权限的号。"
+            if "ChannelPrivate" in name:
+                return "该群为私有或已无法访问，执行号可能已被移出，请换号或重新入群。"
+            self.log.debug("成员身份探测异常（继续尝试采集）: %s", describe_exception(exc))
+        return None
+
     async def _fetch_members(
         self,
         session: Any,
@@ -550,6 +586,11 @@ class GroupIntelMixin:
         """分页拉成员并写库。页与页之间 sleep `GROUP_INTEL_PAGE_INTERVAL_SECONDS`，并逐页上报进度。"""
         if limit <= 0:
             return 0
+        # 先问清楚「能不能采」：不在群里 / 群隐藏名单时 Telegram 只会返回空列表，
+        # 不说清楚就会变成「点了采集，结果 0 个人」这种看不懂的情况。
+        blocked = await self._member_visibility(client, entity)
+        if blocked:
+            raise TaskFailure(blocked, retryable=False)
         page_size = max(1, min(settings.group_intel_page_size, limit))
         fetched = 0
         offset = 0
