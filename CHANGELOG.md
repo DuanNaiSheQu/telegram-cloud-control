@@ -7,6 +7,34 @@
 
 ---
 
+## v0.3.33 — 2026-03-30
+
+主题：**加群解析用错了 API**——把「存在的群」误报成「找不到」。
+
+### 修复
+
+- 现象：加群全部失败，报 `ValueError: No user has "cafinxbank" as username`；
+  实测这个用户名**存在**，而且是个超级群（`CAFINX · 穩定幣開卡 & 全球賬戶 (交流群)`，
+  id 4337589332）。
+- 根因：加群用 `get_input_entity(用户名)` 解析目标。它对**没有本地缓存的频道/群**会按「用户」
+  去查，于是抛出上面那句「没有这个用户」——把「解析方式不对」说成了「群不存在」。
+- 修法：改用 `contacts.ResolveUsername` 正解，再按返回类型分别处理：
+  - 返回的是**频道/超级群** → `JoinChannelRequest` 正常加入；
+  - 返回的是**普通群** → 明确提示「不能按用户名直接加入，请用邀请链接」；
+  - 返回的是**用户** → 明确提示「这是用户账号，不是群/频道」。
+- 顺带把加群目标的三类写法理顺（`_username_from_target` / `_invite_hash_of`）：
+  `@name`、`t.me/name`、`https://t.me/name/` 走用户名解析；
+  `t.me/+HASH`、`t.me/joinchat/HASH`、`+HASH` 走邀请链接——之前 `joinchat` 形式会被误当成用户名。
+
+### 验证
+
+- 目标解析单测：六种写法（`@name` / `name` / `t.me/name` / `https://t.me/name/` / `t.me/+hash` /
+  `t.me/joinchat/hash`）分流正确。
+- 用真实账号复刻修复后的解析路径：`ResolveUsername('cafinxbank')` 取到频道并可构造 `InputChannel`
+  （只解析、未发送加入请求，避免真的加群）。
+
+---
+
 ## v0.3.32 — 2026-03-30
 
 主题：**「找不到成员」这个提示会把人带偏**——把「号被冻结」和「目标不存在」分开。

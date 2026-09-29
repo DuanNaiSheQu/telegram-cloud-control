@@ -65,6 +65,33 @@ def _status_value(status: Any) -> str:
     return status.value if hasattr(status, "value") else str(status)
 
 
+def _invite_hash_of(raw: str) -> str:
+    """邀请链接 → hash：支持 `t.me/+HASH`、`https://t.me/+HASH`、`t.me/joinchat/HASH`、纯 `+HASH`。"""
+    value = str(raw).strip()
+    if "joinchat/" in value:
+        value = value.rsplit("joinchat/", 1)[1]
+    elif "+" in value:
+        value = value.rsplit("+", 1)[1]
+    else:
+        return ""
+    value = value.split("?")[0].split("/")[0].strip()
+    return value
+
+
+def _username_from_target(raw: str) -> str:
+    """从加群目标里取出公开用户名：支持 `@name`、`t.me/name`、`https://t.me/name`。"""
+    value = str(raw).strip().rstrip("/")
+    for prefix in ("https://", "http://"):
+        if value.startswith(prefix):
+            value = value[len(prefix):]
+    if value.startswith("t.me/"):
+        value = value[len("t.me/"):]
+    if "joinchat" in value or "+" in value:
+        return ""  # 邀请链接走 ImportChatInvite，不当用户名解析
+    value = value.split("?")[0].split("/")[-1].strip().lstrip("@")
+    return value if value and not value.startswith("+") else ""
+
+
 class CampaignTasksMixin:
     """批量私信 / 群发 / 素材群发 / 加群 / 退群 / 强拉 / 吵群 / 拟人发言。
 
@@ -474,13 +501,32 @@ class CampaignTasksMixin:
         results: list[dict] = []
         for index, target in enumerate(raw_targets):
             try:
-                if "+" in target:
-                    await client(functions.messages.ImportChatInviteRequest(hash=self._invite_hash(target)))
+                invite_hash = _invite_hash_of(target)
+                if invite_hash:
+                    await client(functions.messages.ImportChatInviteRequest(hash=invite_hash))
                     via = "invite"
                 else:
-                    username = target.lstrip("@").split("/")[-1].strip()
-                    entity = await client.get_input_entity(username)
-                    await client(functions.channels.JoinChannelRequest(channel=entity))
+                    # 公开群 / 频道：必须用 contacts.ResolveUsername 解析。
+                    # 不能用 get_input_entity(用户名)——它对「没缓存过的频道」会当成用户去查，
+                    # 直接抛 `No user has "xxx" as username`，把「群存在但解析方式不对」误报成「群不存在」。
+                    username = _username_from_target(target)
+                    if not username:
+                        raise TaskFailure(f"无法识别的加群目标：{target}", retryable=False)
+                    resolved = await client(functions.contacts.ResolveUsernameRequest(username=username))
+                    if not resolved.chats:
+                        if resolved.users:
+                            raise TaskFailure(
+                                f"@{username} 是用户账号、不是群或频道，无法加群", retryable=False
+                            )
+                        raise TaskFailure(f"@{username} 解析不到群或频道", retryable=False)
+                    chat = resolved.chats[0]
+                    if isinstance(chat, tl_types.Chat):
+                        raise TaskFailure(
+                            f"@{username} 是普通群，不能按用户名直接加入；"
+                            "请用该群的邀请链接（t.me/+...）",
+                            retryable=False,
+                        )
+                    await client(functions.channels.JoinChannelRequest(channel=chat))
                     via = "username"
                 await self._throttle_record(account, task)
                 joined += 1
