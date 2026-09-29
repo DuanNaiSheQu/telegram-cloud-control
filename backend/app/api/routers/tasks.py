@@ -18,7 +18,16 @@ from app.api.deps import get_current_user, get_session, visible_account_ids
 from app.api.routers import build_order_by, dedupe, enum_value, publish_task_safely, task_out
 from app.core.audit import write_audit
 from app.core.tasks import cancel_task, requeue_task
-from app.models import Bot, Task, TaskStatus, TaskType, TgAccount, User
+from app.models import (
+    TASK_STATUS_LABELS,
+    TASK_TYPE_LABELS,
+    Bot,
+    Task,
+    TaskStatus,
+    TaskType,
+    TgAccount,
+    User,
+)
 from app.schemas import (
     TaskActionResponse,
     TaskBulkRetryItem,
@@ -137,6 +146,45 @@ async def _enrich(session: AsyncSession, tasks: List[Task]) -> List[TaskOut]:
         task_out(item, accounts.get(item.account_id), bots.get(item.bot_id), users.get(item.created_by))
         for item in tasks
     ]
+
+
+@router.get("/{task_id}/logs", summary="任务实时日志（执行过程中的每一步）")
+async def task_logs(
+    task_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """给任务详情/展开行用：读执行过程中写入的进度与日志。
+
+    多账户任务（例如一批号各发一批私信）每一号是一条任务，这里给的是**这一条**的实时进度：
+    `stage` 当前阶段、`detail` 最近一步做了什么的文字、`logs` 最近 50 条时间线。
+    """
+    task = await session.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在")
+    ids = await visible_account_ids(session, user)
+    if ids is not None and task.account_id is not None and task.account_id not in set(ids):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="该任务不属于分配给你的账号")
+
+    result = task.result if isinstance(task.result, dict) else {}
+    return {
+        "task_id": str(task.id),
+        "type": enum_value(task.type),
+        "type_label": TASK_TYPE_LABELS.get(enum_value(task.type), enum_value(task.type)),
+        "status": enum_value(task.status),
+        "status_label": TASK_STATUS_LABELS.get(enum_value(task.status), enum_value(task.status)),
+        "stage": result.get("stage") or ("done" if enum_value(task.status) == "completed" else ""),
+        "detail": result.get("detail") or "",
+        "progress": {
+            key: result.get(key)
+            for key in ("sent", "total", "joined", "fetched", "target_count")
+            if result.get(key) is not None
+        },
+        "logs": result.get("logs") or [],
+        "error": task.error or "",
+        "started_at": task.started_at,
+        "completed_at": task.completed_at,
+    }
 
 
 @router.get("", response_model=TaskListResponse, summary="任务列表（分页 + 状态汇总）")

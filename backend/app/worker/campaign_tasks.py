@@ -352,6 +352,11 @@ class CampaignTasksMixin:
                     session, task, account, client, entity, text, material=material
                 )
                 sent += 1
+                await self._report_progress(
+                    session, task, stage="sending",
+                    detail=f"已发 {sent}/{len(targets)}：{raw}",
+                    sent=sent, total=len(targets),
+                )
             except TaskFailure as exc:
                 failed += 1
                 failures.append({"target": raw, "error": exc.error})
@@ -440,6 +445,10 @@ class CampaignTasksMixin:
                         sent_msg,
                     )
                 sent += 1
+                await self._report_progress(
+                    session, task, stage="sending",
+                    detail=f"已发 {sent}/{len(targets)}", sent=sent, total=len(targets),
+                )
             except Exception as exc:  # noqa: BLE001
                 failed += 1
                 failures.append({"target": str(getattr(entity, "id", "")), "error": describe_exception(exc)})
@@ -531,6 +540,11 @@ class CampaignTasksMixin:
                 await self._throttle_record(account, task)
                 joined += 1
                 results.append({"target": target, "joined": True, "via": via})
+                await self._report_progress(
+                    session, task, stage="joining",
+                    detail=f"已加入 {joined}/{len(raw_targets)}：{target}",
+                    joined=joined, total=len(raw_targets),
+                )
             except (UserAlreadyParticipantError, InviteHashExpiredError) as exc:
                 already += 1
                 results.append({"target": target, "joined": False, "already": True, "detail": describe_exception(exc)})

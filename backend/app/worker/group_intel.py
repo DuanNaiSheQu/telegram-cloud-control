@@ -137,14 +137,20 @@ class GroupIntelMixin:
 
         运行中写 result 是安全的：任务真正结束时 `complete_task` 会用最终结果整体覆盖。
         """
+        moment = _now().isoformat()
         snapshot = {
             "stage": stage,
             "detail": detail,
-            "updated_at": _now().isoformat(),
+            "updated_at": moment,
             **{key: value for key, value in extra.items() if value is not None},
         }
+        # 实时日志：把每一步追加进 result.logs（保留最近 50 条，前端轮询它就能看到进度）
+        previous = dict(task.result or {})
+        logs = list(previous.get("logs") or [])
+        logs.append({"at": moment, "stage": stage, "detail": detail})
+        snapshot["logs"] = logs[-50:]
         try:
-            task.result = {**(task.result or {}), **snapshot}
+            task.result = {**previous, **snapshot}
             await session.flush()
         except Exception:  # noqa: BLE001 - 进度写不进去不能影响采集本身
             logger.debug("写入采集进度失败 task_id=%s", getattr(task, "id", ""))

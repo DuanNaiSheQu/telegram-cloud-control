@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Iterable, List, Optional, Sequence
@@ -85,14 +86,27 @@ def user_label(user: Optional[User]) -> Optional[str]:
     return user.display_name or user.username
 
 
+#: 脱敏手机号长这样：`+9597****8160`、`+1202****0143`（带 + 与掩码，或纯数字）
+_PHONE_MASKED_RE = re.compile(r"^\+?\d[\d\s*]{5,}$")
+
+
 def account_label(account: Optional[TgAccount]) -> Optional[str]:
-    """脱敏手机号优先；没有手机号时退回用户名 / 短 id。"""
+    """账号展示名：真实手机号 > 用户名 > Telegram 用户 ID > 兜底。
+
+    注意 `phone_masked` 可能是导入时的目录标签（例如 tdata 导入的 `tdata#0`），
+    那种值对外没有辨识度，不能当手机号用——所以先判断它像不像手机号。
+    """
     if account is None:
         return None
-    if account.phone_masked and account.phone_masked != "未知":
-        return account.phone_masked
+    masked = (account.phone_masked or "").strip()
+    if masked and masked != "未知" and _PHONE_MASKED_RE.match(masked):
+        return masked
     if account.username:
         return f"@{account.username}"
+    if account.tg_user_id:
+        return f"ID:{account.tg_user_id}"
+    if masked and masked != "未知":
+        return masked  # 标签总比一串 uuid 强
     return str(account.id)[:8]
 
 

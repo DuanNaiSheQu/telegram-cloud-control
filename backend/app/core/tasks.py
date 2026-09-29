@@ -154,7 +154,13 @@ async def complete_task(
     session: AsyncSession, task: Task, result: Optional[Any] = None
 ) -> None:
     task.status = TaskStatus.completed
-    task.result = result
+    # 保留执行过程中写入的实时日志（result.logs）：任务跑完清掉的话，
+    # 页面上的「这一步做了什么」就永远看不到了——失败排查尤其需要它。
+    previous = task.result if isinstance(task.result, dict) else {}
+    if isinstance(result, dict) and previous.get("logs"):
+        task.result = {**result, "logs": previous["logs"]}
+    else:
+        task.result = result
     task.error = ""
     task.completed_at = _now()
     await session.flush()
@@ -170,6 +176,11 @@ async def fail_task(
 ) -> TaskStatus:
     """记一次失败。可重试且未超上限则回到 pending，否则 failed。"""
     task.error = (error or "")[:4000]
+    # 失败时更要保住实时日志：最后一步卡在哪，全靠它
+    if isinstance(task.result, dict) and task.result.get("logs"):
+        task.result = {**task.result, "error": task.error}
+    elif task.result is None:
+        task.result = {"logs": [], "error": task.error}
     exhausted = task.attempts >= task.max_attempts
     if retryable and not exhausted:
         delay = requeue_after if requeue_after is not None else backoff_seconds(task.attempts)

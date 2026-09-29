@@ -355,6 +355,39 @@ export default function Tasks() {
     () => ({
       expandedRowRender: (record: TaskOut) => (
         <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)', padding: 'var(--tg-space-md) 0' }}>
+          {(() => {
+            // 执行日志：任务跑的过程中每一步都写进 result.logs，
+            // 批量任务（一号一条）就能看到「这一号做到哪了」
+            const logs = ((record.result as Record<string, unknown> | null)?.logs as
+              | { at: string; stage: string; detail: string }[]
+              | undefined) ?? [];
+            const progress = (record.result as Record<string, unknown> | null) ?? {};
+            const summaryParts = ['sent', 'total', 'joined', 'fetched']
+              .filter((key) => progress[key] !== undefined)
+              .map((key) => `${key}=${progress[key]}`);
+            if (!logs.length && !summaryParts.length) return null;
+            return (
+              <div className="tg-stack" style={{ gap: 'var(--tg-space-xs)' }}>
+                <b style={{ fontSize: 'var(--tg-font-size-sm)' }}>
+                  执行日志{summaryParts.length ? `（${summaryParts.join(' · ')}）` : ''}
+                </b>
+                {logs.length ? (
+                  <div className="tg-stack" style={{ gap: 2, maxHeight: 220, overflowY: 'auto' }}>
+                    {logs.map((item, index) => (
+                      <div key={`${item.at}-${index}`} style={{ fontSize: 'var(--tg-font-size-sm)' }}>
+                        <span className="tg-mono tg-muted">{item.at.slice(11, 19)}</span>{' '}
+                        <span>{item.detail || item.stage}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-sm)' }}>
+                    （这一步还没产生日志；批量任务执行时这里会逐步刷新）
+                  </span>
+                )}
+              </div>
+            );
+          })()}
           <JsonBlock title="入队参数（payload）" value={record.payload} maxHeight={200} />
           <JsonBlock
             title="执行结果（result）"
