@@ -12,7 +12,7 @@ from typing import Optional
 from app import security
 from app.models import TgAccount
 
-#: 手机号的形态（明文或脱敏：`+959791178160` / `+9597****8160`）
+#: 手机号的形态（明文或脱敏：`+12025550143` / `+1202****0143`）
 _PHONE_RE = re.compile(r"^\+?\d[\d\s*]{5,}$")
 
 

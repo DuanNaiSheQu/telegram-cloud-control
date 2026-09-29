@@ -10,7 +10,7 @@
 <!-- 徽章说明：仓库为 private 时 shields.io 的 github/* 徽章会显示 not found，
      改成 public 后自动恢复；其余静态徽章不受影响。 -->
 <p>
-  <a href="#许可证"><img src="https://img.shields.io/badge/license-Proprietary-red.svg" alt="License"></a>
+  <a href="#许可证"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/version-0.5.4-2AABEE.svg" alt="Version"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/changelog-%E6%9B%B4%E6%96%B0%E8%AE%B0%E5%BD%95-blue.svg" alt="Changelog"></a>
   <a href="https://t.me/TGCloudcontrol"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-2AABEE?logo=telegram&logoColor=white" alt="Telegram 交流群"></a>
@@ -614,13 +614,13 @@ docker compose logs --no-log-prefix api | jq -c 'select(.level!="INFO")'
 
 ## 许可证
 
-**专有授权（Proprietary）** —— 核心源码为闭源商业成果，著作权归作者所有；**获得发行版不等于获得源码授权**。
+**开源项目**，采用 [MIT](LICENSE) 许可（若仓库根目录的 LICENSE 与本说明不一致，以 LICENSE 文件为准）。
 
-发行版可用于**自用部署与评估**；**禁止转售、去除标识、以衍生版提供商业服务**。
+详细条款见 **[LICENSE](LICENSE)**。
 
-完整条款见 **[LICENSE](LICENSE)**：源码归属 / 授权范围 / 禁止事项 / 商用洽谈 / 免责声明。
+> **部署与使用提醒**：本项目仅用于管理**你自己拥有或有权操作**的账号与 Bot。
+> 请遵守 Telegram 服务条款与所在地区法律，**使用风险由部署者自行承担**。
 
-需要**商用、二次开发或源码授权**，到 [交流群](https://t.me/TGCloudcontrol) 洽谈。
 
 ## 鸣谢
 
