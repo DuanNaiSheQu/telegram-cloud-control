@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -32,6 +34,12 @@ class AccountUpdate(BaseModel):
 
 
 class AccountOut(ORMModel):
+    archived_at: Optional[datetime] = Field(
+        default=None, description="自动归档时间；为空表示在用"
+    )
+    archive_reason: str = Field(
+        default="", description="归档原因（人话），仅在归档时非空"
+    )
     id: uuid.UUID
     phone_masked: str
     # 明文手机号（自建系统，运营需要看完整号码；没有则空——比如 tdata / 会话导入的号）

@@ -134,6 +134,14 @@ class TgAccount(Base, TimestampMixin):
     # 风控标记：{restricted, spam_blocked, flood_strikes, last_flood_at, notes}
     risk_flags: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
+    # 自动归档：检测确认「这个号已经用不了」时，把它从主列表挪走并记下原因。
+    # 归档不是删除——会话、历史、统计都留着，只是默认不占列表位置；
+    # 想找回来在账号页筛「已归档」就能看到，原因也在那里。
+    archived_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    archive_reason: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
     # ---------- 节流与养号 ----------
     # 0 = 走默认阶梯（按号龄自动算），非 0 = 人工指定
     daily_message_limit: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

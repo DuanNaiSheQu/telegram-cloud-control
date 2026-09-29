@@ -275,6 +275,13 @@ async def list_accounts(
     current_task: Optional[CurrentTask] = Query(default=None),
     phone: Optional[str] = Query(default=None, description="按脱敏手机号模糊匹配"),
     keyword: Optional[str] = Query(default=None, description="手机号 / 用户名 / 显示名模糊匹配"),
+    archived: Optional[bool] = Query(
+        default=None,
+        description=(
+            "归档筛选：默认（不传）只看在用的号，把自动归档的排除在外；"
+            "传 true 只看归档的号（含归档原因），传 false 等价于默认"
+        ),
+    ),
     sort: Optional[str] = Query(default=None, description="排序字段，见 ACCOUNT_SORT_FIELDS"),
     order: Optional[str] = Query(default=None, description="asc | desc，默认 desc"),
     session: AsyncSession = Depends(get_session),
@@ -287,6 +294,11 @@ async def list_accounts(
     clause = scope_clause(TgAccount.id, ids)
     if clause is not None:
         conditions.append(clause)
+    # 自动归档的号默认不占列表位置（检测确认用不了的号会被归档，原因记在 archive_reason）。
+    # 想看它们在筛选里传 archived=true。
+    conditions.append(
+        TgAccount.archived_at.is_not(None) if archived else TgAccount.archived_at.is_(None)
+    )
     if group_id is not None:
         conditions.append(TgAccount.group_id == group_id)
     if status_filter is not None:

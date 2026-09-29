@@ -744,6 +744,17 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             raise TaskFailure(f"该号当前连不上（{exc}），稍后重试", retryable=True, requeue_after=30) from exc
         except Exception as exc:  # noqa: BLE001
             await self._apply_status(session, account, exc)
+            # 会话被撤销 / 号被注销这类修不回来的问题：自动归档，从主列表挪走并记下原因。
+            # 冻结不在此列——冻结有解冻可能，只标记状态。
+            if should_archive(exc):
+                reason = archive_reason_for(exc)
+                account.archived_at = datetime.now(tz=timezone.utc)
+                account.archive_reason = reason
+                await session.flush()
+                logger.info("账号已自动归档：%s（%s）", account_label(account) or "", reason)
+                raise TaskFailure(
+                    f"账号检测失败（已自动归档）：{reason}", retryable=False
+                ) from exc
             raise TaskFailure(f"账号检测失败：{describe_exception(exc)}", retryable=False) from exc
 
         await persist_identity(session, account, me)
