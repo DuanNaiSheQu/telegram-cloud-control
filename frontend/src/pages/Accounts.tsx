@@ -39,7 +39,7 @@ import {
 import AccountDetailDrawer, { type AccountDetailHandlers } from '../features/accounts/AccountDetailDrawer';
 import { BulkActionModal, CreateAccountModal, EditAccountModal, ProfileModal } from '../features/accounts/AccountModals';
 import BulkResultModal from '../features/accounts/BulkResultModal';
-import AccountAvatar from '../features/accounts/AccountAvatar';
+import AccountAvatar, { forgetAvatar } from '../features/accounts/AccountAvatar';
 import AccountImportModal from '../features/accounts/AccountImportModal';
 import { useRowSelection } from '../features/accounts/useRowSelection';
 import type { AccountOut, AccountStatus, BulkAction, BulkResultOut, CurrentTask } from '../api/types';
@@ -128,6 +128,8 @@ export default function Accounts() {
 
   const handleCheck = async (account: AccountOut) => {
     const res = await accountApi.check(account.id);
+    // 这次检测会让 Worker 顺带刷新该号的头像缓存，旧结论作废、头像位立刻重拉
+    forgetAvatar(account.id);
     // 分隔用中点：掩码号码后面直接跟一长串中文太挤
     if (res.reachable) toast.success(`${res.phone_masked} · ${res.message || '连得上'}`);
     else toast.error(`${res.phone_masked} · ${res.message || res.status_label || '连不上'}`);

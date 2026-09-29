@@ -97,6 +97,11 @@ export default function Tasks() {
 
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // 展开行控制：「日志」按钮和行首的展开箭头共用这一份状态，
+  // 之前只能点那个不起眼的小箭头才能看到日志，很多人根本不知道有这功能
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const toggleExpanded = (id: string) =>
+    setExpandedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const [batchRetrying, setBatchRetrying] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -343,6 +348,7 @@ export default function Tasks() {
         width: 160,
         fixed: 'right',
         render: (_: unknown, record) => {
+          const logCount = ((record.result as Record<string, unknown> | null)?.logs as unknown[] | undefined)?.length ?? 0;
           const canRetry = record.status === 'failed' || record.status === 'pending_confirmation';
           const canCancel =
             record.status === 'pending' ||
@@ -350,6 +356,13 @@ export default function Tasks() {
             record.status === 'pending_confirmation';
           return (
             <Space size={0}>
+              <Tooltip
+                title={logCount ? `展开看执行日志（${logCount} 条，执行中会实时追加）` : '还没有日志——任务开始执行后这里会实时刷新'}
+              >
+                <Button type="text" size="small" onClick={() => toggleExpanded(record.id)}>
+                  日志{logCount ? ` ${logCount}` : ''}
+                </Button>
+              </Tooltip>
               <Tooltip title={canRetry ? '重新排队（attempts 归零）' : '只允许失败或等待确认的任务重试'}>
                 <Button
                   type="text"
@@ -391,6 +404,8 @@ export default function Tasks() {
 
   const expandable = useMemo(
     () => ({
+      expandedRowKeys: expandedIds,
+      onExpandedRowsChange: (keys: readonly React.Key[]) => setExpandedIds(keys.map(String)),
       expandedRowRender: (record: TaskOut) => (
         <div className="tg-stack" style={{ gap: 'var(--tg-space-lg)', padding: 'var(--tg-space-md) 0' }}>
           {(() => {
