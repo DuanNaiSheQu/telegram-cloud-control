@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select, text
@@ -33,6 +33,10 @@ from app.models import (
     TASK_STATUS_LABELS,
     TASK_TYPE_LABELS,
     CampaignSchedule,
+    Dialog,
+    DialogChannel,
+    DialogKind,
+    GroupProfile,
     Material,
     Task,
     TaskStatus,
@@ -52,6 +56,7 @@ from app.schemas import (
     ForceAddRequest,
     GroupBroadcastRequest,
     JoinGroupRequest,
+    JoinMissingRequest,
     LeaveGroupRequest,
     MaterialSendRequest,
     PersonaRequest,
@@ -147,19 +152,101 @@ async def _auto_supply_accounts(
         logger.info("自动补号：补入 %s 个可用号承担本批目标", len(extra))
     return accounts + extra
 
+async def _split_by_quota(
+    accounts: List[TgAccount], task_type: TaskType
+) -> tuple[List[TgAccount], List[TgAccount], int]:
+    """按今日剩余额度分两拨：够的本轮派活，不够的当场跳出来。
+
+    额度是「每号每天多少次动作」，一次动作的成本见 action_cost（群发一条 = 3 点）。
+    不预检的话，任务派下去只会被节流拦下、推到第二天早上——页面上就是一排
+    「待执行」干等 8 小时，看着跟卡死一样。
+    """
+    from app.redis_client import get_redis
+    from app.services.throttle import action_cost, throttle_state
+
+    cost = max(1, action_cost(task_type.value))
+    redis = get_redis()
+    ready: List[TgAccount] = []
+    out_of_quota: List[TgAccount] = []
+    for account in accounts:
+        try:
+            state = await throttle_state(redis, account)
+            remaining = max(0, int(state.get("daily_limit") or 0) - int(state.get("used_today") or 0))
+        except Exception:  # noqa: BLE001 - 读不到额度就当它够用，别把活卡在入口
+            remaining = cost
+        (ready if remaining >= cost else out_of_quota).append(account)
+    return ready, out_of_quota, cost
+
+
+async def _accounts_in_target_chat(
+    session: AsyncSession, accounts: List[TgAccount], target: str
+) -> List[TgAccount]:
+    """只留下「这个号确实在那个群里」的账号。
+
+    群发到不在的群只会换一次「无法向该会话发消息」的失败：白占队列、还多挨一次限流。
+    依据是系统已经同步下来的会话列表（dialogs）——@username、-100xxx、dialog_id 三种写法都能对上。
+    """
+    raw = (target or "").strip()
+    if not raw or not accounts:
+        return accounts
+    if raw.startswith("@"):
+        clause = Dialog.username == raw.lstrip("@")
+    elif raw.lstrip("-").isdigit():
+        clause = Dialog.tg_chat_id == int(raw)
+    else:
+        try:
+            clause = Dialog.id == uuid.UUID(raw)
+        except ValueError:
+            return accounts
+    rows = await session.scalars(
+        select(Dialog.account_id).where(clause, Dialog.account_id.in_([a.id for a in accounts]))
+    )
+    members = {row for row in rows if row is not None}
+    return [account for account in accounts if account.id in members]
+
+
+def _merge_results(
+    merged: Optional[BulkResultResponse], incoming: BulkResultResponse, group: str
+) -> BulkResultResponse:
+    """多目标群的提交结果合并成一份：任务 id 与逐账号回执都拼起来。"""
+    if merged is None:
+        merged = incoming.model_copy(deep=True)
+        merged.message = f"[{group}] {incoming.message}"
+        return merged
+    merged.ok = merged.ok and incoming.ok
+    merged.requested += incoming.requested
+    merged.succeeded += incoming.succeeded
+    merged.failed += incoming.failed
+    merged.skipped += incoming.skipped
+    merged.truncated = merged.truncated or incoming.truncated
+    merged.task_ids = list(merged.task_ids or []) + list(incoming.task_ids or [])
+    merged.items = list(merged.items or []) + list(incoming.items or [])
+    merged.message = f"{merged.message}；[{group}] {incoming.message}"
+    return merged
+
+
 async def _submit_campaign(
     *,
-    action: str,
-    task_type: TaskType,
+    action: str,    task_type: TaskType,
     payload_scope,
     params: dict,
     session: AsyncSession,
     user: User,
     per_account: Optional[Callable[[TgAccount, int, int], dict]] = None,
     priority: int = 80,
+    account_filter: Optional[Callable[[List[TgAccount]], Any]] = None,
 ) -> BulkResultResponse:
     """公共提交流程：解析账号范围 → 生成 batch_id → 每号一条任务（错峰入队）→ 审计 + 回执。"""
     accounts, scope, truncated = await _resolve_accounts(session, user, payload_scope, usable_only=True)
+    if account_filter is not None:
+        # 动作专属的二次筛选（群发用「这个号在不在目标群」）
+        before = len(accounts)
+        accounts = await account_filter(accounts)
+        if before and not accounts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="选中的号都不在目标群里：群发只发给群成员——先在「会话」里同步这些号的群列表，或关掉「只发给群成员」开关",
+            )
     # 无号自动补号：勾了这项、而可用的号不够承担这批目标时，自动从号池里补状态正常的号。
     # 运营不用手动一个个挑——号源少了任务会变慢，这个开关让系统自己把坑填上。
     if getattr(payload_scope, "auto_supply", False):
@@ -173,6 +260,22 @@ async def _submit_campaign(
     batch_id = uuid.uuid4()
     items: List[BulkAccountResult] = []
     task_ids: List[uuid.UUID] = []
+
+    # 额度预检：今日额度不够的号当场标出来，不派下去干等到明天
+    accounts, out_of_quota, quota_cost = await _split_by_quota(accounts, task_type)
+    for account in out_of_quota:
+        items.append(
+            _item(account, message=f"今日额度不足（这次动作需要 {quota_cost} 点），额度明天自动恢复")
+        )
+    if not accounts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"选中的号今日额度都不够（这次动作需要 {quota_cost} 点）："
+                "可以等明天额度自动恢复，或在「账号 → 设置发送节流」里调大每日上限"
+            ),
+        )
+
     stagger = max(0.0, float(settings.campaign_stagger_seconds))
     for index, account in enumerate(accounts):
         payload = {
@@ -218,17 +321,30 @@ async def _submit_campaign(
     await publish_task_safely(
         {"task_id": None, "type": task_type.value, "ok": True, "detail": f"批次 {batch_id} 已排队 {len(task_ids)} 个号"}
     )
-    succeeded = sum(1 for item in items if item.ok)
+    succeeded = sum(1 for item in items if item.ok and item.task_id)
+    quota_skipped = sum(1 for item in items if item.ok and not item.task_id)
     failed = sum(1 for item in items if not item.ok)
-    logger.info("批量运营提交 action=%s batch=%s 成功=%s 失败=%s by=%s", action, batch_id, succeeded, failed, user.username)
+    logger.info(
+        "批量运营提交 action=%s batch=%s 成功=%s 额度跳过=%s 失败=%s by=%s",
+        action,
+        batch_id,
+        succeeded,
+        quota_skipped,
+        failed,
+        user.username,
+    )
     return BulkResultResponse(
         ok=failed == 0,
         action=action,
-        message=f"批次 {batch_id}：已排队 {succeeded} 个号" + (f"，失败 {failed} 个" if failed else ""),
-        requested=len(accounts),
+        message=(
+            f"批次 {batch_id}：已排队 {succeeded} 个号"
+            + (f"，{quota_skipped} 个号今日额度不足、已跳过" if quota_skipped else "")
+            + (f"，失败 {failed} 个" if failed else "")
+        ),
+        requested=len(accounts) + len(out_of_quota),
         succeeded=succeeded,
         failed=failed,
-        skipped=0,
+        skipped=quota_skipped,
         truncated=truncated,
         task_ids=task_ids,
         items=items,
@@ -342,14 +458,37 @@ async def group_broadcast(
         "forward_from_message_id": payload.forward_from_message_id,
         "drop_author": payload.drop_author,
     }
-    return await _submit_campaign(
-        action="campaign.group_broadcast",
-        task_type=TaskType.group_broadcast,
-        payload_scope=payload,
-        params=params,
-        session=session,
-        user=user,
-    )
+    # 目标群：单个（target_group）或多选（target_groups）。多选时按「一个群一批」逐个提交，
+    # 每个群都只派给「确实在那个群里」的号——各群的在群号本来就不同。
+    targets = [str(item).strip() for item in (payload.target_groups or []) if str(item).strip()]
+    if not targets:
+        single = str(payload.target_group or "").strip()
+        if not single:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="至少要选一个目标群：可以从「选择群」里勾，也可以手填 @username / chat_id / dialog_id",
+            )
+        targets = [single]
+
+    merged: Optional[BulkResultResponse] = None
+    for group in targets:
+        group_params = {**params, "target_group": group}
+        result = await _submit_campaign(
+            action="campaign.group_broadcast",
+            task_type=TaskType.group_broadcast,
+            payload_scope=payload,
+            params=group_params,
+            session=session,
+            user=user,
+            account_filter=(
+                (lambda accounts, target=group: _accounts_in_target_chat(session, accounts, target))
+                if payload.only_members
+                else None
+            ),
+        )
+        merged = _merge_results(merged, result, group)
+    assert merged is not None
+    return merged
 
 
 @router.post("/material-send", response_model=BulkResultResponse, summary="素材群发：按素材库内容发给指定群或目标")
@@ -749,6 +888,137 @@ async def generate_texts(
     if not texts:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI 没有返回可用文本，请稍后重试或换个主题")
     return {"texts": texts}
+
+
+@router.post("/join-missing", response_model=BulkResultResponse, summary="补齐覆盖：让选中的号都进这些群")
+async def join_missing(
+    payload: JoinMissingRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> BulkResultResponse:
+    """只给「还不在群里」的号排加群任务，已经在里头的自动跳过。
+
+    一个号一条任务、任务里带上它缺的那几个群——加群本身就是要慢慢来的动作
+    （群与群之间 20–60 秒间隔），拆成几十条任务只会互相抢并发。
+    """
+    accounts, scope, truncated = await _resolve_accounts(session, user, payload, usable_only=True)
+    if not accounts:
+        raise _empty()
+
+    batch_id = uuid.uuid4()
+    items: List[BulkAccountResult] = []
+    task_ids: List[uuid.UUID] = []
+    for account in accounts:
+        missing: List[str] = []
+        for target in payload.targets:
+            if not await _accounts_in_target_chat(session, [account], target):
+                missing.append(target)
+        if not missing:
+            items.append(_item(account, message="已经在所有目标群里，跳过"))
+            continue
+        try:
+            task = await enqueue_task(
+                session,
+                type=TaskType.join_group,
+                account_id=account.id,
+                payload={
+                    "targets": missing,
+                    "batch_id": str(batch_id),
+                    "source": "join_missing",
+                    "auto_verify": payload.auto_verify,
+                    "verify_timeout": payload.verify_timeout,
+                    "min_interval": payload.min_interval,
+                    "max_interval": payload.max_interval,
+                },
+                created_by=user.id,
+                priority=80,
+            )
+            task_ids.append(task.id)
+            items.append(_item(account, message=f"待加入 {len(missing)} 个群", task_id=task.id))
+        except Exception as exc:  # noqa: BLE001 - 单个号入队失败不影响其它号
+            items.append(_item(account, ok=False, message=f"入队失败：{exc}"))
+
+    await session.commit()
+    await publish_task_safely(
+        {"task_id": None, "type": TaskType.join_group.value, "ok": True, "detail": f"补齐覆盖：{len(task_ids)} 个号"}
+    )
+    succeeded = sum(1 for item in items if item.ok and item.task_id)
+    skipped = sum(1 for item in items if item.ok and not item.task_id)
+    return BulkResultResponse(
+        ok=True,
+        action="campaign.join_missing",
+        message=f"已为 {succeeded} 个号排加群任务；{skipped} 个号已经在群里，跳过",
+        requested=len(accounts),
+        succeeded=succeeded,
+        failed=0,
+        skipped=skipped,
+        truncated=truncated,
+        task_ids=task_ids,
+        items=items,
+    )
+
+
+@router.get("/group-options", summary="可群发的群：按会话聚合，带「哪些号在里头」")
+async def group_options(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> List[dict]:
+    """列出「系统里的号都在哪些群里」，给群发页勾选目标群。
+
+    数据来自已同步的会话列表：一个群只出现一次，带上是哪些号在里面——
+    选群时就能看出「这个群我有几个号能发」，不会选到一个人都发不了的群。
+    """
+    visible = await visible_account_ids(session, user)
+    stmt = select(Dialog.tg_chat_id, Dialog.title, Dialog.username, Dialog.account_id).where(
+        Dialog.channel == DialogChannel.user_account,
+        # 只要群/频道：个人私聊和 Bot（Spam Info Bot、PeiQiBot 这些）不是群发的目标，
+        # 混进列表里既没用、还容易手滑选中
+        Dialog.kind == DialogKind.group,
+    )
+    if visible is not None:
+        stmt = stmt.where(Dialog.account_id.in_(visible))
+    rows = list(await session.execute(stmt))
+
+    agg: dict[int, dict] = {}
+    for tg_chat_id, title, username, account_id in rows:
+        item = agg.setdefault(
+            int(tg_chat_id),
+            {
+                "tg_chat_id": int(tg_chat_id),
+                "title": title or "",
+                "username": username or "",
+                "account_ids": [],
+            },
+        )
+        if account_id is not None:
+            item["account_ids"].append(str(account_id))
+
+    groups = sorted(agg.values(), key=lambda item: (-len(item["account_ids"]), item["title"]))
+
+    # 关联群档案的 kind：channel（频道）只有管理员能发言，普通成员群发必吃 ChatAdminRequiredError，
+    # 列表里标出来，选之前就知道这个目标发不了
+    kind_map: dict[int, str] = {}
+    if groups:
+        rows = await session.execute(
+            select(GroupProfile.tg_chat_id, GroupProfile.kind).where(
+                GroupProfile.tg_chat_id.in_([group["tg_chat_id"] for group in groups])
+            )
+        )
+        for tg_chat_id, kind in rows:
+            if kind:
+                kind_map[int(tg_chat_id)] = str(kind)
+
+    return [
+        {
+            # 交给群发接口的目标写法：有公开用户名就用 @username，否则用数字 chat_id
+            "value": f"@{group['username']}" if group["username"] else str(group["tg_chat_id"]),
+            **group,
+            "account_count": len(group["account_ids"]),
+            # channel = 频道（要管理员才能发）；megagroup = 普通超级群（成员可发）
+            "kind": kind_map.get(group["tg_chat_id"], ""),
+        }
+        for group in groups
+    ]
 
 
 # ---------------------------------------------------------------- 定时计划

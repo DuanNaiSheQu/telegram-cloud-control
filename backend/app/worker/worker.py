@@ -41,6 +41,11 @@ logger = logging.getLogger(__name__)
 TASK_CONCURRENCY = 10  # 默认值；实际用 settings.task_concurrency
 #: 同时建连的上限
 CONNECT_CONCURRENCY = 10
+
+#: 单个号的建连硬超时（秒）。网络被干扰时 Telethon 会在内部无限重连（日志里刷
+#: 「0 bytes read」），而 ensure_connected() 自己不会返回——不设上限的话，
+#: 一个号就能把整轮 _maintain_connections 拖死：主循环不转，任务投了没人领。
+CONNECT_TIMEOUT_SECONDS = 45.0
 #: Worker 心跳 TTL（告警阈值 60 秒）
 WORKER_HEARTBEAT_TTL = 60
 #: 单号心跳 TTL
@@ -304,7 +309,15 @@ class Worker:
         """建连（受并发上限约束），永久不可用的号立刻放开。"""
         async with semaphore:
             try:
-                await conn.ensure_connected()
+                # 硬超时兜底：见 CONNECT_TIMEOUT_SECONDS 的注释——单个号连不上，
+                # 不能把整轮连接维护（以及背后等着领任务的主循环）一起拖住
+                await asyncio.wait_for(conn.ensure_connected(), timeout=CONNECT_TIMEOUT_SECONDS)
+            except asyncio.TimeoutError:
+                self.log.warning(
+                    "建连接超时（%.0f 秒），本轮跳过，下一轮再试",
+                    CONNECT_TIMEOUT_SECONDS,
+                    extra=conn.log_extra(),
+                )
             except Exception:  # noqa: BLE001 - 连接层不该抛，兜一层
                 self.log.exception("建连异常", extra=conn.log_extra())
         if conn.fatal_status is not None:
@@ -362,6 +375,32 @@ class Worker:
             except Exception:  # noqa: BLE001 - 单次失败不影响下一轮
                 self.log.exception("后台续租循环异常", extra={"worker_id": self.worker_id})
 
+    async def _recover_expired_limits(self, session) -> int:
+        """限流到期自动恢复：`limited` 且 flood_until 已过 → 直接回「正常」。
+
+        没有这一步，号会一直挂着「临时受限」——它本来就是被限流才没人敢派活，
+        不主动恢复就永远等不到「下一次成功操作」。
+        """
+        now = datetime.now(tz=timezone.utc)
+        rows = list(
+            await session.scalars(
+                select(TgAccount).where(
+                    TgAccount.status == AccountStatus.limited,
+                    TgAccount.flood_until.is_not(None),
+                    TgAccount.flood_until <= now,
+                )
+            )
+        )
+        for account in rows:
+            account.status = AccountStatus.healthy
+            account.status_reason = ""
+            account.flood_until = None
+        if rows:
+            self.log.info(
+                "限流到期，已恢复为正常", extra={"worker_id": self.worker_id, "count": len(rows)}
+            )
+        return len(rows)
+
     async def _renew_cycle(self) -> None:
         """每 lease_renew_seconds 一次：续租 + 两种心跳 + 指标 + current_task。"""
         self._last_renew = time.monotonic()
@@ -371,6 +410,8 @@ class Worker:
                 renewed = await lease_core.renew_leases(
                     session, worker_id=self.worker_id, ttl_seconds=settings.lease_ttl_seconds
                 )
+                # 顺手把限流已到期的号恢复成正常（每 10 秒一次，不额外开循环）
+                await self._recover_expired_limits(session)
         except Exception:  # noqa: BLE001
             metrics.record_lease_renew_failure()
             self.log.error(

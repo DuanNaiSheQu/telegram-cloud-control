@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Checkbox, Dropdown, Form, Input, InputNumber, Modal, Select, Space, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -18,6 +18,7 @@ import { api } from '../api/client';
 import { accountApi, accountBulkApiExtra, exportApi, groupApi, proxyApi, userApi } from '../api/endpoints';
 import '../features/accounts/accounts.css';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { useWsEvent } from '../hooks/useWebSocket';
 import { useTableQuery, buildActiveFilters } from '../hooks/useTableQuery';
 import { useAuth } from '../auth/AuthContext';
 import { ACCOUNT_STATUS_OPTIONS, CURRENT_TASK_OPTIONS } from '../constants';
@@ -51,6 +52,32 @@ interface AccountFilters extends Record<string, unknown> {
   current_task: string;
   phone: string;
   keyword: string;
+}
+
+/**
+ * 限流倒计时：`limited`（临时受限）状态下显示「还有多久自己恢复」。
+ * 到点后 worker 的扫描循环会把号改回「正常」，不用人工解。
+ */
+function FloodCountdown({ until }: { until: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const target = new Date(until).getTime();
+  if (Number.isNaN(target)) return null;
+  const left = Math.ceil((target - now) / 1000);
+  if (left <= 0) {
+    return (
+      <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
+        恢复中…
+      </span>
+    );
+  }
+  const text = left >= 60 ? `${Math.ceil(left / 60)} 分` : `${left} 秒`;
+  return (
+    <span style={{ fontSize: 'var(--tg-font-size-xs)', color: 'var(--tg-color-warning)' }}>{text}后恢复</span>
+  );
 }
 
 export default function Accounts() {
@@ -258,9 +285,15 @@ export default function Accounts() {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
-        width: 110,
+        width: 140,
         render: (_: unknown, record) => (
-          <StatusBadge status={record.status} label={record.status_label} reason={record.status_reason || record.last_error} size="sm" />
+          <span className="tg-flex" style={{ gap: 'var(--tg-space-xs)', alignItems: 'center', flexWrap: 'wrap' }}>
+            <StatusBadge status={record.status} label={record.status_label} reason={record.status_reason || record.last_error} size="sm" />
+            {/* 临时受限：把「还有多久自己恢复」摆在旁边——worker 每 10 秒扫一遍，到点自动改回正常 */}
+            {record.status === 'limited' && record.flood_until ? (
+              <FloodCountdown until={record.flood_until} />
+            ) : null}
+          </span>
         ),
       },
       {
@@ -505,7 +538,40 @@ export default function Accounts() {
     },
   };
 
-  const columns: ColumnsType<AccountOut> = [selectColumn, clientColumn, apiColumn, healthColumn, ...baseColumns];
+  /** 今日额度：已用/上限；快满了标黄、满了标红——省得提交一堆任务才发现发不出去 */
+  const quotaColumn: ColumnsType<AccountOut>[number] = {
+    title: '今日额度',
+    key: 'quota',
+    width: 96,
+    render: (_: unknown, record) => {
+      const used = Number(record.used_today ?? 0);
+      const limit = Number(record.daily_limit ?? 0);
+      if (!limit) return <span className="tg-muted">—</span>;
+      const ratio = used / limit;
+      const tone = ratio >= 1 ? 'danger' : ratio >= 0.8 ? 'warning' : 'success';
+      return (
+        <Tooltip title={`今日已用 ${used} / 上限 ${limit}（一条群发按 3 点计；发完消息这里会自己刷新）`}>
+          <span className="tg-num" style={{ color: `var(--tg-color-${tone})` }}>
+            {used}/{limit}
+          </span>
+        </Tooltip>
+      );
+    },
+  };
+
+  const columns: ColumnsType<AccountOut> = [
+    selectColumn,
+    clientColumn,
+    apiColumn,
+    healthColumn,
+    quotaColumn,
+    ...baseColumns,
+  ];
+
+  // 额度或任务进度变了就刷新列表：不用手动点，发完一条这里就跟着动
+  useWsEvent('task', () => {
+    void accounts.reload();
+  });
 
   const bulkMenuItems = [
     { key: 'appeal', label: '申诉解封（@SpamBot）' },

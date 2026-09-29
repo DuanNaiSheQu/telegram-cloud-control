@@ -346,8 +346,30 @@ async def list_accounts(
     accounts = list(rows.all())
     lease_map = await leases.lease_holders(session, [item.id for item in accounts])
 
+    # 顺手带上今日额度：列表里就能看到「今天还能发几条」，每发一条刷新即变。
+    # 5～200 个号逐个读 Redis 都在毫秒级，不值得为它单开一个接口。
+    from app.redis_client import get_redis
+    from app.services.throttle import throttle_state
+
+    quota: dict = {}
+    redis = get_redis()
+    for item in accounts:
+        try:
+            state = await throttle_state(redis, item)
+            quota[item.id] = (int(state.get("used_today") or 0), int(state.get("daily_limit") or 0))
+        except Exception:  # noqa: BLE001 - 读不到额度不影响列表本身
+            quota[item.id] = (0, 0)
+
+    items: list = []
+    for item in accounts:
+        out = account_out(item, lease_map.get(item.id))
+        used, limit = quota.get(item.id, (0, 0))
+        out.used_today = used
+        out.daily_limit = limit
+        items.append(out)
+
     return AccountListResponse(
-        items=[account_out(item, lease_map.get(item.id)) for item in accounts],
+        items=items,
         total=int(total or 0),
         page=page,
         page_size=page_size,

@@ -181,6 +181,11 @@ async def fail_task(
         task.result = {**task.result, "error": task.error}
     elif task.result is None:
         task.result = {"logs": [], "error": task.error}
+    # 节流拦下只是「现在不能发」，不是一次真的尝试失败：把这次计数还回去。
+    # 否则等额度恢复（可能几小时）的过程中，「等待」就把重试次数耗光了——任务最后会
+    # 顶着一个「失败 5 次」的结论死掉，而它其实一次都没发出去。
+    if "节流拦下" in task.error and task.attempts > 0:
+        task.attempts -= 1
     exhausted = task.attempts >= task.max_attempts
     if retryable and not exhausted:
         delay = requeue_after if requeue_after is not None else backoff_seconds(task.attempts)

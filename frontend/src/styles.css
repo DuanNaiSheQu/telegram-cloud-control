@@ -3374,3 +3374,218 @@ body .ant-spin-container::after {
   width: 10px;
   flex-shrink: 0;
 }
+
+/* ---- 群发页字段排布（只服务 /campaigns/broadcast）--------------------------------
+   背景：群发页的字段是「直接挂」在 .tg-form-body（12 列栅格）里的，没有 Space / tg-form-grid
+   包一层，所以栅格项就是 .ant-form-item 本身。改前的问题：
+     · 「目标群（可多选）」按默认 span 3 只占 1/4 行宽，而 GroupPicker 的 Select 写死
+       minWidth: 460，比卡片还宽 → 撑破边框、右侧整片空；
+     · 「口语化微调」「只发给群成员」各占 span 2（≈205px），里面只有一个 43px 的开关。
+   做法：给字段挂语义 class（不改任何已有 class，不影响其它页面）：
+     .tg-bc-text   文本 / 文本池 —— 各 6 列，一行两个
+     .tg-bc-target 目标群      —— 主输入项，8 列
+     .tg-bc-toggle 开关        —— 2 列窄条，且标签与开关同排
+   8 + 2 + 2 = 12：目标群与两个开关同一行，两行皆无留白。
+   注意特异度：(.tg-form-body + .ant-form-item + .tg-bc-*) = 3 个 class，高于上面通用的
+   `.tg-form-body > .ant-form-item:has(.ant-switch)`，因此必须写在它之后（文件末尾）。 */
+.tg-form-body > .ant-form-item.tg-bc-text { grid-column: span 6; }
+.tg-form-body > .ant-form-item.tg-bc-target { grid-column: span 8; }
+.tg-form-body > .ant-form-item.tg-bc-toggle { grid-column: span 2; }
+
+/* 开关压成一条：标签在左、开关在右，横向铺满卡片，不再「一大块底色里一个小开关」 */
+.tg-form-body > .ant-form-item.tg-bc-toggle .ant-form-item-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tg-form-body > .ant-form-item.tg-bc-toggle .ant-form-item-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-bottom: 0;
+}
+.tg-form-body > .ant-form-item.tg-bc-toggle .ant-form-item-label > label {
+  height: auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tg-form-body > .ant-form-item.tg-bc-toggle .ant-form-item-control { flex: 0 0 auto; }
+
+/* 目标群：多选 Select 铺满卡片（配合 JSX 去掉 minWidth: 460），标签过多时自动收起 */
+.tg-form-body > .ant-form-item.tg-bc-target { align-self: stretch; }
+.tg-form-body > .ant-form-item.tg-bc-target .ant-form-item-control-input-content { min-width: 0; }
+.tg-form-body > .ant-form-item.tg-bc-target .ant-select { width: 100%; }
+.tg-form-body > .ant-form-item.tg-bc-target .ant-select-selector { width: 100%; }
+
+/* 窄屏回落：主输入项先变整行，开关再逐级放宽，避免被挤成一列 */
+@media (max-width: 1500px) {
+  .tg-form-body > .ant-form-item.tg-bc-target { grid-column: span 6; }
+  .tg-form-body > .ant-form-item.tg-bc-toggle { grid-column: span 3; }
+}
+@media (max-width: 1100px) {
+  .tg-form-body > .ant-form-item.tg-bc-text { grid-column: span 6; }
+  .tg-form-body > .ant-form-item.tg-bc-target { grid-column: 1 / -1; }
+  .tg-form-body > .ant-form-item.tg-bc-toggle { grid-column: span 6; }
+}
+@media (max-width: 700px) {
+  .tg-form-body > .ant-form-item.tg-bc-text,
+  .tg-form-body > .ant-form-item.tg-bc-target,
+  .tg-form-body > .ant-form-item.tg-bc-toggle { grid-column: 1 / -1; }
+}
+
+/* ---- 批量私信 / 加群 / 批量改资料：控件撑破卡片（只服务这三个页面）------------------
+   病因与群发页那次一样：span3 的卡片内容区只有 ~290px，里面却塞了固定宽度的控件——
+   附带素材 Select 宽 320、补齐覆盖 Select minWidth 420、头像 Select 宽 320，
+   实测把卡片内容压出边框 17 / 117 / 17px（cardDelta = scrollWidth - clientWidth）。
+   修法：控件在 JSX 里改成 width:100%（内联样式优先，必须改 JSX 才压得住），
+   再按语义给卡片分列宽，顺手把空掉的行填满。
+   前缀与群发页的 .tg-bc-* 分开：.tg-pm-* 批量私信，.tg-join-* 加群，.tg-pf-* 批量改资料。
+   特异度 = 3 个 class，必须写在上面通用的 `.tg-form-body > .ant-form-item:has(...)` 之后（文件末尾）。 */
+
+/* 批量私信「附带素材」：span3 → span4（与同页文本域同宽，Select 可用宽度 428-24） */
+.tg-form-body > .ant-form-item.tg-pm-material { grid-column: span 4; align-self: stretch; }
+.tg-form-body > .ant-form-item.tg-pm-material .ant-form-item-control-input-content { min-width: 0; }
+.tg-form-body > .ant-form-item.tg-pm-material .ant-select { width: 100%; min-width: 0; }
+
+/* 加群「补齐覆盖」：span3 → span8。它是「多选群 + 执行按钮」的操作面板，
+   与右边 span4 的「邀请链接」并排正好占满一行；Select 由 flex 吃满剩余宽度。 */
+.tg-form-body > .ant-form-item.tg-join-cover { grid-column: span 8; align-self: stretch; }
+.tg-form-body > .ant-form-item.tg-join-cover .ant-form-item-control-input-content { min-width: 0; }
+.tg-form-body > .ant-form-item.tg-join-cover .ant-space { display: flex; width: 100%; }
+.tg-form-body > .ant-form-item.tg-join-cover .ant-space-item:first-child { flex: 1 1 auto; min-width: 0; }
+.tg-form-body > .ant-form-item.tg-join-cover .ant-select { width: 100%; min-width: 0; }
+
+/* 批量改资料「头像」：span3 → span4（素材名比纯文本长，Select 值得宽一点），
+   与右边 span3 的「或填头像图片地址」并排。 */
+.tg-form-body > .ant-form-item.tg-pf-photo { grid-column: span 4; align-self: stretch; }
+.tg-form-body > .ant-form-item.tg-pf-photo .ant-form-item-control-input-content { min-width: 0; }
+.tg-form-body > .ant-form-item.tg-pf-photo .ant-select { width: 100%; min-width: 0; }
+
+/* 窄屏：1100 以下「邀请链接」textarea 本来就整行，补齐覆盖面板跟着整行才不显参差 */
+@media (max-width: 1100px) {
+  .tg-form-body > .ant-form-item.tg-join-cover { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .tg-form-body > .ant-form-item.tg-pm-material,
+  .tg-form-body > .ant-form-item.tg-join-cover,
+  .tg-form-body > .ant-form-item.tg-pf-photo { grid-column: 1 / -1; }
+}
+
+/* ================= 触达中心全站排版：审计批次 A / B / C / D =================
+   前缀按页面走：.tg-pm-* 批量私信、.tg-mat-* 素材群发、.tg-join-* 加群、.tg-leave-* 退群、
+   .tg-storm-* 吵群、.tg-persona-* 拟人发言、.tg-pf-* 批量改资料。
+   两个跨页面复用的模式类（只有显式挂上它的字段生效，不影响任何其它页面）：
+     .tg-field-switch —— 「标签在左、开关在右」的横排开关条（与群发页 .tg-bc-toggle 同款）
+     .tg-field-line   —— 同一行多张卡片等高（Select/Input 与 textarea 混排时用）
+   踩过的坑：.tg-form-grid 用的是 repeat(auto-fit, minmax(180px, 1fr)) —— 字段只有 1~2 个时，
+   空轨道会被折叠、字段被拉满整行，所以 grid 内的「收窄」必须用 max-width，用 grid-column 无效
+   （字段多的 grid，例如批量私信的「节奏与配额」，轨道占满不会折叠，那里的 grid-column 才有意义）。
+   特异度均为 3 个 class，规则必须写在文件末尾才能压住上面的通用规则。 */
+
+/* ---- 批次 A：批量私信「转发模式（可选）」--------------------------------------
+   卡片在 grid 里只有 1 列（205px），装不下 Space 里的 210 + 130 两个 InputNumber：
+   实测控件越出卡片内容区 31px、cardDelta 19。该 grid 有 7 个字段、轨道不会被折叠，
+   给 3 列（651px）即可放下。 */
+.tg-form-grid > .ant-form-item.tg-pm-forward { grid-column: span 3; }
+.tg-form-grid > .ant-form-item.tg-pm-forward .ant-form-item-control-input-content { min-width: 0; }
+.tg-form-grid > .ant-form-item.tg-pm-forward .ant-space { width: 100%; }
+.tg-form-grid > .ant-form-item.tg-pm-forward .ant-input-number { min-width: 0; }
+
+/* ---- 批次 B：半空行（原先独占一行、只占 32%，其余 68% 全空）-------------------
+   8 列（874px，占行宽 66%）—— 比 6 列稳过「< 50% 即算半空」这条线（6 列只有 49.3%）。 */
+.tg-form-body > .ant-form-item.tg-pm-material { grid-column: span 8; }    /* 附带素材（可选） */
+.tg-form-body > .ant-form-item.tg-pf-bio { grid-column: span 8; }         /* 简介（多行=候选池） */
+.tg-form-body > .ant-form-item.tg-persona-texts { grid-column: span 8; }  /* AI 不可用时的备用文本池 */
+/* 批量私信「节奏与配额」：发送时间窗 / 每日配额各 2 列，与横排开关条凑满一行（2+2+1） */
+.tg-form-grid > .ant-form-item.tg-pm-num { grid-column: span 2; }
+
+/* ---- 批次 C：整行宽卡里只放一个小控件的 --------------------------------------
+   批量私信「用谁发」不加宽限：默认只有一个字段时 auto-fit 会把它拉满整行，Segmented 用 block
+   铺满；选 Bot 后两个字段各占一半，两种状态都是整行。 */
+.tg-form-grid > .ant-form-item.tg-pm-supply { max-width: 428px; }/* 无号时自动补号：开关条不需要 651 */
+.tg-form-body > .ant-form-item.tg-mat-dispatch { grid-column: span 4; }  /* 素材群发 分发方式 */
+.tg-form-body > .ant-form-item.tg-join-dispatch { grid-column: span 6; } /* 加群 分发方式 */
+.tg-form-body > .ant-form-item.tg-leave-dispatch { grid-column: span 4; }/* 退群 分发方式 */
+/* 素材群发的「间隔」参数行：8 列，与右边 4 列的分发方式并排成满行（8 + 4 = 12） */
+.tg-form-body > .ant-space.tg-mat-intervals { grid-column: span 8; }
+.tg-form-body > .ant-space.tg-mat-intervals .ant-space-item { flex: 1 1 300px; min-width: 200px; }
+
+/* ---- 批次 B/C：退群页三件套一行排满（要退的群 5 + 开关 3 + 分发方式 4 = 12 列）----
+   「退出后删除该会话记录」有 10 个字，205px 的 span2 卡片放不下一行会折成两行，
+   所以开关条给 3 列（292px 内容），标签与开关才是并排的。 */
+.tg-form-body > .ant-form-item.tg-leave-targets { grid-column: span 5; }
+
+/* 批量改资料的两个 Space 行（名字/姓氏/固定用户名、用户名前缀组）：卡片一起拉伸等高 */
+.tg-form-body > .ant-space.tg-pf-lines { align-items: stretch; }
+.tg-form-body > .ant-space.tg-pf-lines .ant-form-item { height: 100%; }
+
+/* ---- 横排开关条：标签在左、开关在右 ------------------------------------------
+   用于 批量私信「口语化微调 / 无号时自动补号」、加群「自动过入群验证」、
+   退群「退出后删除该会话记录」、拟人发言「使用 AI 生成」。
+   注意：antd 在 vertical 布局下给 .ant-form-item-label 设了 width: 100%，
+   只写 flex 仍会被 100% 的基准宽度顶到下一行 —— 必须同时把 width 改回 auto。 */
+:is(.tg-form-body, .tg-form-grid) > .ant-form-item.tg-field-switch .ant-form-item-row,
+.tg-form-body > .ant-space .ant-form-item.tg-field-switch .ant-form-item-row {
+  display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center;
+  justify-content: space-between; gap: 10px; height: 100%;
+}
+:is(.tg-form-body, .tg-form-grid) > .ant-form-item.tg-field-switch .ant-form-item-label,
+.tg-form-body > .ant-space .ant-form-item.tg-field-switch .ant-form-item-label {
+  flex: 1 1 auto; width: auto; min-width: 0; padding-bottom: 0;
+}
+:is(.tg-form-body, .tg-form-grid) > .ant-form-item.tg-field-switch .ant-form-item-label > label,
+.tg-form-body > .ant-space .ant-form-item.tg-field-switch .ant-form-item-label > label {
+  height: auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+:is(.tg-form-body, .tg-form-grid) > .ant-form-item.tg-field-switch .ant-form-item-control,
+.tg-form-body > .ant-space .ant-form-item.tg-field-switch .ant-form-item-control {
+  flex: 0 0 auto; width: auto; min-width: 0;
+}
+/* 开关条卡片宽度：form-body 里占 3 列（292px 内容，标签最长 10 个字也能和开关并排）；
+   .tg-form-grid 里的一列就是 205px，占 1 列即可。
+   两者都拉伸到行高，别和旁边的高卡片（textarea / InputNumber）差出 27px */
+.tg-form-body > .ant-form-item.tg-field-switch { grid-column: span 3; align-self: stretch; }
+.tg-form-grid > .ant-form-item.tg-field-switch { grid-column: span 1; align-self: stretch; }
+/* 批量私信「分发方式」（grid 内）：3 列＝651px，窄屏下也够放 Segmented */
+.tg-form-grid > .ant-form-item.tg-pm-dispatch { grid-column: span 3; }
+
+/* 参数行一行排满 + 卡片等高：吵群 / 拟人发言的 4 个字段（开关条与数字输入同排） */
+.tg-form-body > .ant-space.tg-storm-params .ant-space-item,
+.tg-form-body > .ant-space.tg-persona-params .ant-space-item {
+  flex: 1 1 220px; min-width: 200px; max-width: 430px; align-self: stretch;
+}
+.tg-form-body > .ant-space.tg-storm-params .ant-form-item,
+.tg-form-body > .ant-space.tg-persona-params .ant-form-item { height: 100%; }
+
+/* ---- 批次 D：同行卡片等高 -----------------------------------------------------
+   全是 textarea 的两行改用统一 minRows 解决（批量私信的私信目标/文本/文本池、
+   强拉进群的目标群/要拉进的成员）；这里处理「Select/Input + textarea」混排行：
+   同一行的每张卡片都挂 .tg-field-line → 一起拉伸到行高。 */
+.tg-form-body > .ant-form-item.tg-field-line { align-self: stretch; }
+
+/* 窄屏：上面这些字段回落成整行，避免被压成一条；退群三件套仍按 5/3/4 并排
+   （若各自整行，开关那张会只剩 15% 填充） */
+@media (max-width: 1100px) {
+  .tg-form-body > .ant-form-item.tg-pm-material,
+  .tg-form-body > .ant-form-item.tg-pf-bio,
+  .tg-form-body > .ant-form-item.tg-persona-texts,
+  .tg-form-body > .ant-form-item.tg-mat-dispatch,
+  .tg-form-body > .ant-form-item.tg-join-dispatch { grid-column: 1 / -1; }
+  /* 等高行里的「非开关、非退群三件套」字段整行；退群那三个保持 5/3/4 并排
+     （否则开关独占一行只剩 15% 填充） */
+  .tg-form-body > .ant-form-item.tg-field-line:not(.tg-field-switch):not(.tg-leave-targets):not(.tg-leave-dispatch) { grid-column: 1 / -1; }
+  .tg-form-body > .ant-space.tg-mat-intervals { grid-column: 1 / -1; }
+  /* 批量改资料 Space 内的定宽字段压窄一档，三个才能排在同一行 */
+  .tg-form-body > .ant-space.tg-pf-lines .ant-space-item { flex: 1 1 280px; }
+}
+@media (max-width: 700px) {
+  .tg-form-body > .ant-form-item.tg-field-switch,
+  .tg-form-body > .ant-form-item.tg-leave-targets,
+  .tg-form-body > .ant-form-item.tg-leave-dispatch { grid-column: 1 / -1; }
+  .tg-form-grid > .ant-form-item.tg-field-switch,
+  .tg-form-grid > .ant-form-item.tg-pm-num { grid-column: span 3; }
+  .tg-form-body > .ant-space.tg-pf-lines .ant-space-item { flex: 1 1 100%; }
+}

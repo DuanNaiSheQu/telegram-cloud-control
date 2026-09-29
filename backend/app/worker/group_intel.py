@@ -154,6 +154,10 @@ class GroupIntelMixin:
         try:
             task.result = {**previous, **snapshot}
             await session.flush()
+            # 立刻提交：只 flush 的话进度压在任务自己的事务里，页面和接口都读不到——
+            # 用户看到的就是「执行中」干等好几分钟（这正是「卡住了」的由来）。
+            # 任务真正结束时 complete_task 会用最终结果整体覆盖，提前提交不会留脏数据。
+            await session.commit()
         except Exception:  # noqa: BLE001 - 进度写不进去不能影响采集本身
             logger.debug("写入采集进度失败 task_id=%s", getattr(task, "id", ""))
         try:

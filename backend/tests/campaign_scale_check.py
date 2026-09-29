@@ -1,4 +1,4 @@
-"""营销中心规模化验收：手动选号（部分账号）+ 目标轮询分发 + 并发配置。
+"""触达中心规模化验收：手动选号（部分账号）+ 目标轮询分发 + 并发配置。
 
     cd backend && .venv/bin/python -m tests.campaign_scale_check
 

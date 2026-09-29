@@ -17,6 +17,7 @@ class AccountStatus(str, enum.Enum):
     healthy = "healthy"        # 正常：租约有效、心跳在
     needs_code = "needs_code"  # 要验证码：会话存在但需重新验证
     frozen = "frozen"          # 冻结：被 Telegram 限制，不再替它发送
+    limited = "limited"        # 临时受限：限流 / 单群无权限，等一会儿就恢复，不是封号
     invalid = "invalid"        # 失效：会话打不开
     dead = "dead"              # 永久双向：只留记录，不再认领
     disabled = "disabled"      # 人工停用：手动下线
@@ -29,10 +30,11 @@ CLAIMABLE_STATUSES = (
     AccountStatus.needs_code.value,
     AccountStatus.frozen.value,
     AccountStatus.invalid.value,
+    AccountStatus.limited.value,  # 临时受限也要能认领：恢复了得有人替它干活
 )
 
-#: 允许替它执行发送的状态
-SENDABLE_STATUSES = (AccountStatus.healthy.value,)
+#: 允许替它执行发送的状态（limited 是临时的，给一次机会——发成功就自愈）
+SENDABLE_STATUSES = (AccountStatus.healthy.value, AccountStatus.limited.value)
 
 #: 展示用中文名
 ACCOUNT_STATUS_LABELS = {
@@ -40,6 +42,7 @@ ACCOUNT_STATUS_LABELS = {
     "healthy": "正常",
     "needs_code": "要验证码",
     "frozen": "冻结",
+    "limited": "临时受限",
     "invalid": "失效",
     "dead": "永久双向",
     "disabled": "停用",

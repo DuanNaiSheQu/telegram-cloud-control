@@ -258,8 +258,8 @@
       <img src="frontend/screenshots/uiops-assignments-dark.png" alt="成员分配"></td>
   </tr>
   <tr>
-    <td><b>营销中心</b>：批量私信 / 群发 / 素材群发 / 加群退群 / 强拉 / 改资料 / 吵群 / 拟人<br>
-      <img src="frontend/screenshots/uicore-campaigns-dark-1440.png" alt="营销中心"></td>
+    <td><b>触达中心</b>：批量私信 / 群发 / 素材群发 / 加群退群 / 强拉 / 改资料 / 吵群 / 拟人<br>
+      <img src="frontend/screenshots/uicore-campaigns-dark-1440.png" alt="触达中心"></td>
     <td><b>群情报</b>：入群即采、按链接采集群员、逐条进度与一键打包<br>
       <img src="frontend/screenshots/uicore-group-intel-dark-1440.png" alt="群情报"></td>
   </tr>

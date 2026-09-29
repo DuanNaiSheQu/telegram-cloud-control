@@ -5,7 +5,7 @@
 用户填了也不会进 payload，任务按默认值跑——这类缺陷只靠点页面很难发现，
 但静态交叉比对一眼就能揪出来（v0.3.88 就是这么发现两处问题的）。
 
-    python3 scripts/check_form_payload.py            # 检查营销中心表单
+    python3 scripts/check_form_payload.py            # 检查触达中心表单
     python3 scripts/check_form_payload.py --all      # 扫描所有页面
 
 退出码：0 = 全部对上；1 = 存在「有控件但没提交」的字段。

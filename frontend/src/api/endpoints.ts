@@ -15,8 +15,12 @@ import type {
   AccountMatrixState,
   BulkAccountRequest,
   BulkAction,
+  CampaignScheduleOut,
+  GroupOptionOut,
   CollectJobsResponse,
   CollectLinkRequest,
+  ScheduleCreateRequest,
+  ScheduleUpdateRequest,
   GroupCollectRequest,
   GroupEventListResponse,
   GroupIntelStats,
@@ -410,6 +414,11 @@ export const groupIntelApi = {
 // ---------------------------------------------------------------- 触达中心（批量运营）
 
 export const campaignApi = {
+  /** 可群发的群：按会话聚合，带「哪些号在里头」——群发页的「选择群」用 */
+  groupOptions: () => api.get<GroupOptionOut[]>('/api/campaigns/group-options'),
+  /** 补齐覆盖：让选中的号都进这些群，已经在里头的自动跳过 */
+  joinMissing: (payload: { targets: string[]; scope?: string }) =>
+    api.post<BulkResultOut>('/api/campaigns/join-missing', payload),
   bulkPm: (payload: BulkPmRequest) => api.post<BulkResultOut>('/api/campaigns/bulk-pm', payload),
   groupBroadcast: (payload: GroupBroadcastRequest) => api.post<BulkResultOut>('/api/campaigns/group-broadcast', payload),
   materialSend: (payload: MaterialSendRequest) => api.post<BulkResultOut>('/api/campaigns/material-send', payload),
@@ -563,3 +572,16 @@ export function sortParams(
   if (!field || !order) return {};
   return { sort: field, order };
 }
+
+/**
+ * 定时计划（触达中心 → 群发页下方「正在定时」）。
+ * 计划只存参数与节奏，到点由服务端调度器复用对应端点的提交逻辑展开「一号一任务」。
+ */
+export const campaignScheduleApi = {
+  list: () => api.get<CampaignScheduleOut[]>('/api/campaigns/schedules'),  create: (payload: ScheduleCreateRequest) =>
+    api.post<CampaignScheduleOut>('/api/campaigns/schedules', payload),
+  update: (id: UUID, patch: ScheduleUpdateRequest) =>
+    api.patch<CampaignScheduleOut>(`/api/campaigns/schedules/${id}`, patch),
+  remove: (id: UUID) => api.del<{ ok: boolean; message?: string }>(`/api/campaigns/schedules/${id}`),
+  runNow: (id: UUID) => api.post<CampaignScheduleOut>(`/api/campaigns/schedules/${id}/run-now`, {}),
+};

@@ -57,6 +57,7 @@ export type AccountStatus =
   | 'healthy'
   | 'needs_code'
   | 'frozen'
+  | 'limited'
   | 'invalid'
   | 'dead'
   | 'disabled';
@@ -70,6 +71,9 @@ export interface AccountOut {
   display_label?: string;
   id: UUID;
   phone_masked: string;
+  /** 今日已用额度 / 每日上限：列表里直接看「今天还能发几条」 */
+  used_today?: number;
+  daily_limit?: number;
   username?: string | null;
   tg_user_id?: number | null;
   /** 该号登录用的 api_id（多套凭据混用时便于排查） */
@@ -1379,4 +1383,54 @@ export interface ReplyRuleOut {
   priority: number;
   cooldown_seconds: number;
   hit_count: number;
+}
+
+// ---------------------------------------------------------------- 群发定时计划
+
+/** 一条定时计划：群发页下方「正在定时」那一块 */
+export interface CampaignScheduleOut {
+  id: UUID;
+  name: string;
+  action: string;
+  action_label: string;
+  target_summary: string;
+  interval_minutes: number;
+  send_window: string;
+  enabled: boolean;
+  next_run_at: string;
+  last_run_at: string | null;
+  run_count: number;
+  last_error: string;
+  created_by_name: string;
+  created_at: string;
+}
+
+export interface ScheduleCreateRequest {
+  action: string;
+  name?: string;
+  interval_minutes: number;
+  send_window?: string;
+  start_in_minutes?: number;
+  enabled?: boolean;
+  payload: Record<string, unknown>;
+}
+
+export interface ScheduleUpdateRequest {
+  name?: string;
+  interval_minutes?: number;
+  send_window?: string;
+  enabled?: boolean;
+}
+
+/** 可群发的群：来自各号已同步的会话列表，带「哪些号在里头」 */
+export interface GroupOptionOut {
+  /** 交给群发接口的写法：@username 或数字 chat_id */
+  value: string;
+  tg_chat_id: number;
+  title: string;
+  username: string;
+  account_ids: UUID[];
+  account_count: number;
+  /** channel = 频道（只有管理员能发言，群发会被拒）；megagroup = 超级群（成员可发） */
+  kind: string;
 }

@@ -127,10 +127,20 @@ class BulkPmRequest(BulkScopeRequest, _TextPoolMixin):
 # ---------------- 群发 / 素材群发 ----------------
 
 class GroupBroadcastRequest(BulkScopeRequest, _TextPoolMixin):
-    target_group: str = Field(description="目标群：@username / 数字 chat_id / 会话 dialog_id")
+    target_group: str = Field(
+        default="", description="目标群（单个）：@username / 数字 chat_id / 会话 dialog_id"
+    )
+    target_groups: List[str] = Field(
+        default_factory=list,
+        description="目标群（可多选）：从「哪些号在哪些群」里勾出来的那几个；填了就按每个群各发一批，忽略 target_group",
+    )
     material_id: Optional[uuid.UUID] = Field(
         default=None,
         description="可选：附带素材（图片/视频/文档），文本会作为配文一起发；不填则只发文本",
+    )
+    only_members: bool = Field(
+        default=True,
+        description="只发给「确实在那个群里」的号——不在群里的号发出去只会换一次失败，白占队列、还多挨一次限流",
     )
 
 
@@ -195,6 +205,25 @@ class JoinGroupRequest(BulkScopeRequest):
         if len(merged) > 50:
             raise ValueError("单次最多 50 个群，请分批")
         self.targets = merged
+        return self
+
+
+class JoinMissingRequest(BulkScopeRequest):
+    """补齐覆盖：让选中的号都进这些群——已经在里头的号自动跳过，只给缺的排加群任务。"""
+
+    targets: List[str] = Field(
+        default_factory=list, description="要覆盖的群：@username / -100xxx / dialog_id；从「选择群」里勾"
+    )
+    min_interval: float = Field(default=20.0, ge=5, le=600, description="两个群之间的最小间隔（秒）")
+    max_interval: float = Field(default=60.0, ge=5, le=900, description="两个群之间的最大间隔（秒）")
+    auto_verify: bool = Field(default=True, description="加群后自动过入群验证（佩奇 / NuoMi）")
+    verify_timeout: int = Field(default=150, ge=30, le=600, description="等待验证消息的秒数")
+
+    @model_validator(mode="after")
+    def _check_targets(self):
+        self.targets = [str(item).strip() for item in (self.targets or []) if str(item).strip()]
+        if not self.targets:
+            raise ValueError("至少要选一个群")
         return self
 
 

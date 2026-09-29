@@ -13,7 +13,7 @@ import random
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Optional
 
 from sqlalchemy import select
@@ -423,6 +423,11 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
         account.status = resolved
         account.status_reason = describe_exception(exc)[:255]
         account.last_error = friendly_error_text(exc)[:512]
+        # 限流带上到期时间：界面能倒计时「还有多少秒」，熔断闸门也认这个时间；
+        # worker 每轮扫一遍，到点自己把号恢复成正常
+        wait = flood_wait_seconds(exc)
+        if wait:
+            account.flood_until = _now() + timedelta(seconds=wait)
         account.last_checked_at = _now()
         await session.flush()
         if resolved is AccountStatus.dead:

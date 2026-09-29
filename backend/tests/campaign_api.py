@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""营销中心验收（永久回归，需先起栈：./scripts/stack_local.sh up）：
+"""触达中心验收（永久回归，需先起栈：./scripts/stack_local.sh up）：
 
     cd backend && .venv/bin/python -m tests.campaign_api
 
@@ -157,7 +157,7 @@ def part_d(api: Api) -> None:
 
 
 def part_e(api: Api) -> None:
-    r = api.post("/api/users", json={"username": f"camp-op-{SUFFIX}", "password": "op-pass-1234", "display_name": "营销员工", "role": "operator"})
+    r = api.post("/api/users", json={"username": f"camp-op-{SUFFIX}", "password": "op-pass-1234", "display_name": "触达员工", "role": "operator"})
     op_uid = r.json()["id"]
     STATE.setdefault("operators", []).append(op_uid)
     api.post("/api/assignments", json={"user_id": op_uid, "account_ids": [STATE["accounts"][0]]})
@@ -185,7 +185,7 @@ def part_f(api: Api) -> None:
     run(_fail())
     r = api.post("/api/tasks/bulk/retry", json={"task_ids": task_ids})
     body = r.json()
-    check("F1 营销任务允许批量重试", r.status_code == 200 and body["succeeded"] == len(task_ids), body.get("results"))
+    check("F1 触达任务允许批量重试", r.status_code == 200 and body["succeeded"] == len(task_ids), body.get("results"))
 
 
 def part_g() -> None:
@@ -215,12 +215,12 @@ async def seed(api: Api) -> None:
     r = api.post("/api/auth/login", json={"username": "admin", "password": "admin12345"})
     assert r.status_code == 200, r.text
     api.token = r.json()["access_token"]
-    group = api.post("/api/groups", json={"name": f"营销分组-{SUFFIX}", "description": "campaign-check"}).json()
+    group = api.post("/api/groups", json={"name": f"触达分组-{SUFFIX}", "description": "campaign-check"}).json()
     STATE["group"] = group["id"]
     accounts = []
     for i in (1, 2, 3):
         phone = f"+113810{int(SUFFIX, 16) % 100000:05d}{i}"
-        created = api.post("/api/accounts", json={"phone": phone, "group_id": group["id"], "remark": f"营销验收-{SUFFIX}-{i}"})
+        created = api.post("/api/accounts", json={"phone": phone, "group_id": group["id"], "remark": f"触达验收-{SUFFIX}-{i}"})
         assert created.status_code in (200, 201), created.text
         accounts.append(created.json()["id"])
     STATE["accounts"] = accounts

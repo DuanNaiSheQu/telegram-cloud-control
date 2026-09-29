@@ -108,9 +108,11 @@ class CampaignTasksMixin:
     # ---------------- 公共件 ----------------
 
     def _ensure_sendable(self, account: TgAccount) -> None:
-        """发送类动作的前置检查：只有 healthy 的号才替它对外发消息。"""
+        """发送类动作的前置检查：healthy 与 limited（临时限流）都放行。"""
         status_value = _status_value(account.status)
-        if status_value != AccountStatus.healthy.value:
+        # limited 也给一次机会：真限流的话会再吃一次 FloodWait 并重新打标，
+        # 没限流就正常发出去、顺带自愈回「正常」——不然它会一直卡着没人管
+        if status_value not in (AccountStatus.healthy.value, AccountStatus.limited.value):
             label = ACCOUNT_STATUS_LABELS.get(status_value, status_value)
             raise TaskFailure(f"账号不是正常状态（当前：{label}），不替它发送", retryable=False)
 

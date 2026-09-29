@@ -114,7 +114,16 @@ def map_exception_to_status(exc: BaseException) -> Optional[AccountStatus]:
     if isinstance(exc, FrozenMethodInvalidError):
         # 420：账号被 Telegram 冻结，受限方法（改资料、发消息等）一律不可用
         return AccountStatus.frozen
-    if isinstance(exc, (FloodWaitError, PeerFloodError, UserBannedInChannelError, UserRestrictedError, ChatWriteForbiddenError)):
+    if isinstance(exc, FloodWaitError):
+        # 临时限流：等几十秒就过去，**不是封号**——标成「临时受限」而不是「冻结」，
+        # 这样界面上能一眼看出「它在歇，不是在死」
+        return AccountStatus.limited
+    if isinstance(exc, (UserBannedInChannelError, ChatWriteForbiddenError)):
+        # 只是**某一个**群/频道里没发言权，号本身完全正常，不改账号状态
+        return None
+    if isinstance(exc, (PeerFloodError, UserRestrictedError)):
+        # 这两个是账号级的：PeerFlood（被判定发垃圾信息）与 UserRestricted（整号受限），
+        # 确实该停下来，等申诉或冷却
         return AccountStatus.frozen
     return None
 

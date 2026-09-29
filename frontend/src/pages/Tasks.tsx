@@ -4,7 +4,7 @@
  * 单条重试/取消 + 勾选批量重试（POST /api/tasks/bulk/retry，404 时回退逐条）+
  * 自动刷新开关 + 详情抽屉（payload/result/error/worker_id/时间线）+ 导出 CSV。
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Checkbox, Select, Space, Switch, Tooltip, Typography } from 'antd';
 import type { TableColumnsType } from 'antd';
@@ -328,7 +328,12 @@ export default function Tasks() {
           if (record.status !== 'failed') {
             return (
               <Tooltip title={<div style={{ maxWidth: 520, whiteSpace: 'pre-wrap' }}>上次尝试失败：{value}</div>}>
-                <span className="tg-clamp-cell tg-muted">上次失败：{value}</span>
+                <span className="tg-clamp-cell tg-muted">
+                  上次失败：{value}
+                  {/* 待执行的任务带着 next_run_at：把「多久后自动重试」摆出来，
+                      不然只看到一条失败信息，很容易以为要手动点重试 */}
+                  {record.status === 'pending' ? <RetryCountdown nextRunAt={record.next_run_at} /> : null}
+                </span>
               </Tooltip>
             );
           }
@@ -760,6 +765,31 @@ export default function Tasks() {
       />
     </PageContainer>
   );
+}
+
+/**
+ * 自动重试倒计时：限流（FloodWait）这类失败会回队列并带上 next_run_at，
+ * 这里把它翻成「N 秒后自动重试」，让人知道不用手点——到点自动跑。
+ */
+function RetryCountdown({ nextRunAt }: { nextRunAt?: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  if (!nextRunAt) return null;
+  const target = new Date(nextRunAt).getTime();
+  if (Number.isNaN(target)) return null;
+  const left = Math.ceil((target - now) / 1000);
+  if (left <= 0) return <span> · 即将自动重试</span>;
+  // 节流可能把任务推到几小时后（等每日额度重置），用小时/分钟说才看得懂
+  const text =
+    left >= 3600
+      ? `${Math.floor(left / 3600)} 小时 ${Math.floor((left % 3600) / 60)} 分后自动重试`
+      : left >= 60
+        ? `${Math.floor(left / 60)} 分 ${left % 60} 秒后自动重试`
+        : `${left} 秒后自动重试`;
+  return <span> · {text}</span>;
 }
 
 function SoftTagBot({ label }: { label: string }) {

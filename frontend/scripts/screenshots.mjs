@@ -39,9 +39,9 @@ const PAGES = [
   { key: 'dialogs', path: '/dialogs', file: 'uiinbox-dialogs-chat-{theme}.png', label: '会话收件箱' },
   { key: 'accounts', path: '/accounts', file: 'uicore-accounts-{theme}-1440.png', label: '账号管理' },
   { key: 'tasks', path: '/tasks', file: 'uiinbox-tasks-{theme}.png', label: '任务中心' },
-  // 本次新增：营销中心与群情报
-  { key: 'campaigns', path: '/campaigns/bulk-pm', file: 'uicore-campaigns-{theme}-1440.png', label: '营销中心' },
-  { key: 'campaigns-materials', path: '/campaigns/materials', file: 'uicore-campaigns-materials-{theme}.png', label: '营销中心·素材' },
+  // 本次新增：触达中心与群情报
+  { key: 'campaigns', path: '/campaigns/bulk-pm', file: 'uicore-campaigns-{theme}-1440.png', label: '触达中心' },
+  { key: 'campaigns-materials', path: '/campaigns/materials', file: 'uicore-campaigns-materials-{theme}.png', label: '触达中心·素材' },
   { key: 'group-intel', path: '/group-intel', file: 'uicore-group-intel-{theme}-1440.png', label: '群情报' },
   { key: 'detection', path: '/detection', file: 'uicore-detection-results-{theme}-1440.png', label: '账号检测' },
   { key: 'groups', path: '/groups', file: 'uicore-groups-{theme}-1440.png', label: '分组管理' },

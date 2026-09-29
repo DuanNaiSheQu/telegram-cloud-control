@@ -15,6 +15,7 @@ import {
 } from '../../components';
 import { taskApi } from '../../api/endpoints';
 import { useAsyncData, useInterval } from '../../hooks/useAsyncData';
+import { useWsEvent } from '../../hooks/useWebSocket';
 import { formatTime } from '../../utils/format';
 import type { TaskOut } from '../../api/types';
 import { JsonBlock } from './JsonBlock';
@@ -52,11 +53,20 @@ export function TaskDetailDrawer({ taskId, onClose, onRetry, onCancel }: TaskDet
 
   const task = detail.data;
 
-  // 任务还在排队 / 执行中时定时拉最新：日志是逐步追加的，抽屉开着就能实时看到
+  // 实时：任务事件一到就刷（WS 推的是「状态变了」；逐条追加的日志仍靠下面的轮询兜底）
+  useWsEvent(
+    'task',
+    (event) => {
+      if (taskId && event.task_id === taskId) void detail.reload();
+    },
+    Boolean(taskId),
+  );
+
+  // 兜底轮询：任务还在排队 / 执行中时每 3 秒拉一次，抽屉开着就能看到日志往上长
   useInterval(() => {
     if (!taskId) return;
     if (task?.status === 'pending' || task?.status === 'running') void detail.reload();
-  }, 5000);
+  }, 3000);
 
   // 执行日志：与列表页展开的那份同源（result.logs）
   const logs = useMemo(() => {
@@ -75,26 +85,58 @@ export function TaskDetailDrawer({ taskId, onClose, onRetry, onCancel }: TaskDet
         {
           title: '执行日志',
           content: logs.length ? (
-            <div className="tg-stack" style={{ gap: 'var(--tg-space-sm)' }}>
-              {logs.map((entry, index) => (
-                <div
-                  key={`${entry.at}-${index}`}
-                  style={{ display: 'flex', gap: 'var(--tg-space-md)', alignItems: 'baseline' }}
-                >
-                  <span
+            <div className="tg-stack" style={{ gap: 2, maxHeight: 340, overflowY: 'auto' }}>
+              {logs.map((entry, index) => {
+                const tone = stageTone(entry.stage);
+                const isLatest = index === logs.length - 1;
+                return (
+                  <div
+                    key={`${entry.at}-${index}`}
                     style={{
-                      flex: 'none',
-                      color: 'var(--tg-color-text-tertiary)',
-                      fontSize: 'var(--tg-font-size-xs)',
-                      fontVariantNumeric: 'tabular-nums',
+                      display: 'flex',
+                      gap: 'var(--tg-space-md)',
+                      alignItems: 'baseline',
+                      padding: '3px var(--tg-space-sm)',
+                      borderRadius: 4,
+                      // 最新一条加底纹：一眼看到「现在卡在哪一步」
+                      background: isLatest ? 'var(--tg-color-primary-bg)' : undefined,
                     }}
                   >
-                    {formatTime(entry.at)}
-                  </span>
-                  <span style={{ flex: 'none', color: 'var(--tg-color-text-secondary)' }}>{entry.stage}</span>
-                  <span style={{ color: 'var(--tg-color-text-primary)' }}>{entry.detail}</span>
-                </div>
-              ))}
+                    <span
+                      style={{
+                        flex: 'none',
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: isLatest ? tone.color : 'transparent',
+                        border: `2px solid ${tone.color}`,
+                      }}
+                    />
+                    <span
+                      style={{
+                        flex: 'none',
+                        color: 'var(--tg-color-text-tertiary)',
+                        fontSize: 'var(--tg-font-size-xs)',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {formatTime(entry.at)}
+                    </span>
+                    <span
+                      style={{
+                        flex: 'none',
+                        minWidth: 56,
+                        fontSize: 'var(--tg-font-size-xs)',
+                        color: tone.color,
+                        fontWeight: 'var(--tg-font-weight-medium)',
+                      }}
+                    >
+                      {tone.label}
+                    </span>
+                    <span style={{ color: 'var(--tg-color-text-primary)' }}>{entry.detail}</span>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <Typography.Text type="secondary">
@@ -207,8 +249,31 @@ export function TaskDetailDrawer({ taskId, onClose, onRetry, onCancel }: TaskDet
   );
 }
 
-function TimelineRow({ label, value }: { label: string; value?: string | null }) {
-  return (
+/** 日志分级：把 stage 翻成中文短标签 + 配色，一眼看出「在干嘛 / 卡哪了」 */
+const STAGE_LABELS: Record<string, string> = {
+  start: '开始',
+  scanning: '扫描中',
+  searching: '搜索中',
+  sending: '发送中',
+  progress: '进行中',
+  online: '上线',
+  done: '完成',
+  error: '出错',
+  failed: '失败',
+};
+
+function stageTone(stage: string): { label: string; color: string } {
+  const key = (stage || '').toLowerCase();
+  const label = STAGE_LABELS[key] ?? stage ?? '进行中';
+  if (key.includes('error') || key.includes('fail')) return { label, color: 'var(--tg-color-danger)' };
+  if (key.includes('done') || key.includes('complete') || key === 'ok') {
+    return { label, color: 'var(--tg-color-success)' };
+  }
+  if (key.includes('start')) return { label, color: 'var(--tg-color-primary)' };
+  return { label, color: 'var(--tg-color-text-secondary)' };
+}
+
+function TimelineRow({ label, value }: { label: string; value?: string | null }) {  return (
     <div
       style={{
         display: 'flex',

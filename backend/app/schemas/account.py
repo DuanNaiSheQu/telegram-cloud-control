@@ -42,6 +42,11 @@ class AccountOut(ORMModel):
     )
     id: uuid.UUID
     phone_masked: str
+    #: 今日已用额度 / 每日上限：列表里直接看「今天还能发几条」（发完消息刷新即变）
+    used_today: int = 0
+    daily_limit: int = 0
+    #: 限流到期时间：limited 状态下界面据此倒计时「还有多久自己恢复」
+    flood_until: Optional[datetime] = None
     # 明文手机号（自建系统，运营需要看完整号码；没有则空——比如 tdata / 会话导入的号）
     phone: str = ""
     # 展示用标签：真手机号 > @用户名 > ID:{tg_user_id}（phone_masked 可能是导入目录标签，如 tdata#0）
