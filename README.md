@@ -12,7 +12,7 @@
 <p>
   <a href="#许可证"><img src="https://img.shields.io/badge/license-待定-yellow.svg" alt="License"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/github/v/release/cafinxnull/telegram-cloud-control?label=release&color=2AABEE" alt="Release"></a>
-  <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/version-0.3.74-2AABEE.svg" alt="Version"></a>
+  <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/version-0.3.75-2AABEE.svg" alt="Version"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/releases"><img src="https://img.shields.io/badge/changelog-%E6%9B%B4%E6%96%B0%E8%AE%B0%E5%BD%95-blue.svg" alt="Changelog"></a>
   <a href="https://t.me/TGCloudcontrol"><img src="https://img.shields.io/badge/Telegram-%E4%BA%A4%E6%B5%81%E7%BE%A4-2AABEE?logo=telegram&logoColor=white" alt="Telegram 交流群"></a>
   <a href="https://github.com/cafinxnull/telegram-cloud-control/stargazers"><img src="https://img.shields.io/github/stars/cafinxnull/telegram-cloud-control?label=stars&color=f5a623" alt="Stars"></a>

@@ -95,6 +95,12 @@ class BulkPmRequest(BulkScopeRequest, _TextPoolMixin):
     auto_supply: bool = Field(
         default=False, description="选中的号不足时，自动从可用的号里补足（补号只挑状态正常的）"
     )
+    # ---- 多通道：账号私信 / Bot 私信 ----
+    via_bot: bool = Field(
+        default=False,
+        description="改用 Bot 发送（不占账号配额、不受冻结影响）；注意 Bot 只能给**和它交互过**的用户发私信",
+    )
+    bot_id: Optional[uuid.UUID] = Field(default=None, description="via_bot=true 时必填：用哪个 Bot")
 
     @model_validator(mode="after")
     def _check_targets(self):

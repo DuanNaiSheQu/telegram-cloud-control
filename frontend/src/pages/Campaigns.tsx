@@ -36,7 +36,7 @@ import AccountPickerModal from '../components/AccountPickerModal';
 import MaterialThumb from '../features/materials/MaterialThumb';
 import MaterialPicker from '../features/materials/MaterialSelect';
 import { PageContainer, StatusBadge } from '../components';
-import { campaignApi, groupApi, materialApi } from '../api/endpoints';
+import { botApi, campaignApi, groupApi, materialApi } from '../api/endpoints';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { notifySuccess, toast } from '../utils/feedback';
 import { formatNumber, formatTime } from '../utils/format';
@@ -513,6 +513,8 @@ function ActionTab({ title, description, submit, buildPayload, children }: Actio
 // ---------------------------------------------------------------- 页面
 
 export default function Campaigns() {
+  // Bot 列表：私信 / 群发的「用 Bot 发送」通道要用
+  const bots = useAsyncData(() => botApi.list(), []);
   const { section } = useParams<{ section: string }>();
   const sections = [
     { key: 'materials', label: '素材库', children: <MaterialsTab /> },
@@ -587,6 +589,39 @@ export default function Campaigns() {
               <Switch />
             </Form.Item>
           </div>
+          <div className="tg-form-group-title">发送通道</div>
+          <div className="tg-form-grid">
+            <Form.Item
+              label="用谁发"
+              name="via_bot"
+              initialValue={false}
+              tooltip="用 Bot 发：不占账号每日配额、不受账号冻结影响；但 Telegram 规定 Bot 只能给**和它交互过**的用户发私信，陌生目标会失败"
+            >
+              <Segmented
+                options={[
+                  { label: '用账号私信', value: false },
+                  { label: '用 Bot 私信', value: true },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item noStyle shouldUpdate={(prev, next) => prev.via_bot !== next.via_bot}>
+              {({ getFieldValue }) =>
+                getFieldValue('via_bot') ? (
+                  <Form.Item label="选择 Bot（必填）" name="bot_id">
+                    <Select
+                      placeholder="选一个已配置的 Bot"
+                      options={(bots.data ?? []).map((item: { id: string; name: string; bot_username?: string | null }) => ({
+                        value: item.id,
+                        label: `@${item.bot_username || item.name}`,
+                      }))}
+                      notFoundContent="还没有配 Bot：先去「Bot 管理」添加 Token"
+                    />
+                  </Form.Item>
+                ) : null
+              }
+            </Form.Item>
+          </div>
+
           <div className="tg-form-group-title">执行方式</div>
           <div className="tg-form-grid">
             <Form.Item

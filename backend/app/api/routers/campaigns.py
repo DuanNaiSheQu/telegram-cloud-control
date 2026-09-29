@@ -39,6 +39,7 @@ from app.models import (
     TgAccount,
     User,
     AccountStatus,
+    Bot,
 )
 from app.schemas import (
     BulkAccountResult,
@@ -234,6 +235,49 @@ async def bulk_pm(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> BulkResultResponse:
+    # 多通道分流：选「用 Bot 发送」时不走账号，直接派 Bot 任务。
+    # Bot 不受账号冻结 / 每日配额 / 设备指纹影响，代价是只能发给**和它交互过**的用户。
+    if payload.via_bot:
+        if payload.bot_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="用 Bot 发送时必须选择 bot_id")
+        bot = await session.get(Bot, payload.bot_id)
+        if bot is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bot 不存在")
+        text = (payload.text or "").strip() or (payload.texts[0] if payload.texts else "")
+        if not text:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="用 Bot 发送同样需要文本或文本池")
+        task = await enqueue_task(
+            session,
+            type=TaskType.bot_broadcast,
+            bot_id=bot.id,
+            payload={"targets": payload.targets, "text": text, "source": "bulk_pm_via_bot"},
+            created_by=user.id,
+            priority=70,
+        )
+        await write_audit(
+            session,
+            action="campaign.bulk_pm_via_bot",
+            user_id=user.id,
+            target_type="bot",
+            target_id=str(bot.id),
+            detail={"targets": len(payload.targets)},
+        )
+        await session.commit()
+        return BulkResultResponse(
+            ok=True,
+            action="bulk_pm_via_bot",
+            message=(
+                f"已排队：用 @{bot.bot_username or bot.name} 给 {len(payload.targets)} 个目标发私信。"
+                "注意 Bot 只能给与它交互过的用户发消息，陌生人会失败（Telegram 限制）。"
+            ),
+            requested=len(payload.targets),
+            succeeded=1,
+            failed=0,
+            skipped=0,
+            truncated=False,
+            task_ids=[task.id],
+            items=[],
+        )
     params = {
         "targets": payload.targets,
         "texts": payload.texts,
