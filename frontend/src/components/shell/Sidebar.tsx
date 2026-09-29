@@ -17,6 +17,7 @@
  * - 侧栏整体折叠时只留一级图标：含子项的项直接进它的第一个子页面（Tooltip 说明）。
  */
 import { useEffect, useMemo, useState } from 'react';
+import { healthApi } from '../../api/endpoints';
 import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { Tooltip } from 'antd';
@@ -90,6 +91,26 @@ export function Sidebar({
     closedGroups: [],
     closedItems: [],
   });
+  // 版本号：优先用后端 /health 返回的（与仓库根 VERSION 同源）。
+  // 构建期注入的 __APP_VERSION__ 只在 dev server 启动那一刻求值，长跑会停在旧版本，故只作兜底。
+  const [runningVersion, setRunningVersion] = useState<string>(
+    typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '',
+  );
+  useEffect(() => {
+    let alive = true;
+    void healthApi
+      .live()
+      .then((res) => {
+        if (alive && res?.version) setRunningVersion(res.version);
+      })
+      .catch(() => {
+        /* 后端拿不到就继续显示构建期版本 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const autoParents = useMemo(() => parentsOf(activePath), [activePath]);
   // 用户本次会话里手动展开过的父项（点击后立即生效，不受历史收起记录影响）
   const [justOpened, setJustOpened] = useState<string[]>([]);
@@ -266,7 +287,7 @@ export function Sidebar({
           </button>
           {!collapsed ? (
             <span className="tg-muted" style={{ fontSize: 'var(--tg-font-size-xs)' }}>
-              {`v${__APP_VERSION__}`}
+              {`v${runningVersion}`}
             </span>
           ) : null}
         </div>

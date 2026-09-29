@@ -42,6 +42,16 @@ interface BulkRetryOut {
   results: Array<{ task_id: string; ok: boolean; message: string }>;
 }
 
+/** 每个状态对应的视觉语义：数字用它自己的颜色，异常态才抢眼 */
+const STATUS_CHIP_TONE: Record<TaskStatus, string> = {
+  pending: 'is-neutral',
+  pending_confirmation: 'is-info',
+  running: 'is-info',
+  completed: 'is-success',
+  failed: 'is-danger',
+  cancelled: 'is-muted',
+};
+
 const STATUS_CHIP_ORDER: TaskStatus[] = [
   'pending',
   'pending_confirmation',
@@ -494,9 +504,9 @@ export default function Tasks() {
         type="button"
         className={[
           'tg-task-chip',
+          STATUS_CHIP_TONE[status] ?? 'is-neutral',
           isActive ? 'is-active' : '',
-          // 失败数非零就标红：这一格是唯一需要立刻处理的状态
-          status === 'failed' && count > 0 ? 'is-danger' : '',
+          count > 0 ? 'has-count' : 'is-zero',
         ]
           .filter(Boolean)
           .join(' ')}
@@ -515,7 +525,10 @@ export default function Tasks() {
       description="所有异步任务的队列视图：待执行、等待确认、执行中、失败都可在这里看到；失败任务可直接重试，执行中的可取消。"
     >
       <div className="tg-task-summary" style={{ marginBottom: 'var(--tg-space-lg)' }}>
-        {STATUS_CHIP_ORDER.map(chipStatus)}
+        {STATUS_CHIP_ORDER.slice(0, 3).map(chipStatus)}
+        <span className="tg-task-summary-sep" aria-hidden />
+        {STATUS_CHIP_ORDER.slice(3).map(chipStatus)}
+        <span className="tg-task-summary-sep" aria-hidden />
         <Tooltip title="来自工作台口径：已超过预计执行时间、仍待执行的任务数">
           <span className="tg-task-chip is-static is-overdue">
             <span className="dot" />

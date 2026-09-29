@@ -26,6 +26,12 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      '/health': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/ready': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      // 健康检查在根路径（没有 /api 前缀），生产 nginx 也是这么代理的——
+      // 不转发的话侧栏版本号、连通性提示都拿不到后端数据
+      '/health': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/ready': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
   preview: {

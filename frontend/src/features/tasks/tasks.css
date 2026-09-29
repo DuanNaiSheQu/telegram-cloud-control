@@ -123,6 +123,66 @@
   background: var(--tg-color-error-bg, rgba(255, 77, 79, 0.14));
 }
 
+/* 汇总条的分组分隔：待处理 / 结果 / 异常 三段 */
+.tg-task-summary-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--tg-color-border);
+  margin: 0 var(--tg-space-xs);
+}
+
+/* 状态配色：数字用各自的语义色，一眼看出哪一格需要动手 */
+.tg-task-chip.is-neutral .tg-task-chip-count {
+  color: var(--tg-color-text);
+}
+.tg-task-chip.is-info .tg-task-chip-count {
+  color: var(--tg-color-info, var(--tg-color-primary));
+}
+.tg-task-chip.is-success .tg-task-chip-count {
+  color: var(--tg-color-success);
+}
+.tg-task-chip.is-muted .tg-task-chip-count {
+  color: var(--tg-color-text-tertiary);
+}
+.tg-task-chip.is-warning .tg-task-chip-count {
+  color: var(--tg-color-warning);
+}
+.tg-task-chip.is-info.has-count {
+  border-color: var(--tg-color-info-border, var(--tg-color-primary));
+  background: var(--tg-color-primary-bg);
+  color: var(--tg-color-info, var(--tg-color-primary));
+}
+.tg-task-chip.is-success.has-count {
+  border-color: var(--tg-color-success-border, var(--tg-color-success));
+  color: var(--tg-color-success);
+}
+.tg-task-chip.is-warning.has-count {
+  border-color: var(--tg-color-warning-border, var(--tg-color-warning));
+  color: var(--tg-color-warning);
+}
+
+/* 计数为 0 的格子退到背景里，不跟有数的抢注意力 */
+.tg-task-chip.is-zero {
+  opacity: 0.62;
+}
+.tg-task-chip.is-zero:hover {
+  opacity: 1;
+}
+
+/* 选中态压过状态色：让「正在筛选哪个状态」永远清晰 */
+.tg-task-chip.is-active,
+.tg-task-chip.is-active .tg-task-chip-count {
+  border-color: var(--tg-color-primary);
+  background: var(--tg-color-primary-bg);
+  color: var(--tg-color-primary);
+}
+.tg-task-chip.is-danger.is-active,
+.tg-task-chip.is-danger.is-active .tg-task-chip-count {
+  border-color: var(--tg-color-error);
+  background: var(--tg-color-error-bg, rgba(255, 77, 79, 0.12));
+  color: var(--tg-color-error);
+}
+
 /* 顶部汇总条：右侧操作区（一键重试全部失败） */
 .tg-task-summary-actions {
   margin-left: auto;
