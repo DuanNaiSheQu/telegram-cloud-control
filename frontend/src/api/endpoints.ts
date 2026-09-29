@@ -95,6 +95,7 @@ import type {
   UserUpdate,
   KeywordHitOut,
   KeywordWatchOut,
+  ReplyRuleOut,
   UUID,
 } from './types';
 
@@ -329,6 +330,23 @@ export const groupIntelApi = {
     api.patch<{ ok: boolean; message: string }>(`/api/group-intel/keyword-watches/${id}`, payload),
   deleteKeywordWatch: (id: string) =>
     api.del<{ ok: boolean; message: string }>(`/api/group-intel/keyword-watches/${id}`),
+  // 自动回复规则：命中会自动发消息（带冷却）
+  replyRules: () => api.get<{ items: ReplyRuleOut[]; total: number }>('/api/group-intel/reply-rules'),
+  createReplyRule: (payload: {
+    name?: string;
+    keywords: string[];
+    reply_text: string;
+    match_mode?: 'contains' | 'exact' | 'regex';
+    scope?: 'private' | 'group' | 'both';
+    priority?: number;
+    cooldown_seconds?: number;
+  }) => api.post<{ ok: boolean; id: string; message: string }>('/api/group-intel/reply-rules', payload),
+  updateReplyRule: (
+    id: string,
+    payload: { enabled?: boolean; reply_text?: string; keywords?: string[]; cooldown_seconds?: number },
+  ) => api.patch<{ ok: boolean; message: string }>(`/api/group-intel/reply-rules/${id}`, payload),
+  deleteReplyRule: (id: string) =>
+    api.del<{ ok: boolean; message: string }>(`/api/group-intel/reply-rules/${id}`),
   keywordHits: (limit = 100) =>
     api.get<{ items: KeywordHitOut[]; total: number }>('/api/group-intel/keyword-hits', { limit }),
   /** 采集群内对话：成员名单被群主隐藏时的替代方案（对话照样能读，从发言里淘成员） */

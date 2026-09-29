@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import KeywordWatchPanel from '../features/group/KeywordWatchPanel';
+import ReplyRulePanel from '../features/group/ReplyRulePanel';
 import {
   Alert,
   Button,
@@ -744,6 +745,7 @@ export default function GroupIntel() {
         </div>
       </Modal>
       <KeywordWatchPanel />
+      <ReplyRulePanel />
     </PageContainer>
   );
 }

@@ -21,6 +21,7 @@ import {
   Tag,
   Typography,
   Upload,
+  Checkbox,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -586,6 +587,15 @@ export default function Campaigns() {
             max_interval: Number(values.max_interval ?? 8),
             dispatch: String(values.dispatch ?? 'each'),
             material_id: (values.material_id as string | undefined) ?? null,
+            // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
+            send_window: String(values.send_window ?? '').trim(),
+            daily_quota: Number(values.daily_quota ?? 0),
+            auto_supply: Boolean(values.auto_supply),
+            // 内容形态：富文本 / 转发（可隐藏来源）
+            parse_mode: String(values.parse_mode ?? '').trim(),
+            forward_from_chat_id: values.forward_from_chat_id ?? null,
+            forward_from_message_id: values.forward_from_message_id ?? null,
+            drop_author: Boolean(values.drop_author),
           })}
           submit={(payload) => campaignApi.bulkPm(payload as unknown as BulkPmRequest)}
         >
@@ -616,6 +626,37 @@ export default function Campaigns() {
             </Form.Item>
             <Form.Item label="最大间隔（秒）" name="max_interval" initialValue={8}>
               <InputNumber min={1} max={120} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              label="文字格式（富文本）"
+              name="parse_mode"
+              tooltip="Markdown：**加粗**、> 引用、`代码`；HTML：<b>加粗</b>。留空 = 纯文本"
+            >
+              <Select
+                style={{ width: '100%' }}
+                allowClear
+                placeholder="纯文本"
+                options={[
+                  { value: 'md', label: 'Markdown（加粗 / 引用 / 代码块）' },
+                  { value: 'html', label: 'HTML（<b> 等标签）' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              label="转发模式（可选）"
+              tooltip="填了来源会话与消息 id 就转发那条消息，而不是发文本；勾上隐藏来源则不显示原频道署名"
+            >
+              <Space size="small" wrap>
+                <Form.Item name="forward_from_chat_id" noStyle>
+                  <InputNumber placeholder="来源 chat_id（-100...）" style={{ width: 210 }} />
+                </Form.Item>
+                <Form.Item name="forward_from_message_id" noStyle>
+                  <InputNumber placeholder="消息 id" style={{ width: 130 }} />
+                </Form.Item>
+                <Form.Item name="drop_author" valuePropName="checked" noStyle>
+                  <Checkbox>隐藏转发来源</Checkbox>
+                </Form.Item>
+              </Space>
             </Form.Item>
             <Form.Item
               label="发送时间窗（定时）"
@@ -714,6 +755,15 @@ export default function Campaigns() {
             text: String(values.text ?? '').trim() || null,
             texts: splitField(values.texts).length ? splitField(values.texts) : null,
             naturalize: Boolean(values.naturalize),
+            // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
+            send_window: String(values.send_window ?? '').trim(),
+            daily_quota: Number(values.daily_quota ?? 0),
+            auto_supply: Boolean(values.auto_supply),
+            // 内容形态：富文本 / 转发（可隐藏来源）
+            parse_mode: String(values.parse_mode ?? '').trim(),
+            forward_from_chat_id: values.forward_from_chat_id ?? null,
+            forward_from_message_id: values.forward_from_message_id ?? null,
+            drop_author: Boolean(values.drop_author),
           })}
           submit={(payload) => campaignApi.groupBroadcast(payload as unknown as GroupBroadcastRequest)}
         >
@@ -747,6 +797,15 @@ export default function Campaigns() {
             min_interval: Number(values.min_interval ?? 3),
             max_interval: Number(values.max_interval ?? 8),
             dispatch: String(values.dispatch ?? 'each'),
+            // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
+            send_window: String(values.send_window ?? '').trim(),
+            daily_quota: Number(values.daily_quota ?? 0),
+            auto_supply: Boolean(values.auto_supply),
+            // 内容形态：富文本 / 转发（可隐藏来源）
+            parse_mode: String(values.parse_mode ?? '').trim(),
+            forward_from_chat_id: values.forward_from_chat_id ?? null,
+            forward_from_message_id: values.forward_from_message_id ?? null,
+            drop_author: Boolean(values.drop_author),
           })}
           submit={(payload) => campaignApi.materialSend(payload as unknown as MaterialSendRequest)}
         >
@@ -794,6 +853,15 @@ export default function Campaigns() {
             ...scopePayload(scope),
             targets: splitField(values.targets),
             dispatch: String(values.dispatch ?? 'each'),
+            // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
+            send_window: String(values.send_window ?? '').trim(),
+            daily_quota: Number(values.daily_quota ?? 0),
+            auto_supply: Boolean(values.auto_supply),
+            // 内容形态：富文本 / 转发（可隐藏来源）
+            parse_mode: String(values.parse_mode ?? '').trim(),
+            forward_from_chat_id: values.forward_from_chat_id ?? null,
+            forward_from_message_id: values.forward_from_message_id ?? null,
+            drop_author: Boolean(values.drop_author),
           })}
           submit={(payload) => campaignApi.joinGroup(payload as unknown as JoinGroupRequest)}
         >
@@ -835,6 +903,15 @@ export default function Campaigns() {
             targets: splitField(values.targets),
             delete_history: values.delete_history !== false,
             dispatch: String(values.dispatch ?? 'each'),
+            // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
+            send_window: String(values.send_window ?? '').trim(),
+            daily_quota: Number(values.daily_quota ?? 0),
+            auto_supply: Boolean(values.auto_supply),
+            // 内容形态：富文本 / 转发（可隐藏来源）
+            parse_mode: String(values.parse_mode ?? '').trim(),
+            forward_from_chat_id: values.forward_from_chat_id ?? null,
+            forward_from_message_id: values.forward_from_message_id ?? null,
+            drop_author: Boolean(values.drop_author),
           })}
           submit={(payload) => campaignApi.leaveGroup(payload as unknown as LeaveGroupRequest)}
         >
@@ -872,6 +949,15 @@ export default function Campaigns() {
             groups: splitField(values.groups),
             members: splitField(values.members),
             dispatch: String(values.dispatch ?? 'each'),
+            // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
+            send_window: String(values.send_window ?? '').trim(),
+            daily_quota: Number(values.daily_quota ?? 0),
+            auto_supply: Boolean(values.auto_supply),
+            // 内容形态：富文本 / 转发（可隐藏来源）
+            parse_mode: String(values.parse_mode ?? '').trim(),
+            forward_from_chat_id: values.forward_from_chat_id ?? null,
+            forward_from_message_id: values.forward_from_message_id ?? null,
+            drop_author: Boolean(values.drop_author),
           })}
           submit={(payload) => campaignApi.forceAdd(payload as unknown as ForceAddRequest)}
         >
@@ -991,6 +1077,15 @@ export default function Campaigns() {
             max_interval: Number(values.max_interval ?? 30),
             texts: splitField(values.texts),
             reply_probability: Number(values.reply_probability ?? 0),
+            // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
+            send_window: String(values.send_window ?? '').trim(),
+            daily_quota: Number(values.daily_quota ?? 0),
+            auto_supply: Boolean(values.auto_supply),
+            // 内容形态：富文本 / 转发（可隐藏来源）
+            parse_mode: String(values.parse_mode ?? '').trim(),
+            forward_from_chat_id: values.forward_from_chat_id ?? null,
+            forward_from_message_id: values.forward_from_message_id ?? null,
+            drop_author: Boolean(values.drop_author),
           })}
           submit={(payload) => campaignApi.storm(payload as unknown as StormRequest)}
         >
@@ -1034,6 +1129,15 @@ export default function Campaigns() {
             rounds: Number(values.rounds ?? 5),
             min_interval: Number(values.min_interval ?? 10),
             max_interval: Number(values.max_interval ?? 40),
+            // 定时 / 定量 / 补号：之前只加了控件、没接到 payload，填了也不生效（本轮修）
+            send_window: String(values.send_window ?? '').trim(),
+            daily_quota: Number(values.daily_quota ?? 0),
+            auto_supply: Boolean(values.auto_supply),
+            // 内容形态：富文本 / 转发（可隐藏来源）
+            parse_mode: String(values.parse_mode ?? '').trim(),
+            forward_from_chat_id: values.forward_from_chat_id ?? null,
+            forward_from_message_id: values.forward_from_message_id ?? null,
+            drop_author: Boolean(values.drop_author),
           })}
           submit={(payload) => campaignApi.persona(payload as unknown as PersonaRequest)}
         >

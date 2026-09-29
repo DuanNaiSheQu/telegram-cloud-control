@@ -1364,3 +1364,17 @@ export interface KeywordHitOut {
   rule_name?: string | null;
   occurred_at?: string;
 }
+
+/** 账号自动回复规则（命中会自动发消息） */
+export interface ReplyRuleOut {
+  id: string;
+  name: string;
+  keywords: string[];
+  reply_text: string;
+  match_mode: 'contains' | 'exact' | 'regex';
+  scope: 'private' | 'group' | 'both';
+  enabled: boolean;
+  priority: number;
+  cooldown_seconds: number;
+  hit_count: number;
+}
