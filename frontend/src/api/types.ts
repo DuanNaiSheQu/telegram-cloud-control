@@ -141,6 +141,8 @@ export interface AccountUpdate {
 }
 
 export interface AccountListQuery {
+  /** 归档筛选：true 只看已归档的号（含归档原因）；不传为只看在用的号 */
+  archived?: boolean;
   page?: number;
   page_size?: number;
   group_id?: UUID | null;

@@ -3009,63 +3009,60 @@ body .ant-spin-container::after {
 }
 
 /* ============================================================================
-   企业级营销页面设计系统
-   营销中心各功能页共用 ActionTab 外壳，这里统一页头 / 分组卡片 / 字段网格 /
-   吸底提交栏的观感：宽屏不散、窄屏不挤、每个字段都有明确的层级与说明。
+   营销页面排版 v3：12 列栅格对齐 + 配色分区
+   上一版用 flex 自由伸缩，导致每行字段宽度参差（691 / 1122 / 260），
+   起始边线对不齐，看起来乱。这一版改成固定 12 列栅格：谁占几列是明确的，
+   所有行的竖向边线自然对齐；同时给页头 / 分组 / 字段 / 提交栏分配不同色阶，
+   让层级靠颜色区分，而不是靠堆边框。
    ============================================================================ */
 
-/* ---- 页面容器：限宽居中，底部留出提交栏高度 ---- */
+/* ---- 语义色（跟随主题变量，深色模式自动生效） ---- */
 .tg-action-page {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 4px 24px 132px;
+  --tg-v-head-bg: linear-gradient(135deg,
+      color-mix(in srgb, var(--tg-color-primary) 10%, var(--tg-color-bg-card)) 0%,
+      var(--tg-color-bg-card) 62%);
+  --tg-v-group-bg: color-mix(in srgb, var(--tg-color-primary) 7%, transparent);
+  --tg-v-group-fg: var(--tg-color-primary);
+  --tg-v-field-bg: var(--tg-color-bg-card);
+  --tg-v-field-border: var(--tg-color-border);
+  --tg-v-scope-bg: var(--tg-color-bg-hover);
+  width: 100%;
+  max-width: none;
+  padding: 0 0 104px;
 }
 
-/* ---- 页头 ---- */
+/* ---- 页头：淡色渐变 + 左侧色条 ---- */
 .tg-page-head {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 24px;
-  padding: 20px 24px;
-  margin-bottom: 18px;
-  background: var(--tg-color-bg-card);
+  gap: 20px;
+  padding: 16px 20px 16px 22px;
+  margin-bottom: 16px;
+  background: var(--tg-v-head-bg);
   border: 1px solid var(--tg-color-border);
   border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
 }
-.tg-page-head-main { min-width: 0; }
-.tg-page-title {
-  margin: 0 0 6px;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--tg-color-text);
+.tg-page-head::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg,
+      var(--tg-color-primary),
+      color-mix(in srgb, var(--tg-color-primary) 35%, transparent));
 }
-.tg-page-desc {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--tg-color-text-secondary);
-  max-width: 76ch;
-}
-.tg-page-head-meta {
-  display: flex;
-  flex-shrink: 0;
-  gap: 8px;
-  padding-top: 2px;
-}
+.tg-page-title { margin: 0 0 5px; font-size: 18px; font-weight: 600; line-height: 1.3; }
+.tg-page-desc { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--tg-color-text-secondary); max-width: 120ch; }
+.tg-page-head-meta { display: flex; flex-shrink: 0; gap: 8px; padding-top: 2px; }
 .tg-chip {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  font-size: 12px;
-  border-radius: 999px;
+  display: inline-flex; align-items: center; height: 22px; padding: 0 10px;
+  font-size: 12px; font-weight: 500; border-radius: 999px; white-space: nowrap;
   color: var(--tg-color-primary);
-  background: color-mix(in srgb, var(--tg-color-primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tg-color-primary) 24%, transparent);
-  white-space: nowrap;
+  background: color-mix(in srgb, var(--tg-color-primary) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tg-color-primary) 25%, transparent);
 }
 .tg-chip-soft {
   color: var(--tg-color-text-secondary);
@@ -3073,132 +3070,186 @@ body .ant-spin-container::after {
   border-color: var(--tg-color-border);
 }
 
-/* ---- 表单主体与分组卡片 ---- */
+/* ---- 表单主体：12 列栅格，字段占列数固定 → 边线对齐 ---- */
 .tg-action-form { max-width: none; }
-.tg-form-body { display: flex; flex-direction: column; }
+.tg-form-body {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px 18px;
+  align-items: start;
+}
+.tg-form-body > .ant-form-item {
+  grid-column: span 3;
+  min-width: 0;
+  margin-bottom: 0;
+  padding: 10px 12px 12px;
+  background: var(--tg-v-field-bg);
+  border: 1px solid var(--tg-v-field-border);
+  border-radius: 10px;
+}
+/* 多行文本域：半行宽，通常两个并排 */
+.tg-form-body > .ant-form-item:has(textarea) { grid-column: span 6; }
+/* 开关 / 复选框：窄块 */
+.tg-form-body > .ant-form-item:has(.ant-switch),
+.tg-form-body > .ant-form-item:has(.ant-checkbox) { grid-column: span 2; }
+/* 整行占位元素：分组标题、分组网格、区块，以及任何「横向排列的按钮组 / 卡片组」。
+   后者如果被塞进单列（span 3）会被压成竖排，节拍预设就是这么废掉的。 */
+.tg-form-body > .tg-form-group-title,
+.tg-form-body > .tg-form-grid,
+.tg-form-body > .tg-section,
+.tg-form-body > .tg-preset-row,
+.tg-form-body > .ant-form-item:has(.tg-preset-row),
+.tg-form-body > .ant-form-item:has(.ant-segmented),
+.tg-form-body > .ant-form-item:has(.ant-radio-group) { grid-column: 1 / -1; }
 
+/* ---- 分组标题：淡色胶囊 + 主色字，一眼看出分段 ---- */
 .tg-form-group-title {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 44px;
-  margin: 22px 0 18px;
-  padding: 0 16px;
-  font-size: 14px;
+  gap: 9px;
+  margin: 8px 0 0;
+  padding: 7px 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  letter-spacing: 0.2px;
-  color: var(--tg-color-text);
-  background: var(--tg-color-bg-card);
-  border: 1px solid var(--tg-color-border);
+  color: var(--tg-v-group-fg);
+  background: var(--tg-v-group-bg);
+  border: none;
   border-left: 3px solid var(--tg-color-primary);
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  border-radius: 6px;
+  box-shadow: none;
 }
-.tg-form-body > .tg-form-group-title:first-child { margin-top: 0; }
+.tg-form-group-title::before { display: none; }
 
-/* ---- 字段网格：自适应列宽，窄屏自动折行 ---- */
+/* ---- 分组内网格：同样按栅格对齐，字段自带底色 ---- */
 .tg-form-grid,
 .tg-action-form .tg-form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px 20px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 18px;
   align-items: start;
   justify-content: stretch;
-  padding: 18px 20px;
-  margin-bottom: 18px;
-  background: var(--tg-color-bg-card);
-  border: 1px solid var(--tg-color-border);
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  padding: 0;
+  margin-bottom: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 .tg-form-grid > .ant-form-item,
-.tg-form-grid > .ant-space { width: 100%; margin-bottom: 0; }
+.tg-form-grid > .ant-space {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 10px 12px 12px;
+  background: var(--tg-v-field-bg);
+  border: 1px solid var(--tg-v-field-border);
+  border-radius: 10px;
+}
 .tg-form-grid .ant-input-number,
 .tg-form-grid .ant-select,
 .tg-form-grid .ant-picker { width: 100%; }
 
-/* 分组标题紧跟其字段卡片：视觉上绑成一节 */
-.tg-form-body > .tg-form-group-title + .tg-form-grid { margin-top: 0; }
-
-/* 未包在分组里的字段（直接铺在表单下的）：也给一张卡 */
-.tg-form-body > .ant-form-item {
-  padding: 16px 20px 0;
-  background: var(--tg-color-bg-card);
-  border: 1px solid var(--tg-color-border);
-  border-radius: 12px;
-}
-.tg-form-body > .ant-form-item:last-child { padding-bottom: 16px; }
-
-/* ---- 账号范围卡片（section 形式） ---- */
-.tg-section {
-  margin-top: 22px;
-  background: var(--tg-color-bg-card);
-  border: 1px solid var(--tg-color-border);
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-  overflow: hidden;
-}
-.tg-section-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--tg-color-border);
-  background: var(--tg-color-bg-hover);
-}
-.tg-section-bar {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  background: var(--tg-color-primary);
-  flex-shrink: 0;
-}
-.tg-section-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
+/* ---- 标签与输入：统一规格 ---- */
+.tg-action-form .ant-form-item-label { padding-bottom: 5px; }
+.tg-action-form .ant-form-item-label > label {
+  height: 19px;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--tg-color-text);
-  white-space: nowrap;
 }
-.tg-section-note {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--tg-color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.tg-action-form .ant-form-item-label > label::after { margin-inline-start: 3px; }
+/* 必填星号用主色强调 */
+.tg-action-form .ant-form-item-required::before { color: var(--tg-color-primary) !important; }
+/* 输入控件统一高度与圆角，避免同排高低不齐 */
+.tg-action-form .ant-input,
+.tg-action-form .ant-input-affix-wrapper,
+.tg-action-form .ant-input-number,
+.tg-action-form .ant-select .ant-select-selector {
+  border-radius: 7px;
 }
-.tg-section > *:not(.tg-section-head) { padding: 18px 20px; }
 
-/* ---- 吸底提交栏 ---- */
+/* ---- 账号范围：淡底卡片，跟字段卡区分开 ---- */
+.tg-section {
+  margin-top: 6px;
+  padding: 14px 16px;
+  background: var(--tg-v-scope-bg);
+  border: 1px solid var(--tg-color-border);
+  border-radius: 10px;
+}
+.tg-section-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.tg-section-bar { width: 3px; height: 13px; border-radius: 2px; background: var(--tg-color-primary); flex-shrink: 0; }
+.tg-section-title { margin: 0; font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--tg-color-text); }
+.tg-section-note { font-size: 12px; line-height: 1.5; color: var(--tg-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tg-section > *:not(.tg-section-head) { padding: 0; }
+
+/* ---- 提交栏：主色描边 + 浮起 ---- */
 .tg-submit-dock {
   position: sticky;
-  bottom: 0;
+  bottom: 12px;
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-top: 22px;
-  padding: 14px 20px;
-  background: color-mix(in srgb, var(--tg-color-bg-card) 92%, transparent);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--tg-color-border);
-  border-radius: 12px;
-  box-shadow: 0 -2px 16px rgba(15, 23, 42, 0.06);
+  gap: 14px;
+  margin-top: 16px;
+  padding: 10px 16px;
+  background: var(--tg-color-bg-card);
+  border: 1px solid color-mix(in srgb, var(--tg-color-primary) 30%, var(--tg-color-border));
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
 }
-.tg-submit-hint { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.tg-submit-hint strong { font-size: 13px; font-weight: 600; color: var(--tg-color-text); }
-.tg-submit-hint span {
-  font-size: 12px;
-  line-height: 1.5;
+.tg-submit-hint { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tg-submit-hint strong { font-size: 12.5px; font-weight: 600; color: var(--tg-color-primary); }
+.tg-submit-hint span { font-size: 12px; color: var(--tg-color-text-secondary); }
+.tg-submit-bar { margin-top: 0; padding: 0; border: none; background: none; }
+
+/* ---- 响应式：窄屏逐级放宽占列数 ---- */
+@media (max-width: 1500px) {
+  .tg-form-body > .ant-form-item { grid-column: span 4; }
+  .tg-form-body > .ant-form-item:has(textarea) { grid-column: span 6; }
+}
+@media (max-width: 1100px) {
+  .tg-form-body > .ant-form-item { grid-column: span 6; }
+  .tg-form-body > .ant-form-item:has(textarea) { grid-column: span 12; }
+  .tg-form-body > .ant-form-item:has(.ant-switch),
+  .tg-form-body > .ant-form-item:has(.ant-checkbox) { grid-column: span 4; }
+}
+@media (max-width: 700px) {
+  .tg-form-body > .ant-form-item,
+  .tg-form-body > .ant-form-item:has(textarea) { grid-column: span 12; }
+}
+
+/* 节奏预设：横向一排铺开，别挤成竖条 */
+.tg-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+}
+.tg-preset-label {
+  align-self: center;
+  flex: 0 0 auto;
+  font-size: 12.5px;
   color: var(--tg-color-text-secondary);
+  white-space: nowrap;
 }
-
-/* 老版本遗留的提交区样式不再需要（已由 dock 取代） */
-.tg-submit-bar { margin-top: 18px; padding: 0; border: none; background: none; }
-
-@media (max-width: 900px) {
-  .tg-action-page { padding: 4px 12px 140px; }
-  .tg-page-head { flex-direction: column; gap: 12px; }
-  .tg-section-note { white-space: normal; }
+.tg-preset-btn {
+  flex: 1 1 200px;
+  min-width: 180px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 12px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--tg-color-bg-card);
+  border: 1px solid var(--tg-color-border);
+  border-radius: 9px;
+  transition: border-color .15s, box-shadow .15s;
 }
+.tg-preset-btn:hover {
+  border-color: var(--tg-color-primary);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--tg-color-primary) 16%, transparent);
+}
+.tg-preset-btn b { font-size: 12.5px; font-weight: 600; color: var(--tg-color-text); }
+.tg-preset-btn span { font-size: 11.5px; line-height: 1.45; color: var(--tg-color-text-secondary); }

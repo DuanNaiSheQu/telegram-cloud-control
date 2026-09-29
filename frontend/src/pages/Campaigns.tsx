@@ -7,7 +7,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
-  Alert,
   Button,
   Card,
   Form,
@@ -475,7 +474,11 @@ interface ActionFormProps {
 function RhythmPresets() {
   const form = Form.useFormInstance();
   return (
-    <div className="tg-preset-row">
+    <div
+      className="tg-preset-row"
+      /* 这排预设是横向卡片组，必须独占整行；靠 CSS 选择器匹配容易失手，直接写死更稳 */
+      style={{ gridColumn: '1 / -1' }}
+    >
       <span className="tg-preset-label">一键套用节奏：</span>
       {RHYTHM_PRESETS.map((preset) => (
         <button
