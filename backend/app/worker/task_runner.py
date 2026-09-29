@@ -48,6 +48,7 @@ from app.models import (
     TgAccount,
 )
 from app.services.inbound import preview_of, publish_message, upsert_dialog
+from app.services.account_label import account_label
 from app.services.throttle import note_flood
 from app.services.username import USERNAME_RULE_TEXT, normalize_username, validate_username
 from app.worker import login as login_flow
@@ -934,19 +935,31 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
         changed: list[str] = []
         try:
             profile: dict[str, Any] = {}
+            clipped: list[str] = []
+
+            def _clip(value: Any, limit: int, field: str) -> str:
+                """Telegram 对各字段有硬性长度上限，超一个字都会直接抛错、让整批失败。
+                这里按上限截断并记下来，比整批报废强。"""
+                text = str(value).strip()
+                if len(text) > limit:
+                    clipped.append(f"{field}: {len(text)}→{limit} 字符")
+                    return text[:limit]
+                return text
+
             if "first_name" in payload:
-                profile["first_name"] = str(payload["first_name"])
+                profile["first_name"] = _clip(payload["first_name"], 64, "名字")
             if "last_name" in payload:
-                profile["last_name"] = str(payload["last_name"])
+                profile["last_name"] = _clip(payload["last_name"], 64, "姓氏")
             bio = payload.get("bio") or payload.get("about")
             if bio:
-                profile["about"] = str(bio)
+                # 简介上限 70 字符（AboutTooLongError 就是踩了这个）
+                profile["about"] = _clip(bio, 70, "简介")
             if profile:
                 await client(functions.account.UpdateProfileRequest(**profile))
                 changed.extend(sorted(profile))
             if payload.get("username"):
                 # 兜底清洗：历史任务里可能存着 `@name` 或 t.me 链接，直接发会被 Telegram 拒绝
-                username = normalize_username(str(payload["username"]))
+                username = _clip(normalize_username(str(payload["username"])), 32, "用户名")
                 try:
                     validate_username(username or "")
                 except ValueError as exc:
@@ -1000,7 +1013,12 @@ class TaskRunner(CampaignTasksMixin, GroupIntelMixin, OfficialTasksMixin):
             target_id=str(account.id),
             detail={"updated": changed},
         )
-        return {"updated": changed, "display_name": account.display_name, "username": account.username}
+        result = {"updated": changed, "display_name": account.display_name, "username": account.username}
+        if clipped:
+            # 明确告诉用户哪些字段被截断了 —— 静默截断会让人以为改了完整内容
+            result["clipped"] = clipped
+            result["note"] = "有字段超出 Telegram 上限，已按上限截断：" + "；".join(clipped)
+        return result
 
     async def _avatar_photo_id(self, client: Any) -> Optional[int]:
         """读当前头像的 photo_id。

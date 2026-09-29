@@ -55,7 +55,7 @@ const QUICK_LINKS: { path: string; label: string; desc: string; icon: ReactNode;
   { path: '/detection', label: '账号检测', desc: '连得上 / 要验证码 / 失效', icon: <SafetyCertificateOutlined />, tone: 'success' },
   { path: '/network', label: '网络', desc: '代理与出站地址', icon: <GlobalOutlined />, tone: 'info' },
   { path: '/tasks', label: '任务中心', desc: '队列进度与失败重试', icon: <ScheduleOutlined />, tone: 'warning' },
-  { path: '/campaigns', label: '营销中心', desc: '批量私信 / 群发 / 加退群', icon: <SendOutlined />, tone: 'danger' },
+  { path: '/campaigns', label: '触达中心', desc: '批量私信 / 群发 / 加退群', icon: <SendOutlined />, tone: 'danger' },
   { path: '/dialogs', label: '会话', desc: '私信与群聊', icon: <MessageOutlined />, tone: 'primary' },
 ];
 

@@ -88,6 +88,13 @@ from app.schemas import (
 
 logger = logging.getLogger(__name__)
 
+# 1x1 透明 PNG：账号还没缓存头像时的占位图
+_PLACEHOLDER_AVATAR = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00"
+    b"\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 #: 一次「全部检测」最多排队多少个号，防止误点把任务表灌爆
@@ -825,6 +832,13 @@ async def account_avatar(
     if not base.is_absolute():
         base = pathlib.Path.cwd() / base
     path = base / "avatars" / f"{account_id}.jpg"
+    # 没缓存过头像时返回一张 1x1 透明图（HTTP 200），而不是 404——
+    # 列表里每个号都请求一次，404 会在控制台刷满错误、也干扰排查真问题。
+    if not path.exists():
+        from fastapi import Response
+
+        return Response(content=_PLACEHOLDER_AVATAR, media_type="image/png",
+                        headers={"Cache-Control": "no-store"})
     if not path.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="该号还没有头像缓存")
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "max-age=600"})
@@ -1084,12 +1098,13 @@ async def _check_one(
     account_status = enum_value(account.status)
     reachable = account_status == AccountStatus.healthy.value and bool(holder)
     if reachable:
-        message = f"租约有效（Worker {holder['worker_id']}），已排队重新检测一次"
+        # 提示只讲用户关心的结论：Worker 标识（主机名-PID）是内部细节，别往界面上抖
+        message = "在线，已排队重新检测"
     elif account_status == AccountStatus.healthy.value:
-        message = "状态正常但没有有效租约：暂没有 Worker 接管这个号"
+        message = "状态正常但没有 Worker 接管，任务会排队等待"
     else:
         label = ACCOUNT_STATUS_LABELS.get(account_status, account_status)
-        message = f"当前状态「{label}」，已排队检测；结果会写回该账号"
+        message = f"当前状态「{label}」，已排队检测"
 
     return CheckResultOut(
         account_id=account.id,

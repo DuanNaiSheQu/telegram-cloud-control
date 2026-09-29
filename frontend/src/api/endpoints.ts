@@ -407,7 +407,7 @@ export const groupIntelApi = {
   membersCsvUrl: (profileId: UUID) => `/api/group-intel/members.csv?profile_id=${profileId}`,
 };
 
-// ---------------------------------------------------------------- 营销中心（批量运营）
+// ---------------------------------------------------------------- 触达中心（批量运营）
 
 export const campaignApi = {
   bulkPm: (payload: BulkPmRequest) => api.post<BulkResultOut>('/api/campaigns/bulk-pm', payload),

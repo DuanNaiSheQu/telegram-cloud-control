@@ -1,5 +1,5 @@
 /**
- * 营销中心：素材库 + 批量私信 / 群发 / 素材群发 / 加群 / 退群 / 强拉 / 批量改资料 / 吵群 / 拟人发言 + 批次进度。
+ * 触达中心：素材库 + 批量私信 / 群发 / 素材群发 / 加群 / 退群 / 强拉 / 批量改资料 / 吵群 / 拟人发言 + 批次进度。
  *
  * 每个动作都是「账号范围 + 动作参数」表单，提交后后端按「一 号一任务」入队，
  * 结果弹窗复用 BulkResultModal；执行进度看「批次进度」或任务中心。
@@ -78,7 +78,7 @@ const KIND_COLORS: Record<MaterialKind, string> = {
 
 /** 账号范围选择器：all / group:<id>；limit 默认 200
  *
- * 注意：提交时后端只保留「能承接营销动作」的号 —— 冻结 / 失效 / 停用的号会被自动滤掉
+ * 注意：提交时后端只保留「能承接触达动作」的号 —— 冻结 / 失效 / 停用的号会被自动滤掉
  *（它们写操作必被 Telegram 拒绝），所以勾了 10 个可能只排出 9 条任务。
  */
 function ScopeFields({ value, onChange }: { value: ScopeState; onChange: (next: ScopeState) => void }) {
@@ -1229,7 +1229,7 @@ export default function Campaigns() {
   return (
     <PageContainer
       title={active.label}
-      description="批量运营：提交后按「一 号一任务」错峰入队，由 Worker 执行；进度与取消在「批次进度」页。左侧「营销中心」子菜单可切换功能。"
+      description="批量运营：提交后按「一 号一任务」错峰入队，由 Worker 执行；进度与取消在「批次进度」页。左侧「触达中心」子菜单可切换功能。"
       actions={
         <Select
           size="small"
@@ -1237,7 +1237,7 @@ export default function Campaigns() {
           value={active.key}
           onChange={(key) => navigate(`/campaigns/${key}`)}
           options={sections.map((item) => ({ value: item.key, label: item.label }))}
-          aria-label="切换营销中心功能"
+          aria-label="切换触达中心功能"
         />
       }
     >

@@ -2439,7 +2439,7 @@ body .ant-spin-container::after {
 
 /* ============================================================================
    子菜单式导航（2026-09-28 迭代）
-   分组标题可折叠、含子项的菜单可展开（营销中心 → 素材库 / 批量私信 / … / 批次进度）。
+   分组标题可折叠、含子项的菜单可展开（触达中心 → 素材库 / 批量私信 / … / 批次进度）。
    复用 .app-nav-item 的既有交互语言，只补层级与折叠相关的部分。
    ============================================================================ */
 .app-nav-group-title {
@@ -2915,7 +2915,7 @@ body .ant-spin-container::after {
 }
 
 /* ---- 表单排版：分组标题 + 自适应网格 ----
-   放在全局样式里，营销中心的各功能页都能直接用，不必各自引入一份 CSS */
+   放在全局样式里，触达中心的各功能页都能直接用，不必各自引入一份 CSS */
 .tg-form-group-title {
   margin: var(--tg-space-lg) 0 var(--tg-space-md);
   padding: 10px 14px;
@@ -2928,7 +2928,7 @@ body .ant-spin-container::after {
   letter-spacing: 0.2px;
 }
 /* 表单区收敛宽度：宽屏下不要让输入框拉到 2000px，那种"散"的观感比挤更难用 */
-/* 营销动作表单：铺满宽度，字段用自适应网格排两/三列，别把表单挤在左半边。
+/* 触达动作表单：铺满宽度，字段用自适应网格排两/三列，别把表单挤在左半边。
    （不用整表单 grid：分组标题和它的字段会被拆到不同列，读起来是断的。） */
 .tg-action-form {
   max-width: none;
@@ -3009,7 +3009,7 @@ body .ant-spin-container::after {
 }
 
 /* ============================================================================
-   营销页面排版 v3：12 列栅格对齐 + 配色分区
+   触达页面排版 v3：12 列栅格对齐 + 配色分区
    上一版用 flex 自由伸缩，导致每行字段宽度参差（691 / 1122 / 260），
    起始边线对不齐，看起来乱。这一版改成固定 12 列栅格：谁占几列是明确的，
    所有行的竖向边线自然对齐；同时给页头 / 分组 / 字段 / 提交栏分配不同色阶，
@@ -3088,7 +3088,9 @@ body .ant-spin-container::after {
   border-radius: 10px;
 }
 /* 多行文本域：半行宽，通常两个并排 */
-.tg-form-body > .ant-form-item:has(textarea) { grid-column: span 6; }
+/* 多行文本域：占 4 列 —— 三个正好一行。
+   之前给 6 列，导致「名字 / 姓氏 / 简介」这种三件套被拆成两行（批量改资料页就是这么乱的）。 */
+.tg-form-body > .ant-form-item:has(textarea) { grid-column: span 4; }
 /* 开关 / 复选框：窄块 */
 .tg-form-body > .ant-form-item:has(.ant-switch),
 .tg-form-body > .ant-form-item:has(.ant-checkbox) { grid-column: span 2; }
@@ -3097,8 +3099,27 @@ body .ant-spin-container::after {
 .tg-form-body > .ant-space,
 .tg-form-body > .ant-space-item { align-items: flex-start; }
 .tg-form-body > .ant-space { grid-column: 1 / -1; }
-.tg-form-body > .ant-space .ant-form-item { margin-bottom: 0; padding: 10px 12px 12px;
-  background: var(--tg-v-field-bg); border: 1px solid var(--tg-v-field-border); border-radius: 10px; }
+.tg-form-body > .ant-space { align-items: flex-start; }
+/* Space 内的字段必须限宽：textarea 默认会撑满容器，
+   于是同一 Space 里的「名字 / 姓氏」各自换行、各占一整行，旁边全空。 */
+/* 注意层级：Ant Design 的 Space 会插一层 .ant-space-item，flex 项是它而不是 .ant-form-item，
+   限宽必须打在这一层，否则字段仍会被 textarea 撑满、逐个换行。 */
+.tg-form-body > .ant-space .ant-space-item {
+  flex: 0 1 330px;
+  min-width: 240px;
+  max-width: 430px;
+}
+.tg-form-body > .ant-space .ant-form-item {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 10px 12px 12px;
+  background: var(--tg-v-field-bg);
+  border: 1px solid var(--tg-v-field-border);
+  border-radius: 10px;
+}
+.tg-form-body > .ant-space .ant-form-item textarea { max-height: 132px; }
+.tg-form-body > .ant-space .ant-form-item .ant-input,
+.tg-form-body > .ant-space .ant-form-item .ant-select { width: 100%; }
 .tg-form-body > .ant-space .ant-input-number { width: 100%; min-width: 96px; }
 
 /* 整行占位元素：分组标题、分组网格、区块，以及任何「横向排列的按钮组 / 卡片组」。

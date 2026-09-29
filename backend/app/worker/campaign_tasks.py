@@ -1,4 +1,4 @@
-"""批量运营任务执行（营销中心）：8 类任务类型的 handler，以 Mixin 形式挂进 `TaskRunner`。
+"""批量运营任务执行（触达中心）：8 类任务类型的 handler，以 Mixin 形式挂进 `TaskRunner`。
 
 为什么单独成文件：这些 handler 只依赖 `TaskRunner` 上已有的公共件
 （`self.worker` / `self.log` / `self._client` / `self._load_dialog` / `self._resolve_entity`

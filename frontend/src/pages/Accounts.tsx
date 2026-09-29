@@ -128,8 +128,9 @@ export default function Accounts() {
 
   const handleCheck = async (account: AccountOut) => {
     const res = await accountApi.check(account.id);
-    if (res.reachable) toast.success(`${res.phone_masked}：${res.message || '连得上'}`);
-    else toast.error(`${res.phone_masked}：${res.message || res.status_label || '连不上'}`);
+    // 分隔用中点：掩码号码后面直接跟一长串中文太挤
+    if (res.reachable) toast.success(`${res.phone_masked} · ${res.message || '连得上'}`);
+    else toast.error(`${res.phone_masked} · ${res.message || res.status_label || '连不上'}`);
     void accounts.reload();
   };
 

@@ -41,7 +41,7 @@ export interface SidebarProps {
 interface NavOpenState {
   /** 被收起的分组 key */
   closedGroups: string[];
-  /** 被收起的父项 path（营销中心这类） */
+  /** 被收起的父项 path（触达中心这类） */
   closedItems: string[];
 }
 

@@ -4,7 +4,7 @@
  * 结构约定：
  * - `NavGroup` 是一级分组（总览 / 账号 / 消息 / 运营），分组标题可折叠；
  * - `NavItem` 可以是叶子（有 path，点击跳转），也可以带 `children`（点击只展开子菜单）；
- * - 营销中心是唯一的三级菜单：分组「运营」→ 营销中心 → 素材库 / 批量私信 / … / 批次进度，
+ * - 触达中心是唯一的三级菜单：分组「运营」→ 触达中心 → 素材库 / 批量私信 / … / 批次进度，
  *   每个子项是独立路由 `/campaigns/<section>`，页面内不再堆 Tab。
  *
  * 兼容导出：`NAV_ITEMS` 是全部叶子（全局搜索、全局搜索的结果列表用它）。
@@ -58,7 +58,7 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-/** 营销中心的 11 个子页面（三级菜单，独立路由） */
+/** 触达中心的 11 个子页面（三级菜单，独立路由） */
 export const CAMPAIGN_CHILDREN: NavItem[] = [
   { path: '/campaigns/materials', label: '素材库', icon: <FolderOutlined />, description: '文字与媒体素材，批量动作共用' },
   { path: '/campaigns/bulk-pm', label: '批量私信', icon: <SendOutlined />, description: '一批号各向目标逐个发消息' },
@@ -150,7 +150,7 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         path: '/campaigns',
-        label: '营销中心',
+        label: '触达中心',
         icon: <RocketOutlined />,
         description: '批量私信、群发、素材、加退群、强拉、改资料、吵群、拟人发言',
         children: CAMPAIGN_CHILDREN,

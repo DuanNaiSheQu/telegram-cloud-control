@@ -80,7 +80,7 @@ async def _resolve_accounts(
 
     返回 (账号行, 范围标签, 是否被 limit 截断)。越权 403、不存在 404、没匹配到 400。
 
-    `usable_only=True` 时只返回能承接**营销动作**的号（冻结 / 失效 / 停用会被滤掉）——
+    `usable_only=True` 时只返回能承接**触达动作**的号（冻结 / 失效 / 停用会被滤掉）——
     这些号写操作必被 Telegram 拒绝，派任务给它们只是白占队列。
     """
     ids = await visible_account_ids(session, user)
@@ -107,7 +107,7 @@ async def _resolve_accounts(
             if not rows:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="选中的账号当前都不能用于营销动作（冻结 / 失效 / 停用）。",
+                    detail="选中的账号当前都不能用于触达动作（冻结 / 失效 / 停用）。",
                 )
         return rows, f"selected({len(rows)})", False
 
@@ -147,12 +147,12 @@ async def _resolve_accounts(
     truncated = len(rows) > payload.limit
     rows = rows[: payload.limit]
     if usable_only:
-        # 冻结 / 失效 / 停用的号写操作必被拒，别派营销任务给它们（省队列、少挨限流）
+        # 冻结 / 失效 / 停用的号写操作必被拒，别派触达任务给它们（省队列、少挨限流）
         rows, _blocked = split_marketing_usable(rows)
         if not rows:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="选中的账号当前都不能用于营销动作（冻结 / 失效 / 停用）。"
+                detail="选中的账号当前都不能用于触达动作（冻结 / 失效 / 停用）。"
                 "冻结的号可以先跑「申诉解封」，或在账号管理里换一台可用的号。",
             )
     return rows, scope, truncated
@@ -874,7 +874,7 @@ async def bulk_delete(
     items: List[BulkAccountResult] = []
     deleted = 0
     for account in accounts:
-        label = account_label(account) or account.phone_masked or str(account.id)[:8]
+        label = display_label(account) or account.phone_masked or str(account.id)[:8]
         try:
             await leases.release_account(session, account_id=account.id)
         except Exception:  # noqa: BLE001 - 清租约失败不阻塞删除（外键会级联）
